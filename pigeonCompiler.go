@@ -861,7 +861,7 @@ func compile(statements []Statement) (string, error) {
         declarations += "var _" + g + " interface{}\n"
     }
 
-    header := `package main
+    header := `package stdlib
 
 import _pigeon "github.com/BrianWill/pigeon/stdlib/"
 
