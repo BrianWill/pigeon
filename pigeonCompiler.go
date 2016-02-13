@@ -103,6 +103,7 @@ var operators = []string{
 	"print",
     "list",
     "dict",
+    "len",
 }
 
 type Token struct {
@@ -861,9 +862,9 @@ func compile(statements []Statement) (string, error) {
         declarations += "var _" + g + " interface{}\n"
     }
 
-    header := `package stdlib
+    header := `package main
 
-import _pigeon "github.com/BrianWill/pigeon/stdlib/"
+import _pigeon "github.com/BrianWill/pigeon/stdlib"
 
 `
     body = "func main() {\n" + body + "}\n"
@@ -875,7 +876,7 @@ import _pigeon "github.com/BrianWill/pigeon/stdlib/"
 func compileFunc(fn FunctionDefinition, globals Scope) (string, error) {
     locals := make(Scope)
 
-    code := "func " + fn.Name.Content + "("
+    code := "func _" + fn.Name.Content + "("
     for _, param := range fn.Parameters {
         code += "_" + param.Content + " interface{}, "
     }
@@ -907,7 +908,7 @@ func compileIfStatement(s IfStatement, this, enclosing Scope) (string, error) {
     if err != nil {
         return "", err
     }
-    code := "if " + c
+    code := "if " + c + ".(bool)"
     c, err = compileBody(s.Body, this, enclosing)
     if err != nil {
         return "", nil
@@ -918,7 +919,7 @@ func compileIfStatement(s IfStatement, this, enclosing Scope) (string, error) {
         if err != nil {
             return "", err
         }
-        code += " else if " + c + " {\n"
+        code += " else if " + c + ".(bool) {\n"
         c, err = compileBody(elif.Body, this, enclosing)
         if err != nil {
             return "", err
@@ -941,7 +942,7 @@ func compileWhileStatement(s WhileStatement, this, enclosing Scope) (string, err
     if err != nil {
         return "", err
     }
-    code := "for " + c + " {\n"
+    code := "for " + c + ".(bool) {\n"
     c, err = compileBody(s.Body, this, enclosing)
     if err != nil {
         return "", err

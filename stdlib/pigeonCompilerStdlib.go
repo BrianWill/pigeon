@@ -250,11 +250,12 @@ func Get(args ...interface{}) interface{} {
 		}
 		return (*v)[int(f)]
 	case map[interface{}]interface{}:
-		str, ok := args[1].(string)
-		if !ok {
-			panic("Second operand to 'get' on a dict should be a string.")
-		}
-		return v[str]
+		switch key := args[1].(type) {
+		case float64, string:
+			return v[key]
+		default:
+			panic("Second operand to 'get' on a dict should be a string or number.")
+		}		
 	default:
 		panic("First operand to 'get' must be a dict or a list.")
 	}
@@ -273,11 +274,12 @@ func Set(args ...interface{}) interface{} {
 		}
 		(*v)[int(f)] = args[2]
 	case map[interface{}]interface{}:
-		str, ok := args[1].(string)
-		if !ok {
-			panic("Second operand to 'set' on a dict should be a string.")
+		switch key := args[1].(type) {
+		case float64, string:
+			v[key] = args[2]
+		default:
+			panic("Second operand to 'set' on a dict should be a string or number.")
 		}
-		v[str] = args[2]
 	default:
 		panic("First operand to 'set' must be a dict or a list.")
 	}
@@ -340,9 +342,6 @@ func Print(args ...interface{}) interface{} {
 }
 
 func List(args ...interface{}) interface{} {
-	if len(args) == 0 {
-		panic("'List' operation needs at least one operand.")
-	}
 	list := make([]interface{}, len(args))
 	for i, a := range args {
 		list[i] = a
@@ -363,4 +362,19 @@ func Dict(args ...interface{}) interface{} {
 		i += 2
 	}
 	return dict
+}
+
+func Len(args ...interface{}) interface{} {
+	if len(args) != 1 {
+		panic("'len' operator must have just one operand.")
+	}
+	switch a := args[0].(type) {
+	case *[]interface{}:
+		return len(*a)
+	case map[interface{}]interface{}:
+		return len(a)
+	default:
+		panic("'len' operator operand must be a dict or list.")
+	}
+	return nil
 }
