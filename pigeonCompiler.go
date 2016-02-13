@@ -42,6 +42,8 @@ import "io/ioutil"
 import "errors"
 import "strconv"
 import "unicode"
+import "os"
+import "os/exec"
 
 // TODO use bytes.Buffer for more efficent string building
 //import "bytes"
@@ -802,9 +804,6 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
     return statements, i, nil
 }
 
-const inputFilename = "example.pigeon"
-
-
 /* All identifiers get prefixed with _ to avoid collisions with Go reserved words and predefined identifiers */
 func compile(statements []Statement) (string, error) {
     globals := make(Scope)
@@ -1086,6 +1085,12 @@ func compileExpression(e Expression) (string, error) {
 }
 
 func main() {
+    if len(os.Args) != 2 {
+        fmt.Println("Must specify a .pigeon file.")
+        return
+    }
+    inputFilename := os.Args[1]
+
 	data, err := ioutil.ReadFile(inputFilename)
     if err != nil {
     	fmt.Println(err)
@@ -1106,5 +1111,27 @@ func main() {
         fmt.Println(err)
         return
     }
-    fmt.Println(code)
+
+    outputFilename := inputFilename + ".go"
+    err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    err = exec.Command("go", "fmt", outputFilename).Run()
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    cmd := exec.Command("go", "run", outputFilename)
+    cmd.Stdin = os.Stdin
+    cmd.Stdout = os.Stdout
+    cmd.Stderr = os.Stderr
+    err = cmd.Run()
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
 }
