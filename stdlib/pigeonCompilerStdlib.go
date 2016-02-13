@@ -364,8 +364,3 @@ func Dict(args ...interface{}) interface{} {
 	}
 	return dict
 }
-
-
-func main() {
-	fmt.Println("testing Pigeon stdlib")
-}
