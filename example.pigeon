@@ -1,0 +1,92 @@
+
+function eric
+    (print "hello")
+
+function ryan bat goat
+    as ted2 4
+    (print (sub goat ted2))
+
+(eric)
+
+(ryan 4 -9)
+(ryan 3 5)
+
+
+as ted (dict 5 2 "yo" -1)
+(print (len ted))
+(print (get ted "yo"))
+(set ted "yo" 8)
+(print (get ted "yo"))
+(set ted 21 false)
+(print (get ted 21))   # test comment
+
+
+
+(print "\n\"\tyup!\"\n")
+
+
+
+as x 1
+while (lte x 15)
+    as by3 (eq (mod x 3) 0)
+    as by5 (eq (mod x 5) 0)
+    if (and by3 by5)
+        (print "fizzbuzz")
+    elif by3
+        (print "fizz")
+    elif by5
+        (print "buzz")
+    else
+        (print x)
+    as x (add x 1)
+
+
+
+
+as leo (list)
+as bruce leo
+(print (len leo))
+(append bruce "salut")
+(print (len leo))
+
+as ed (list 88 8)
+as thom (list 88 8)
+(print (id ed thom))
+as thom ed
+(print (id ed thom))
+
+as x 1
+as y x
+as z x
+(print (id x z))
+
+
+as x -7
+as y -7
+if (eq x 3)
+    (print "hi")
+elif (eq x 5)
+    (print "bye")
+elif (eq x -7 y)
+    (print "moo")
+elif (eq x 14)
+    (print "woof")
+else
+    (print "grunt")
+
+as x 8
+if (eq (mod x 2) 0)
+    (print "even")
+else
+    (print "odd")
+
+(print (and true false))
+(print (or true false true))
+(print (or false false))
+
+
+as z 6
+while (gt z 0)
+    (print z)
+    as z (sub z 1)
+# part 6 of 13
