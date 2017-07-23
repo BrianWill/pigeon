@@ -36,13 +36,16 @@ The last line of the input file will not necessarily end with a newline, but add
 
 package main
 
-import "fmt"
-import "io/ioutil"
-import "errors"
-import "strconv"
-import "unicode"
-import "os"
-import "os/exec"
+import (
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"unicode"
+)
 
 // TODO use bytes.Buffer for more efficent string building
 //import "bytes"
@@ -66,19 +69,32 @@ const (
 	NumberLiteral
 	StringLiteral
 	BooleanLiteral
-	NullLiteral
+	NilLiteral
+	OpenSquare
+	CloseSquare
+	Dot
+	Space
 )
 
 const indentationSpaces = 4
+const outputDir = "output"
 
 var reservedWords = []string{
-	"function",
+	"func",
+	"global",
 	"if",
 	"while",
 	"else",
-	"elif",
+	"elseif",
 	"return",
 	"as",
+	"locals",
+	"asinc",
+	"asdec",
+	"asadd",
+	"assub",
+	"asmul",
+	"asdiv",
 }
 
 var operators = []string{
@@ -101,8 +117,10 @@ var operators = []string{
 	"or",
 	"and",
 	"print",
+	"prompt",
+	"concat",
 	"list",
-	"dict",
+	"map",
 	"len",
 }
 
@@ -121,11 +139,18 @@ type Expression interface {
 	Expression()
 }
 
+type Definition interface {
+	Definition()
+}
+
 func (t Token) Expression()        {}
 func (t FunctionCall) Expression() {}
 func (t Operation) Expression()    {}
 
-func (t FunctionDefinition) Statement()  {}
+func (t FunctionDefinition) Definition() {}
+func (t GlobalDefinition) Definition()   {}
+
+func (t LocalsStatement) Statement()     {}
 func (t IfStatement) Statement()         {}
 func (t WhileStatement) Statement()      {}
 func (t AssignmentStatement) Statement() {}
@@ -140,9 +165,15 @@ type FunctionDefinition struct {
 	Body       []Statement
 }
 
+type GlobalDefinition struct {
+	Name  Token // identifier
+	Value Expression
+}
+
 type FunctionCall struct {
-	Function  Expression // either an identifier or another function/operator call
-	Arguments []Expression
+	LineNumber int
+	Function   Expression // either an identifier or another function/operator call
+	Arguments  []Expression
 }
 
 type Operation struct {
@@ -154,11 +185,11 @@ type IfStatement struct {
 	FirstToken Token
 	Condition  Expression
 	Body       []Statement
-	Elifs      []ElifClause
+	Elifs      []ElseifClause
 	Else       ElseClause
 }
 
-type ElifClause struct {
+type ElseifClause struct {
 	FirstToken Token
 	Condition  Expression
 	Body       []Statement
@@ -167,6 +198,10 @@ type ElifClause struct {
 type ElseClause struct {
 	FirstToken Token
 	Body       []Statement
+}
+
+type LocalsStatement struct {
+	Names []Token
 }
 
 type WhileStatement struct {
@@ -181,7 +216,7 @@ type ReturnStatement struct {
 }
 
 type AssignmentStatement struct {
-	Target Token // identifier
+	Target Expression
 	Value  Expression
 }
 
@@ -190,14 +225,14 @@ func isAlpha(r rune) bool {
 	return (r >= 65 && r <= 90) || (r >= 97 && r <= 122)
 }
 
-// returns true if ruen is a numeral
+// returns true if rune is a numeral
 func isNumeral(r rune) bool {
 	return (r >= 48 && r <= 57)
 }
 
 // assumes the string ends with a newline (because that makes it a bit easier to lex)
 func lex(text string) ([]Token, error) {
-	tokens := make([]Token, 0)
+	var tokens []Token
 
 	line := 1
 	column := 1
@@ -210,15 +245,21 @@ func lex(text string) ([]Token, error) {
 		}
 		if r == '\n' {
 			tokens = append(tokens, Token{Newline, "\n", line, column})
-			line += 1
+			line++
 			column = 1
 			i++
-		} else if r == '#' { // start of a comment
+		} else if r == '/' { // start of a comment
+			if runes[i+1] != '/' {
+				return nil, errors.New("Expected second / on line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+			}
 			for runes[i] != '\n' {
 				i++
 			}
 			i++
-			line += 1
+			if len(tokens) > 1 && tokens[len(tokens)-1].Type != Newline {
+				tokens = append(tokens, Token{Newline, "\n", line, column})
+			}
+			line++
 			column = 1
 		} else if r == '(' {
 			tokens = append(tokens, Token{OpenParen, "(", line, column})
@@ -228,22 +269,33 @@ func lex(text string) ([]Token, error) {
 			tokens = append(tokens, Token{CloseParen, ")", line, column})
 			column++
 			i++
+		} else if r == '[' {
+			tokens = append(tokens, Token{OpenSquare, "[", line, column})
+			column++
+			i++
+		} else if r == ']' {
+			tokens = append(tokens, Token{CloseSquare, "]", line, column})
+			column++
+			i++
+		} else if r == '.' {
+			tokens = append(tokens, Token{Dot, ".", line, column})
+			column++
+			i++
 		} else if r == ' ' {
+			tokenType := Space
 			if i > 0 && runes[i-1] == '\n' {
-				firstIdx := i
-				for i < len(runes) {
-					r = runes[i]
-					if r != ' ' {
-						break
-					}
-					i++
-					column++
-				}
-				tokens = append(tokens, Token{Indentation, string(runes[firstIdx:i]), line, column})
-			} else {
-				column++
-				i++
+				tokenType = Indentation
 			}
+			firstIdx := i
+			for i < len(runes) {
+				r = runes[i]
+				if r != ' ' {
+					break
+				}
+				i++
+				column++
+			}
+			tokens = append(tokens, Token{tokenType, string(runes[firstIdx:i]), line, column})
 		} else if r == '\t' {
 			return nil, errors.New("File improperly contains a tab character at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
 		} else if r == '"' { // start of a string
@@ -273,7 +325,7 @@ func lex(text string) ([]Token, error) {
 				current := runes[endIdx]
 				// loop will never run past end of runes because \n appended to end of file
 				// A number literal should always end with space, newline, or )
-				if current == ' ' || current == '\n' || current == ')' {
+				if strings.Contains(" \n)]", string(current)) {
 					break
 				} else if current == '.' {
 					if decimalPointIdx != -1 {
@@ -299,10 +351,10 @@ func lex(text string) ([]Token, error) {
 				current := runes[endIdx]
 				// loop will never run past end of runes because \n appended to end of file
 				// A word should always end with space, newline, or )
-				if current == ' ' || current == '\n' || current == ')' {
+				if strings.Contains(" \n).[", string(current)) {
 					break
 				} else if !(isAlpha(current) || current == '_' || isNumeral(current)) {
-					return nil, errors.New("Word not properly formed at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+					return nil, errors.New("Word improperly formed at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
 				}
 				endIdx++
 			}
@@ -328,8 +380,8 @@ func lex(text string) ([]Token, error) {
 			if content == "true" || content == "false" {
 				tokenType = BooleanLiteral
 			}
-			if content == "null" {
-				tokenType = NullLiteral
+			if content == "nil" {
+				tokenType = NilLiteral
 			}
 
 			tokens = append(tokens, Token{tokenType, content, line, column})
@@ -344,31 +396,27 @@ func lex(text string) ([]Token, error) {
 
 // parse the top-level statements
 // (for this purpose, a top-level function definition is considered a statement)
-func parse(tokens []Token) ([]Statement, error) {
-	statements := make([]Statement, 0)
+func parse(tokens []Token) ([]Definition, error) {
+	var definitions []Definition
 	for i := 0; i < len(tokens); {
 		t := tokens[i]
 		switch t.Type {
 		case ReservedWord:
-			var statement Statement
+			var definition Definition
 			var numTokens int
 			var err error
 			switch t.Content {
-			case "function":
-				statement, numTokens, err = parseFunction(tokens[i:])
-			case "as":
-				statement, numTokens, err = parseAssignment(tokens[i:])
-			case "if":
-				statement, numTokens, err = parseIf(tokens[i:], 0)
-			case "while":
-				statement, numTokens, err = parseWhile(tokens[i:], 0)
+			case "func":
+				definition, numTokens, err = parseFunction(tokens[i:])
+			case "global":
+				definition, numTokens, err = parseGlobal(tokens[i:])
 			default:
 				return nil, errors.New("Improper reserved word at top level of code: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
 			}
 			if err != nil {
 				return nil, err
 			}
-			statements = append(statements, statement)
+			definitions = append(definitions, definition)
 			i += numTokens
 		case Newline:
 			// a blank line
@@ -380,37 +428,163 @@ func parse(tokens []Token) ([]Statement, error) {
 			if tokens[i+1].Type != Newline {
 				return nil, errors.New("Improper indentation at top level of code: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
 			}
-		case OpenParen:
-			expression, numTokens, err := parseOpenParen(tokens[i:])
-			if err != nil {
-				return nil, err
-			}
-			i += numTokens
-			statements = append(statements, expression.(Statement))
 		default:
 			return nil, errors.New("Improper token at top level of code: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
 		}
 	}
-	return statements, nil
+	return definitions, nil
+}
+
+func parseGlobal(tokens []Token) (GlobalDefinition, int, error) {
+	if len(tokens) < 5 {
+		return GlobalDefinition{}, 0, errors.New("Improper global statement on line " + strconv.Itoa(tokens[0].LineNumber))
+	}
+	if tokens[1].Type != Space {
+		return GlobalDefinition{}, 0, errors.New("Expected space on line " + strconv.Itoa(tokens[0].LineNumber))
+	}
+	target := tokens[2]
+	if target.Type != IdentifierWord {
+		return GlobalDefinition{}, 0, errors.New("Improper name for a global on line " + strconv.Itoa(tokens[0].LineNumber))
+	}
+	if tokens[3].Type != Space {
+		return GlobalDefinition{}, 0, errors.New("Expected space on line " + strconv.Itoa(tokens[0].LineNumber))
+	}
+	var value Expression
+	var numValueTokens int
+	t := tokens[4]
+	switch t.Type {
+	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NilLiteral:
+		value = t
+		numValueTokens = 1
+	case OpenParen:
+		var err error
+		value, numValueTokens, err = parseOpenParen(tokens[4:])
+		if err != nil {
+			return GlobalDefinition{}, 0, err
+		}
+	default:
+		return GlobalDefinition{}, 0, errors.New("Improper value for global on line " + strconv.Itoa(tokens[0].LineNumber))
+	}
+
+	if tokens[4+numValueTokens].Type != Newline {
+		return GlobalDefinition{}, 0, errors.New("Global not terminated with newline on line " + strconv.Itoa(tokens[0].LineNumber))
+	}
+	return GlobalDefinition{target, value}, 5 + numValueTokens, nil
+}
+
+func parseExpression(tokens []Token, line int) (Expression, int, error) {
+	lineStr := strconv.Itoa(line)
+	if len(tokens) < 1 {
+		return nil, 0, errors.New("Missing expression on line " + lineStr)
+	}
+	idx := 0
+	token := tokens[idx]
+	var expr Expression
+	switch token.Type {
+	case StringLiteral, NumberLiteral, BooleanLiteral, NilLiteral:
+		return token, 1, nil
+	case IdentifierWord:
+		expr = token
+		idx++
+	case OpenParen:
+		var err error
+		expr, idx, err = parseOpenParen(tokens)
+		if err != nil {
+			return nil, 0, err
+		}
+	default:
+		return nil, 0, errors.New("Improper expression on line " + lineStr +
+			": " + fmt.Sprintf("%#v", token))
+	}
+
+Loop:
+	for len(tokens) > idx {
+		var err error
+		var n int
+		switch tokens[idx].Type {
+		case Dot:
+			expr, n, err = parseDot(tokens[idx:], token, line)
+		case OpenSquare:
+			expr, n, err = parseOpenSquare(tokens[idx:], token, line)
+		default:
+			break Loop
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+		idx += n
+	}
+	return expr, idx, nil
+}
+
+// assumes first token is dot
+func parseDot(tokens []Token, expr Expression, line int) (Expression, int, error) {
+	if len(tokens) < 2 {
+		return nil, 0, errors.New("Improperly formed dot operation on line " + strconv.Itoa(line))
+	}
+	if tokens[1].Type != IdentifierWord {
+		return nil, 0, errors.New("Identifier expected after dot line " + strconv.Itoa(line))
+	}
+	strLiteral := Token{StringLiteral, "\"" + tokens[1].Content + "\"", line, -1}
+	getOp := Operation{
+		Token{OperatorWord, "get", line, -1},
+		[]Expression{expr, strLiteral},
+	}
+	return getOp, 2, nil
+}
+
+// assumes first token is open square
+func parseOpenSquare(tokens []Token, expr Expression, line int) (Expression, int, error) {
+	if len(tokens) < 3 {
+		return nil, 0, errors.New("Improperly formed square brackets on line " + strconv.Itoa(line))
+	}
+	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	indexExpr, nTokens, err := parseExpression(tokens[idx:], line)
+	if err != nil {
+		return nil, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if len(tokens) < idx || tokens[idx].Type != CloseSquare {
+		return nil, 0, errors.New("Improperly formed square brackets on line " + strconv.Itoa(line))
+	}
+	idx++ // account for ']'
+	getOp := Operation{
+		Token{OperatorWord, "get", line, -1},
+		[]Expression{expr, indexExpr},
+	}
+	return getOp, idx, nil
 }
 
 // assumes first token is open paren.
 // Returns a FunctionCall or Operation and the number of tokens that make up the Expression.
 func parseOpenParen(tokens []Token) (Expression, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
 	if len(tokens) < 3 {
-		return nil, 0, errors.New("Improper function call or operation on line " + strconv.Itoa(tokens[0].LineNumber))
+		return nil, 0, errors.New("Improper function call or operation on line " + line)
 	}
 
 	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
+
 	functionCall := true
 	var leadingCall Expression
+	var op Token
 	t := tokens[idx]
-
 	switch t.Type {
 	case OperatorWord:
+		op = t
 		functionCall = false
 		idx++
 	case IdentifierWord:
+		op = t
 		idx++
 	case OpenParen:
 		var numTokens int
@@ -421,60 +595,329 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 		}
 		idx += numTokens
 	default:
-		return nil, 0, errors.New("Improper function call or operation on line " + strconv.Itoa(tokens[0].LineNumber))
+		return nil, 0, errors.New("Improper function call or operation on line " + line)
 	}
 
-	arguments := make([]Expression, 0)
+	var arguments []Expression
 Loop:
 	for true {
 		t := tokens[idx]
 		switch t.Type {
-		case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral:
-			arguments = append(arguments, t)
+		case Space:
 			idx++
-		case OpenParen:
-			expression, numTokens, err := parseOpenParen(tokens[idx:])
-			if err != nil {
-				return nil, 0, err
-			}
-			arguments = append(arguments, expression)
-			idx += numTokens
 		case CloseParen:
 			idx++
 			break Loop
-		default:
-			return nil, 0, errors.New("Improper token in function call or operation on line " + strconv.Itoa(t.LineNumber))
 		}
+		expr, numTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+		if err != nil {
+			return nil, 0, err
+		}
+		arguments = append(arguments, expr)
+		idx += numTokens
 	}
 
+	var expr Expression
 	if functionCall {
 		if leadingCall == nil {
-			return FunctionCall{tokens[1], arguments}, idx, nil
+			expr = FunctionCall{tokens[0].LineNumber, op, arguments}
 		} else {
-			return FunctionCall{leadingCall, arguments}, idx, nil
+			expr = FunctionCall{tokens[0].LineNumber, leadingCall, arguments}
 		}
 	} else {
-		return Operation{tokens[1], arguments}, idx, nil
+		expr = Operation{op, arguments}
 	}
 
+Outer:
+	for len(tokens) > idx {
+		line := tokens[idx].LineNumber
+		var err error
+		var n int
+		switch tokens[idx].Type {
+		case Dot:
+			expr, n, err = parseDot(tokens[idx:], expr, line)
+		case OpenSquare:
+			expr, n, err = parseOpenSquare(tokens[idx:], expr, line)
+			if err != nil {
+				return nil, 0, err
+			}
+			idx += n
+		default:
+			break Outer
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+		idx += n
+	}
+
+	return expr, idx, nil
+}
+
+func debug(args ...interface{}) {
+	fmt.Print("DEBUG: ")
+	fmt.Println(args...)
 }
 
 func parseFunction(tokens []Token) (FunctionDefinition, int, error) {
 	if len(tokens) < 5 {
 		return FunctionDefinition{}, 0, errors.New("Improper function definition on line " + strconv.Itoa(tokens[0].LineNumber))
 	}
-
 	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
 	name := tokens[idx]
 	if name.Type != IdentifierWord {
 		return FunctionDefinition{}, 0, errors.New("Function missing name on line " + strconv.Itoa(name.LineNumber))
 	}
-
 	idx++
-	parameters := make([]Token, 0)
-	for _, token := range tokens[idx:] {
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	var parameters []Token
+	for idx < len(tokens) {
+		token := tokens[idx]
 		if token.Type == IdentifierWord {
 			parameters = append(parameters, token)
+			idx++
+		} else if token.Type == Space {
+			idx++
+		} else {
+			break
+		}
+	}
+	if idx >= len(tokens) || tokens[idx].Type != Newline {
+		return FunctionDefinition{}, 0, errors.New("Improper function definition on line " + strconv.Itoa(tokens[0].LineNumber))
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentationSpaces)
+	if err != nil {
+		return FunctionDefinition{}, 0, err
+	}
+	return FunctionDefinition{tokens[0], name, parameters, body}, idx + numTokens, nil
+}
+
+// 'indentation' = number of spaces before 'if'
+func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	if len(tokens) < 6 {
+		return IfStatement{}, 0, errors.New("Improper if statement on line " + line)
+	}
+	idx := 1
+	if tokens[idx].Type != Space {
+		return IfStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	condition, numConditionTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return IfStatement{}, 0, err
+	}
+	idx += numConditionTokens
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return IfStatement{}, 0, errors.New("If statement condition not followed by newline on line " + line)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return IfStatement{}, 0, err
+	}
+	idx += numTokens
+
+	var elseifClauses []ElseifClause
+	var elseClause ElseClause
+
+	for idx+1 < len(tokens) {
+		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "elseif" {
+			elseifClause, numTokens, err := parseElif(tokens[idx+1:], indentation)
+			if err != nil {
+				return IfStatement{}, 0, err
+			}
+			elseifClauses = append(elseifClauses, elseifClause)
+			idx += numTokens + 1 // +1 for the indentation before this elif
+		} else {
+			break
+		}
+	}
+
+	if idx+1 < len(tokens) {
+		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "else" {
+			var numTokens int
+			var err error
+			elseClause, numTokens, err = parseElse(tokens[idx+1:], indentation)
+			if err != nil {
+				return IfStatement{}, 0, err
+			}
+			idx += numTokens + 1 // +1 for the indentation before this else
+		}
+	}
+	return IfStatement{tokens[0], condition, body, elseifClauses, elseClause}, idx, nil
+}
+
+func parseElif(tokens []Token, indentation int) (ElseifClause, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	if len(tokens) < 5 {
+		return ElseifClause{}, 0, errors.New("Improper elif clause on line " + line)
+	}
+	idx := 1
+	if tokens[idx].Type != Space {
+		return ElseifClause{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	condition, numConditionTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return ElseifClause{}, 0, errors.New("Improper condition in if statement on line " + line)
+	}
+	idx += numConditionTokens
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return ElseifClause{}, 0, errors.New("Elseif clause condition not followed by newline on line " + line)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return ElseifClause{}, 0, err
+	}
+	idx += numTokens
+	return ElseifClause{tokens[0], condition, body}, idx, nil
+}
+
+func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	if len(tokens) < 4 {
+		return ElseClause{}, 0, errors.New("Improper else clause on line " + line)
+	}
+	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return ElseClause{}, 0, errors.New("Elif clause condition not followed by newline on line " + line)
+	}
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return ElseClause{}, 0, err
+	}
+	idx += numTokens
+	return ElseClause{tokens[0], body}, idx, nil
+}
+
+func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	if len(tokens) < 5 {
+		return WhileStatement{}, 0, errors.New("Improper while statement on line " + line)
+	}
+	idx := 1
+	if tokens[idx].Type != Space {
+		return WhileStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	var condition Expression
+	var numConditionTokens int
+	switch tokens[idx].Type {
+	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NilLiteral:
+		condition = tokens[idx]
+		numConditionTokens = 1
+	case OpenParen:
+		var err error
+		condition, numConditionTokens, err = parseOpenParen(tokens[idx:])
+		if err != nil {
+			return WhileStatement{}, 0, err
+		}
+	default:
+		return WhileStatement{}, 0, errors.New("Improper condition in while statement on line " + line)
+	}
+	idx += numConditionTokens
+	if tokens[idx].Type != Newline {
+		return WhileStatement{}, 0, errors.New("While statement condition not followed by newline on line " + line)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return WhileStatement{}, 0, err
+	}
+	idx += numTokens
+	return WhileStatement{tokens[0], condition, body}, idx, nil
+}
+
+func parseReturn(tokens []Token) (ReturnStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	if len(tokens) < 3 {
+		return ReturnStatement{}, 0, errors.New("Improper return statement on line " + line)
+	}
+	idx := 1
+	if tokens[idx].Type != Space {
+		return ReturnStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return ReturnStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Newline {
+		return ReturnStatement{}, 0, errors.New("Return statement not terminated with newline on line " + line)
+	}
+
+	return ReturnStatement{tokens[0], value}, idx, nil
+}
+
+// assume first token is reserved word "as"
+// returns number of tokens (including the newline at the end)
+func parseAssignment(tokens []Token) (AssignmentStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	if len(tokens) < 4 {
+		return AssignmentStatement{}, 0, errors.New("Improper assignment statement on line " + line)
+	}
+	idx := 1
+	if tokens[idx].Type != Space {
+		return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	target, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return AssignmentStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Space {
+		return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return AssignmentStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return AssignmentStatement{}, 0, errors.New("Assignment not terminated with newline on line " + line)
+	}
+	idx++
+	return AssignmentStatement{target, value}, idx, nil // 3 because: 'as', the target, and the newline at the end
+}
+
+func parseLocals(tokens []Token) (LocalsStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	if len(tokens) < 4 {
+		return LocalsStatement{}, 0, errors.New("Improper locals statement on line " + line)
+	}
+
+	idx := 1
+
+	var locals []Token
+	for idx < len(tokens) {
+		token := tokens[idx]
+		if token.Type == IdentifierWord {
+			locals = append(locals, token)
+			idx++
+		} else if token.Type == Space {
 			idx++
 		} else {
 			break
@@ -482,260 +925,18 @@ func parseFunction(tokens []Token) (FunctionDefinition, int, error) {
 	}
 
 	if idx >= len(tokens) || tokens[idx].Type != Newline {
-		return FunctionDefinition{}, 0, errors.New("Improper function definition on line " + strconv.Itoa(tokens[0].LineNumber))
+		return LocalsStatement{}, 0, errors.New("Improper locals statement on line " + line)
 	}
 	idx++
 
-	body, numTokens, err := parseBody(tokens[idx:], indentationSpaces)
-	if err != nil {
-		return FunctionDefinition{}, 0, err
-	}
-
-	return FunctionDefinition{tokens[0], name, parameters, body}, idx + numTokens, nil
-}
-
-// 'indentation' = number of spaces before 'if'
-func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
-	if len(tokens) < 5 {
-		return IfStatement{}, 0, errors.New("Improper if statement on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	var condition Expression
-	var numConditionTokens int
-	switch tokens[1].Type {
-	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral:
-		condition = tokens[1]
-		numConditionTokens = 1
-	case OpenParen:
-		var err error
-		condition, numConditionTokens, err = parseOpenParen(tokens[1:])
-		if err != nil {
-			return IfStatement{}, 0, err
-		}
-	default:
-		return IfStatement{}, 0, errors.New("Improper condition in if statement on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	newline := tokens[1+numConditionTokens]
-	if newline.Type != Newline {
-		return IfStatement{}, 0, errors.New("If statement condition not followed by newline on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	numHeaderTokens := 2 + numConditionTokens
-	body, numTokens, err := parseBody(tokens[numHeaderTokens:], indentation+indentationSpaces)
-	if err != nil {
-		return IfStatement{}, 0, err
-	}
-
-	elifClauses := make([]ElifClause, 0)
-	var elseClause ElseClause
-	idx := numHeaderTokens + numTokens
-
-	if indentation == 0 {
-		for idx < len(tokens) {
-			if tokens[idx].Content == "elif" {
-				elifClause, numTokens, err := parseElif(tokens[idx:], indentation)
-				if err != nil {
-					return IfStatement{}, 0, err
-				}
-				elifClauses = append(elifClauses, elifClause)
-				idx += numTokens
-			} else {
-				break
-			}
-		}
-
-		if idx < len(tokens) {
-			if tokens[idx].Content == "else" {
-				var numTokens int
-				var err error
-				elseClause, numTokens, err = parseElse(tokens[idx:], indentation)
-				if err != nil {
-					return IfStatement{}, 0, err
-				}
-				idx += numTokens
-			}
-		}
-	} else {
-		for idx+1 < len(tokens) {
-			if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "elif" {
-				elifClause, numTokens, err := parseElif(tokens[idx+1:], indentation)
-				if err != nil {
-					return IfStatement{}, 0, err
-				}
-				elifClauses = append(elifClauses, elifClause)
-				idx += numTokens + 1 // +1 for the indentation before this elif
-			} else {
-				break
-			}
-		}
-
-		if idx+1 < len(tokens) {
-			if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "else" {
-				var numTokens int
-				var err error
-				elseClause, numTokens, err = parseElse(tokens[idx+1:], indentation)
-				if err != nil {
-					return IfStatement{}, 0, err
-				}
-				idx += numTokens + 1 // +1 for the indentation before this else
-			}
-		}
-	}
-
-	return IfStatement{tokens[0], condition, body, elifClauses, elseClause}, idx, nil
-}
-
-func parseElif(tokens []Token, indentation int) (ElifClause, int, error) {
-	if len(tokens) < 5 {
-		return ElifClause{}, 0, errors.New("Improper elif clause on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	var condition Expression
-	var numConditionTokens int
-	switch tokens[1].Type {
-	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral:
-		condition = tokens[1]
-		numConditionTokens = 1
-	case OpenParen:
-		var err error
-		condition, numConditionTokens, err = parseOpenParen(tokens[1:])
-		if err != nil {
-			return ElifClause{}, 0, err
-		}
-	default:
-		return ElifClause{}, 0, errors.New("Improper condition in elif clause on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	newline := tokens[1+numConditionTokens]
-	if newline.Type != Newline {
-		return ElifClause{}, 0, errors.New("Elif clause condition not followed by newline on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	numHeaderTokens := 2 + numConditionTokens
-	body, numTokens, err := parseBody(tokens[numHeaderTokens:], indentation+indentationSpaces)
-	if err != nil {
-		return ElifClause{}, 0, err
-	}
-
-	return ElifClause{tokens[0], condition, body}, numHeaderTokens + numTokens, nil
-}
-
-func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
-	if len(tokens) < 4 {
-		return ElseClause{}, 0, errors.New("Improper else clause on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	newline := tokens[1]
-	if newline.Type != Newline {
-		return ElseClause{}, 0, errors.New("Elif clause condition not followed by newline on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	body, numTokens, err := parseBody(tokens[2:], indentation+indentationSpaces)
-	if err != nil {
-		return ElseClause{}, 0, err
-	}
-
-	return ElseClause{tokens[0], body}, 2 + numTokens, nil
-}
-
-func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
-	if len(tokens) < 5 {
-		return WhileStatement{}, 0, errors.New("Improper while statement on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	var condition Expression
-	var numConditionTokens int
-	switch tokens[1].Type {
-	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral:
-		condition = tokens[1]
-		numConditionTokens = 1
-	case OpenParen:
-		var err error
-		condition, numConditionTokens, err = parseOpenParen(tokens[1:])
-		if err != nil {
-			return WhileStatement{}, 0, err
-		}
-	default:
-		return WhileStatement{}, 0, errors.New("Improper condition in while statement on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	newline := tokens[1+numConditionTokens]
-	if newline.Type != Newline {
-		return WhileStatement{}, 0, errors.New("While statement condition not followed by newline on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	numHeaderTokens := 2 + numConditionTokens
-	body, numTokens, err := parseBody(tokens[numHeaderTokens:], indentation+indentationSpaces)
-	if err != nil {
-		return WhileStatement{}, 0, err
-	}
-
-	return WhileStatement{tokens[0], condition, body}, numHeaderTokens + numTokens, nil
-}
-
-func parseReturn(tokens []Token) (ReturnStatement, int, error) {
-	if len(tokens) < 3 {
-		return ReturnStatement{}, 0, errors.New("Improper return statement on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	var value Expression
-	var numValueTokens int
-	switch tokens[1].Type {
-	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral:
-		value = tokens[1]
-		numValueTokens = 1
-	case OpenParen:
-		var err error
-		value, numValueTokens, err = parseOpenParen(tokens[1:])
-		if err != nil {
-			return ReturnStatement{}, 0, err
-		}
-	default:
-		return ReturnStatement{}, 0, errors.New("Improper value in return statement on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	newline := tokens[1+numValueTokens]
-	if newline.Type != Newline {
-		return ReturnStatement{}, 0, errors.New("Return statement not terminated with newline on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	return ReturnStatement{tokens[0], value}, 2 + numValueTokens, nil
-}
-
-// assume first token is reserved word "as"
-// returns number of tokens (including the newline at the end)
-func parseAssignment(tokens []Token) (AssignmentStatement, int, error) {
-	if len(tokens) < 4 {
-		return AssignmentStatement{}, 0, errors.New("Improper assignment statement on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	target := tokens[1]
-	if target.Type != IdentifierWord {
-		return AssignmentStatement{}, 0, errors.New("Improper target of assignment on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	var value Expression
-	var numValueTokens int
-	switch tokens[2].Type {
-	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral:
-		value = tokens[2]
-		numValueTokens = 1
-	case OpenParen:
-		var err error
-		value, numValueTokens, err = parseOpenParen(tokens[2:])
-		if err != nil {
-			return AssignmentStatement{}, 0, err
-		}
-	default:
-		return AssignmentStatement{}, 0, errors.New("Improper value in assignment on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-	newline := tokens[2+numValueTokens]
-	if newline.Type != Newline {
-		return AssignmentStatement{}, 0, errors.New("Assignment not terminated with newline on line " + strconv.Itoa(tokens[0].LineNumber))
-	}
-
-	return AssignmentStatement{target, value}, 3 + numValueTokens, nil // 3 because: 'as', the target, and the newline at the end
+	return LocalsStatement{locals}, idx, nil
 }
 
 // expected to start with Indentation token.
 // 'indentation' = the number of spaces indentation on which the body should be aligned
 // May return zero statements if body is empty.
 func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
-	statements := make([]Statement, 0)
+	var statements []Statement
 	i := 0
 	for i < len(tokens) {
 		t := tokens[i]
@@ -758,7 +959,7 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 				switch t.Type {
 				case ReservedWord:
 					switch t.Content {
-					case "function":
+					case "func":
 						return nil, 0, errors.New("Functions cannot be nested: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
 					case "as":
 						statement, numTokens, err = parseAssignment(tokens[i:])
@@ -766,6 +967,8 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseIf(tokens[i:], indentation)
 					case "while":
 						statement, numTokens, err = parseWhile(tokens[i:], indentation)
+					case "locals":
+						statement, numTokens, err = parseLocals(tokens[i:])
 					case "return":
 						statement, numTokens, err = parseReturn(tokens[i:])
 					default:
@@ -774,7 +977,6 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 					if err != nil {
 						return nil, 0, err
 					}
-
 				case OpenParen:
 					var expression Expression
 					expression, numTokens, err = parseOpenParen(tokens[i:])
@@ -802,70 +1004,48 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 }
 
 /* All identifiers get prefixed with _ to avoid collisions with Go reserved words and predefined identifiers */
-func compile(statements []Statement) (string, error) {
+func compile(definitions []Definition) (string, error) {
 	globals := make(Scope)
-
-	var body string
-	nFunctions := 0
-	funcAllowed := true // check that all function statements come before any other statements
-	for _, s := range statements {
-		fn, ok := s.(FunctionDefinition)
-		if ok {
-			if funcAllowed {
-				nFunctions++
-			} else {
-				return "", errors.New("Functions must all be defined before rest of code. Improperly placed function on line " +
-					strconv.Itoa(fn.FirstToken.LineNumber))
-			}
-		} else {
-			funcAllowed = false // once we encounter a non-function, can't have subsequent functions
-		}
-		var c string
-		var err error
-		switch s := s.(type) {
-		case IfStatement:
-			c, err = compileIfStatement(s, globals, nil)
-		case WhileStatement:
-			c, err = compileWhileStatement(s, globals, nil)
-		case AssignmentStatement:
-			c, err = compileAssignmentStatement(s, globals, nil)
-		case ReturnStatement:
-			return "", errors.New("Cannot have a return statement at top level of code. Line: " + strconv.Itoa(s.FirstToken.LineNumber))
-		case FunctionCall:
-			c, err = compileFunctionCall(s)
-			c += "\n"
-		case Operation:
-			c, err = compileOperation(s)
-			c += "\n"
-		}
-		if err != nil {
-			return "", err
-		}
-		body += c
-	}
-
-	var functions string
-	for _, s := range statements[:nFunctions] {
-		c, err := compileFunc(s.(FunctionDefinition), globals)
-		if err != nil {
-			return "", err
-		}
-		functions += c
-	}
-
-	var declarations string
-	for g, _ := range globals {
-		declarations += "var _" + g + " interface{}\n"
-	}
-
-	header := `package main
+	globalsDone := false
+	code := `package main
 
 import _pigeon "github.com/BrianWill/pigeon/stdlib"
 
 `
-	body = "func main() {\n" + body + "}\n"
+	// TODO check for duplicate global and function names
+	for _, def := range definitions {
+		switch d := def.(type) {
+		case GlobalDefinition:
+			if globalsDone {
+				return "", errors.New("All globals must be defined before all functions")
+			}
+			name := d.Name.Content
+			c, err := compileExpression(d.Value)
+			if err != nil {
+				return "", err
+			}
+			code += "var _" + name + " interface{} = " + c + "\n"
+			globals[name] = true
+		case FunctionDefinition:
+			globalsDone = true
+			c, err := compileFunc(d, globals)
+			if err != nil {
+				return "", err
+			}
+			code += c
+		default:
+			return "", errors.New("Unrecognized definition")
+		}
+	}
 
-	return header + declarations + functions + body, nil
+	code += `
+	
+func main() {
+	_main()
+}	
+`
+
+	return code, nil
 }
 
 // returns code snippet ending with '\n\n'
@@ -880,7 +1060,21 @@ func compileFunc(fn FunctionDefinition, globals Scope) (string, error) {
 		header = header[:len(header)-2] // drop last comma and space
 	}
 	header += ") interface{} {\n"
-	body, err := compileBody(fn.Body, locals, globals)
+	if len(fn.Body) < 1 {
+		return "", errors.New("Function should contain at least one statement.")
+	}
+	bodyStatements := fn.Body
+	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
+		localsStr := "var "
+		for _, name := range localsStatement.Names {
+			locals[name.Content] = true
+			localsStr += "_" + name.Content + ", "
+		}
+		localsStr = localsStr[:len(localsStr)-2] // hack off last comma
+		header += localsStr + " interface{}\n"
+		bodyStatements = bodyStatements[1:]
+	}
+	body, err := compileBody(bodyStatements, locals, globals)
 	if err != nil {
 		return "", err
 	}
@@ -890,22 +1084,16 @@ func compileFunc(fn FunctionDefinition, globals Scope) (string, error) {
 			return header + body + "}\n", nil
 		}
 	}
-
-	var declarations string
-	for l := range locals {
-		declarations += "var _" + l + " interface{}\n"
-	}
-
-	return header + declarations + body + "return nil\n}\n", nil
+	return header + body + "return nil\n}\n", nil
 }
 
-func compileIfStatement(s IfStatement, this, enclosing Scope) (string, error) {
+func compileIfStatement(s IfStatement, locals, globals Scope) (string, error) {
 	c, err := compileExpression(s.Condition)
 	if err != nil {
 		return "", err
 	}
 	code := "if " + c + ".(bool)"
-	c, err = compileBody(s.Body, this, enclosing)
+	c, err = compileBody(s.Body, locals, globals)
 	if err != nil {
 		return "", nil
 	}
@@ -916,7 +1104,7 @@ func compileIfStatement(s IfStatement, this, enclosing Scope) (string, error) {
 			return "", err
 		}
 		code += " else if " + c + ".(bool) {\n"
-		c, err = compileBody(elif.Body, this, enclosing)
+		c, err = compileBody(elif.Body, locals, globals)
 		if err != nil {
 			return "", err
 		}
@@ -924,7 +1112,7 @@ func compileIfStatement(s IfStatement, this, enclosing Scope) (string, error) {
 	}
 
 	if len(s.Else.Body) > 0 {
-		c, err := compileBody(s.Else.Body, this, enclosing)
+		c, err := compileBody(s.Else.Body, locals, globals)
 		if err != nil {
 			return "", err
 		}
@@ -933,31 +1121,31 @@ func compileIfStatement(s IfStatement, this, enclosing Scope) (string, error) {
 	return code + "\n", nil
 }
 
-func compileWhileStatement(s WhileStatement, this, enclosing Scope) (string, error) {
+func compileWhileStatement(s WhileStatement, locals, globals Scope) (string, error) {
 	c, err := compileExpression(s.Condition)
 	if err != nil {
 		return "", err
 	}
 	code := "for " + c + ".(bool) {\n"
-	c, err = compileBody(s.Body, this, enclosing)
+	c, err = compileBody(s.Body, locals, globals)
 	if err != nil {
 		return "", err
 	}
 	return code + c + "}\n", nil
 }
 
-func compileBody(statements []Statement, this, enclosing Scope) (string, error) {
+func compileBody(statements []Statement, locals, globals Scope) (string, error) {
 	var code string
 	for _, s := range statements {
 		var c string
 		var err error
 		switch s := s.(type) {
 		case IfStatement:
-			c, err = compileIfStatement(s, this, enclosing)
+			c, err = compileIfStatement(s, locals, globals)
 		case WhileStatement:
-			c, err = compileWhileStatement(s, this, enclosing)
+			c, err = compileWhileStatement(s, locals, globals)
 		case AssignmentStatement:
-			c, err = compileAssignmentStatement(s, this, enclosing)
+			c, err = compileAssignmentStatement(s, locals, globals)
 		case ReturnStatement:
 			c, err = compileReturnStatement(s)
 		case FunctionCall:
@@ -975,17 +1163,39 @@ func compileBody(statements []Statement, this, enclosing Scope) (string, error) 
 	return code, nil
 }
 
-// 'scope' = map of variable names assigned to in the current scope
-func compileAssignmentStatement(s AssignmentStatement, this, enclosing Scope) (string, error) {
-	target := s.Target.Content
-	if (enclosing == nil) || !enclosing[target] {
-		this[target] = true
+func compileAssignmentStatement(s AssignmentStatement, locals, globals Scope) (string, error) {
+	switch target := s.Target.(type) {
+	case Token:
+		if target.Type != IdentifierWord {
+			return "", errors.New("Assignment to non-identifier on line " + strconv.Itoa(target.LineNumber))
+		}
+		name := target.Content
+		if locals[name] && globals[name] {
+			return "", errors.New("Assignment to non-existent variable on line " + strconv.Itoa(target.LineNumber))
+		}
+		c, err := compileExpression(s.Value)
+		if err != nil {
+			return "", err
+		}
+		return "_" + target.Content + " = " + c + "\n", nil
+	case Operation:
+		if target.Operator.Content != "get" {
+			return "", errors.New("Improper target of assignment on line " + strconv.Itoa(target.Operator.LineNumber))
+		}
+		// turn the get op into a set op
+		target.Operator.Content = "set"
+		target.Operands = append(target.Operands, s.Value)
+		c, err := compileExpression(target)
+		if err != nil {
+			return "", err
+		}
+		return c + "\n", nil
+	case FunctionCall:
+		return "", errors.New("Invalid target of assignment on line " + strconv.Itoa(target.LineNumber))
+	default:
+		// TODO give Expression LineNumber() method so we can get a line number here
+		return "", errors.New("Invalid target of assignment.")
 	}
-	c, err := compileExpression(s.Value)
-	if err != nil {
-		return "", err
-	}
-	return "_" + target + " = " + c + "\n", nil
 }
 
 func compileReturnStatement(s ReturnStatement) (string, error) {
@@ -1011,6 +1221,7 @@ func compileFunctionCall(s FunctionCall) (string, error) {
 			return "", err
 		}
 		code += c
+		// TODO have to assert type of function
 	case Token: // will always be an identifier
 		code += "_" + s.Content
 	}
@@ -1073,10 +1284,9 @@ func compileExpression(e Expression) (string, error) {
 			code = "float64(" + e.Content + ")"
 		case StringLiteral, BooleanLiteral:
 			code = e.Content
-		case NullLiteral:
+		case NilLiteral:
 			code = "_pigeon.Null(0)"
 		}
-
 	}
 	return code, nil
 }
@@ -1098,18 +1308,20 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	statements, err := parse(tokens)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	code, err := compile(statements)
+
+	definitions, err := parse(tokens)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	outputFilename := inputFilename + ".go"
+	code, err := compile(definitions)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	outputFilename := outputDir + "/" + inputFilename + ".go"
 	err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
 	if err != nil {
 		fmt.Println(err)

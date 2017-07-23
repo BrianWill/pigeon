@@ -1,6 +1,10 @@
 package stdlib
 
-import "fmt"
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
 
 type Null int
 
@@ -127,7 +131,7 @@ func Eq(values ...interface{}) interface{} {
 }
 
 func Neq(values ...interface{}) interface{} {
-	return !Eq(values).(bool)
+	return !Eq(values...).(bool)
 }
 
 func Id(vals ...interface{}) interface{} {
@@ -254,10 +258,10 @@ func Get(args ...interface{}) interface{} {
 		case float64, string:
 			return v[key]
 		default:
-			panic("Second operand to 'get' on a dict should be a string or number.")
-		}		
+			panic("Second operand to 'get' on a map should be a string or number.")
+		}
 	default:
-		panic("First operand to 'get' must be a dict or a list.")
+		panic("First operand to 'get' must be a map or a list.")
 	}
 	return nil
 }
@@ -278,10 +282,10 @@ func Set(args ...interface{}) interface{} {
 		case float64, string:
 			v[key] = args[2]
 		default:
-			panic("Second operand to 'set' on a dict should be a string or number.")
+			panic("Second operand to 'set' on a map should be a string or number.")
 		}
 	default:
-		panic("First operand to 'set' must be a dict or a list.")
+		panic("First operand to 'set' must be a map or a list.")
 	}
 	return Null(0)
 }
@@ -341,6 +345,24 @@ func Print(args ...interface{}) interface{} {
 	return Null(0)
 }
 
+func Prompt(args ...interface{}) interface{} {
+	if len(args) > 1 {
+		Print(args...)
+	}
+	// TODO read console input to first newline
+	// TODO may need to customize printing for some types
+	reader := bufio.NewReader(os.Stdin)
+	text, _ := reader.ReadString('\n')
+	return text
+}
+
+func Concat(args ...interface{}) interface{} {
+	if len(args) < 1 {
+		panic("Concat operation needs two or more operands.")
+	}
+	return fmt.Sprint(args...)
+}
+
 func List(args ...interface{}) interface{} {
 	list := make([]interface{}, len(args))
 	for i, a := range args {
@@ -349,19 +371,19 @@ func List(args ...interface{}) interface{} {
 	return &list
 }
 
-func Dict(args ...interface{}) interface{} {
+func Map(args ...interface{}) interface{} {
 	if len(args) == 0 {
-		panic("'Dict' operation needs at least one operand.")
+		panic("'Map' operation needs at least one operand.")
 	}
-	if len(args) % 2 != 0 {
-		panic("'Dict' operations needs an even number of operands.")
+	if len(args)%2 != 0 {
+		panic("'Map' operations needs an even number of operands.")
 	}
-	dict := make(map[interface{}]interface{})
+	_map := make(map[interface{}]interface{})
 	for i := 0; i < len(args); {
-		dict[args[i]] = args[i + 1] 
+		_map[args[i]] = args[i+1]
 		i += 2
 	}
-	return dict
+	return _map
 }
 
 func Len(args ...interface{}) interface{} {
@@ -374,7 +396,7 @@ func Len(args ...interface{}) interface{} {
 	case map[interface{}]interface{}:
 		return len(a)
 	default:
-		panic("'len' operator operand must be a dict or list.")
+		panic("'len' operator operand must be a map or list.")
 	}
 	return nil
 }
