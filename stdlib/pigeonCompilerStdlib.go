@@ -3,10 +3,21 @@ package stdlib
 import (
 	"bufio"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
+	"reflect"
+	"strconv"
+	"strings"
 )
 
-type Null int
+type Nil int
+
+type ListType struct {
+	list []interface{}
+}
+
+type MapType map[interface{}]interface{}
 
 func Add(numbers ...interface{}) interface{} {
 	var sum float64
@@ -91,9 +102,9 @@ func Eq(values ...interface{}) interface{} {
 
 	for _, val := range values {
 		switch val.(type) {
-		case float64, bool, string, Null:
+		case float64, bool, string, Nil, ListType, MapType:
 		default:
-			panic("Attempted quality test with type other than a number, boolean, string, or null.")
+			panic("Attempted equality test with type other than a number, boolean, string, or null.")
 		}
 	}
 
@@ -119,10 +130,24 @@ func Eq(values ...interface{}) interface{} {
 				return false
 			}
 		}
-	case Null:
+	case Nil:
 		for _, v := range values[1:] {
-			_, ok := v.(Null)
+			_, ok := v.(Nil)
 			if !ok {
+				return false
+			}
+		}
+	case ListType:
+		for _, v := range values[1:] {
+			_, ok := v.(ListType)
+			if !ok || reflect.DeepEqual(v, val) {
+				return false
+			}
+		}
+	case MapType:
+		for _, v := range values[1:] {
+			_, ok := v.(MapType)
+			if !ok || reflect.DeepEqual(v, val) {
 				return false
 			}
 		}
@@ -247,13 +272,13 @@ func Get(args ...interface{}) interface{} {
 		panic("Incorrect number of operands for 'get' operation.")
 	}
 	switch v := args[0].(type) {
-	case *[]interface{}:
+	case ListType:
 		f, ok := args[1].(float64)
 		if !ok {
 			panic("Second operand to 'get' on a list should be a number.")
 		}
-		return (*v)[int(f)]
-	case map[interface{}]interface{}:
+		return v.list[int(f)]
+	case MapType:
 		switch key := args[1].(type) {
 		case float64, string:
 			return v[key]
@@ -271,13 +296,13 @@ func Set(args ...interface{}) interface{} {
 		panic("Incorrect number of operands for 'set' operation.")
 	}
 	switch v := args[0].(type) {
-	case *[]interface{}:
+	case ListType:
 		f, ok := args[1].(float64)
 		if !ok {
 			panic("Second operand to 'set' on a list should be a number.")
 		}
-		(*v)[int(f)] = args[2]
-	case map[interface{}]interface{}:
+		v.list[int(f)] = args[2]
+	case MapType:
 		switch key := args[1].(type) {
 		case float64, string:
 			v[key] = args[2]
@@ -287,21 +312,21 @@ func Set(args ...interface{}) interface{} {
 	default:
 		panic("First operand to 'set' must be a map or a list.")
 	}
-	return Null(0)
+	return Nil(0)
 }
 
 func Append(args ...interface{}) interface{} {
 	if len(args) < 2 {
 		panic("Too few operands for 'append' operation.")
 	}
-	list, ok := args[0].(*[]interface{})
+	list, ok := args[0].(ListType)
 	if !ok {
 		panic("First operand to 'append' must be a list.")
 	}
 	for _, v := range args[1:] {
-		*list = append(*list, v)
+		list.list = append(list.list, v)
 	}
-	return Null(0)
+	return Nil(0)
 }
 
 func Or(args ...interface{}) interface{} {
@@ -340,9 +365,9 @@ func Print(args ...interface{}) interface{} {
 	if len(args) == 0 {
 		panic("Print operation needs at least one operand.")
 	}
-	fmt.Println(args[0])
+	fmt.Println(args...)
 	// TODO may need to customize printing for some types
-	return Null(0)
+	return Nil(0)
 }
 
 func Prompt(args ...interface{}) interface{} {
@@ -353,6 +378,7 @@ func Prompt(args ...interface{}) interface{} {
 	// TODO may need to customize printing for some types
 	reader := bufio.NewReader(os.Stdin)
 	text, _ := reader.ReadString('\n')
+	text = text[:len(text)-1] // strip off trailing \n
 	return text
 }
 
@@ -368,7 +394,7 @@ func List(args ...interface{}) interface{} {
 	for i, a := range args {
 		list[i] = a
 	}
-	return &list
+	return ListType{list}
 }
 
 func Map(args ...interface{}) interface{} {
@@ -378,7 +404,7 @@ func Map(args ...interface{}) interface{} {
 	if len(args)%2 != 0 {
 		panic("'Map' operations needs an even number of operands.")
 	}
-	_map := make(map[interface{}]interface{})
+	_map := make(MapType)
 	for i := 0; i < len(args); {
 		_map[args[i]] = args[i+1]
 		i += 2
@@ -391,12 +417,59 @@ func Len(args ...interface{}) interface{} {
 		panic("'len' operator must have just one operand.")
 	}
 	switch a := args[0].(type) {
-	case *[]interface{}:
-		return len(*a)
-	case map[interface{}]interface{}:
+	case ListType:
+		return len(a.list)
+	case MapType:
+		return len(a)
+	case string:
 		return len(a)
 	default:
 		panic("'len' operator operand must be a map or list.")
 	}
-	return nil
+}
+
+func (l ListType) String() string {
+	list := l.list
+	s := "["
+	for _, v := range list {
+		s += fmt.Sprintf("%v ", v)
+	}
+	return s[:len(s)-1] + "]"
+}
+
+type DebugVar struct {
+	name   string
+	val    interface{}
+	global bool
+}
+
+// do nothing (used to supress unused variable compile errors)
+func NullOp(args ...interface{}) {
+	// do nothing
+}
+
+func Server(breakpoints, validBreakpoints map[int]bool) {
+
+	http.HandleFunc("/setBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
+		lineStr := strings.TrimPrefix(r.URL.Path, "/setBreakpoint/")
+		line, err := strconv.Atoi(lineStr)
+		if err != nil {
+			fmt.Fprintf(w, "Invalid line number.")
+			return
+		}
+		fmt.Fprintf(w, "Line number: %d", line)
+	})
+
+	http.HandleFunc("/clearBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
+		lineStr := strings.TrimPrefix(r.URL.Path, "/setBreakpoint/")
+		line, err := strconv.Atoi(lineStr)
+		if err != nil {
+			fmt.Fprintf(w, "Invalid line number.")
+			return
+		}
+		fmt.Fprintf(w, "Line number: %d", line)
+	})
+
+	log.Fatal(http.ListenAndServe(":7070", nil))
+
 }

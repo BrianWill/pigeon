@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>
+        
+    </title>
+    <style>
+        #code {
+            white-space: pre;  
+            font-family: "Lucida Console", Monaco, monospace;
+            font-size: 10pt;
+        }
+        #code li {
+            margin: -7px 0;
+        }
+        .kwd {
+            color: #2d2ee7;
+        }
+        .op {
+            color: #c46113;
+        }
+        .dec, .str, .val {
+            color: purple;
+        }
+        .com {
+            color: green;
+        }
+
+        
+        #code ol {
+            counter-reset: item;
+            list-style: none;
+        }
+        #code li {
+            counter-increment: item;
+        }
+        #code li:before {
+            margin-right: 30px;
+            content: counter(item);
+            background: #24acd9;
+            color: white;
+            width: 4.2em;
+            text-align: right;
+            padding-right: 4px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <ul>
+        {{range .Files}}
+            <li><a href="{{.}}">{{.}}</a></li>
+        {{end}}
+        </ul>
+    </div>
+    <div id="code">
+        {{.Code}}
+    </div>
+</body>
+</html>
