@@ -1,7 +1,6 @@
 package main
 
 import _p "github.com/BrianWill/pigeon/stdlib"
-import _fmt "fmt"
 
 var _breakpoints = make(map[int]bool)
 
@@ -13,19 +12,19 @@ func playerMove(currentPlayer interface{}) interface{} {
 	var move, row, col, slot interface{}
 	_p.NullOp(move, row, col, slot)
 	debug := func(line int) {
-		_fmt.Printf("About to execute line %v.\n", line)
-		// print globals
-		_fmt.Println("Globals:")
-		_fmt.Println("topRow", g_topRow)
-		_fmt.Println("middleRow", g_middleRow)
-		_fmt.Println("bottomRow", g_bottomRow)
-		_fmt.Println("Locals:")
-		_fmt.Println("currentPlayer", currentPlayer)
-		_fmt.Println("move", move)
-		_fmt.Println("row", row)
-		_fmt.Println("col", col)
-		_fmt.Println("slot", slot)
-
+		var globals = map[string]interface{}{
+			"topRow":    g_topRow,
+			"middleRow": g_middleRow,
+			"bottomRow": g_bottomRow,
+		}
+		var locals = map[string]interface{}{
+			"currentPlayer": currentPlayer,
+			"move":          move,
+			"row":           row,
+			"col":           col,
+			"slot":          slot,
+		}
+		_p.PollContinue(globals, locals)
 	}
 	if _breakpoints[7] {
 		debug(7)
@@ -146,17 +145,17 @@ func winner() interface{} {
 	var topRowFull, middleRowFull, bottomRowFull interface{}
 	_p.NullOp(topRowFull, middleRowFull, bottomRowFull)
 	debug := func(line int) {
-		_fmt.Printf("About to execute line %v.\n", line)
-		// print globals
-		_fmt.Println("Globals:")
-		_fmt.Println("topRow", g_topRow)
-		_fmt.Println("middleRow", g_middleRow)
-		_fmt.Println("bottomRow", g_bottomRow)
-		_fmt.Println("Locals:")
-		_fmt.Println("bottomRowFull", bottomRowFull)
-		_fmt.Println("topRowFull", topRowFull)
-		_fmt.Println("middleRowFull", middleRowFull)
-
+		var globals = map[string]interface{}{
+			"bottomRow": g_bottomRow,
+			"topRow":    g_topRow,
+			"middleRow": g_middleRow,
+		}
+		var locals = map[string]interface{}{
+			"topRowFull":    topRowFull,
+			"middleRowFull": middleRowFull,
+			"bottomRowFull": bottomRowFull,
+		}
+		_p.PollContinue(globals, locals)
 	}
 	if _breakpoints[45] {
 		debug(45)
@@ -260,17 +259,17 @@ func _main() interface{} {
 	var w, done, currentPlayer interface{}
 	_p.NullOp(w, done, currentPlayer)
 	debug := func(line int) {
-		_fmt.Printf("About to execute line %v.\n", line)
-		// print globals
-		_fmt.Println("Globals:")
-		_fmt.Println("topRow", g_topRow)
-		_fmt.Println("middleRow", g_middleRow)
-		_fmt.Println("bottomRow", g_bottomRow)
-		_fmt.Println("Locals:")
-		_fmt.Println("w", w)
-		_fmt.Println("done", done)
-		_fmt.Println("currentPlayer", currentPlayer)
-
+		var globals = map[string]interface{}{
+			"topRow":    g_topRow,
+			"middleRow": g_middleRow,
+			"bottomRow": g_bottomRow,
+		}
+		var locals = map[string]interface{}{
+			"w":             w,
+			"done":          done,
+			"currentPlayer": currentPlayer,
+		}
+		_p.PollContinue(globals, locals)
 	}
 	if _breakpoints[78] {
 		debug(78)
@@ -342,9 +341,7 @@ func _main() interface{} {
 	return nil
 }
 
-var _validBreakpoints = map[int]bool{10: true, 19: true, 25: true, 35: true, 69: true, 15: true, 34: true, 63: true, 89: true, 20: true, 21: true, 55: true, 84: true, 71: true, 72: true, 12: true, 33: true, 45: true, 48: true, 51: true, 85: true, 9: true, 36: true, 57: true, 11: true, 79: true, 17: true, 23: true, 74: true, 82: true, 31: true, 66: true, 70: true, 27: true, 32: true, 92: true, 8: true, 46: true, 49: true, 64: true, 90: true, 97: true, 38: true, 52: true, 58: true, 7: true, 80: true, 87: true, 22: true, 54: true, 60: true, 61: true, 73: true, 78: true, 94: true, 95: true, 13: true, 24: true, 29: true, 67: true, 81: true, 83: true}
-
 func main() {
-	go _p.Server(_breakpoints, _validBreakpoints)
+	go _p.PollBreakpoints(&_breakpoints)
 	_main()
 }

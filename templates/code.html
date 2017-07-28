@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>
+        
+    </title>
+    <style>
+        #code {
+            white-space: pre;  
+            font-family: "Lucida Console", Monaco, monospace;
+            font-size: 10pt;
+        }
+        #code li {
+            margin: -7px 0;
+        }
+        .kwd {
+            color: #2d2ee7;
+        }
+        .op {
+            color: #c46113;
+        }
+        .dec, .str, .val {
+            color: purple;
+        }
+        .com {
+            color: green;
+        }
+
+        
+        #code ol {
+            counter-reset: item;
+            list-style: none;
+        }
+        #code li {
+            counter-increment: item;
+        }
+        #code li:before {
+            margin-right: 30px;
+            content: counter(item);
+            background: #1c7998;
+            color: white;
+            width: 4.2em;
+            text-align: right;
+            padding-right: 4px;
+            display: inline-block;
+        }
+        #code li.validBreakpoint:before {
+            background: #24acd9;
+        }
+        #code li.breakpoint:before {
+            background: #c31010;
+        }
+        
+    </style>
+</head>
+<body>
+    <h1>{{.FileName}}</h1>
+    <button id="runButton">run</button><button id="continueButton">continue</button>
+    <div id="code">
+        {{.Code}}
+    </div>
+    <script>
+    var breakpoints = {};
+
+    document.getElementById('runButton').onclick = function (evt) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/run');
+        xhr.send();
+    }
+    document.getElementById('continueButton').onclick = function (evt) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/continue');
+        xhr.send();
+    }
+    document.getElementById('code').addEventListener('click', function (evt) {
+        var linenum = evt.target.getAttribute('linenum');
+        if (linenum) {
+            var xhr = new XMLHttpRequest();
+            if (breakpoints[linenum]) {
+                delete breakpoints[linenum];
+                xhr.open('GET', '/clearBreakpoint/' + linenum);
+                evt.target.classList.remove('breakpoint');         
+            } else {
+                xhr.open('GET', '/setBreakpoint/' + linenum);
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        breakpoints[linenum] = true;
+                        evt.target.classList.add('breakpoint');         
+                    }
+                };
+            } 
+            xhr.send();
+        }
+    }, false);
+
+    (function() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/getValidBreakpoints');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                var validBreakpoints = JSON.parse(xhr.responseText);
+                var lis = document.querySelectorAll('#code li');
+                for (var i in lis) {
+                    var linenum = lis[i].getAttribute('linenum');
+                    if (validBreakpoints[linenum]) {
+                        lis[i].classList.add('validBreakpoint');
+                    }
+                }
+            }
+        };
+        xhr.send();
+    })();
+    
+    </script>
+</body>
+</html>

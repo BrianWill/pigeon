@@ -2,13 +2,15 @@ package stdlib
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
+	"time"
 )
 
 type Nil int
@@ -448,28 +450,55 @@ func NullOp(args ...interface{}) {
 	// do nothing
 }
 
-func Server(breakpoints, validBreakpoints map[int]bool) {
+const pollSleepTime = 300 * time.Millisecond
 
-	http.HandleFunc("/setBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
-		lineStr := strings.TrimPrefix(r.URL.Path, "/setBreakpoint/")
-		line, err := strconv.Atoi(lineStr)
+func PollBreakpoints(breakpoints *map[int]bool) error {
+	for ; ; time.Sleep(pollSleepTime) {
+		resp, err := http.Get("http://localhost:7070/getBreakpoints")
 		if err != nil {
-			fmt.Fprintf(w, "Invalid line number.")
-			return
+			return err
 		}
-		fmt.Fprintf(w, "Line number: %d", line)
-	})
-
-	http.HandleFunc("/clearBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
-		lineStr := strings.TrimPrefix(r.URL.Path, "/setBreakpoint/")
-		line, err := strconv.Atoi(lineStr)
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			fmt.Fprintf(w, "Invalid line number.")
-			return
+			log.Fatalln("Error reading response in PollBreakpoints")
+			return err
 		}
-		fmt.Fprintf(w, "Line number: %d", line)
-	})
+		strBreakpoints := &map[string]bool{}
+		fmt.Println(string(body))
+		err = json.Unmarshal(body, strBreakpoints)
+		if err != nil {
+			log.Fatalln("Error unmarshalling breakpoints in PollContinue")
+			return err
+		}
+		*breakpoints = map[int]bool{}
+		for k := range *strBreakpoints {
+			linenum, err := strconv.Atoi(k)
+			if err != nil {
+				log.Fatalln("Error: breakpoint not a valid integer in PollContinue")
+				return err
+			}
+			(*breakpoints)[linenum] = true
+		}
+		return nil
+	}
+}
 
-	log.Fatal(http.ListenAndServe(":7070", nil))
-
+func PollContinue(globals, locals map[string]interface{}) error {
+	for ; ; time.Sleep(pollSleepTime) {
+		resp, err := http.Get("http://localhost:7070/checkContinue")
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalln("Error reading response in PollContinue")
+			return err
+		}
+		if string(body) == "true" {
+			break
+		}
+	}
+	return nil
 }

@@ -99,7 +99,6 @@ var reservedWords = []string{
 	"asdiv",
 	"_p",
 	"_main",
-	"_fmt",
 	"_break",
 	"_breakpoints",
 	"_validBreakpoints",
@@ -1051,29 +1050,29 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 }
 
 /* All identifiers get prefixed with _ to avoid collisions with Go reserved words and predefined identifiers */
-func compile(definitions []Definition) (string, error) {
+// returns map of valid breakpoints
+func compile(definitions []Definition) (string, map[string]bool, error) {
 	globals := make(Scope)
 	globalsDone := false
 	code := `package main
 
 import _p "github.com/BrianWill/pigeon/stdlib"
-import _fmt "fmt"
 
 var _breakpoints = make(map[int]bool)
 
 `
-	validBreakpoints := make(map[int]bool)
+	validBreakpoints := make(map[string]bool)
 	// TODO check for duplicate global and function names
 	for _, def := range definitions {
 		switch d := def.(type) {
 		case GlobalDefinition:
 			if globalsDone {
-				return "", errors.New("All globals must be defined before all functions")
+				return "", nil, errors.New("All globals must be defined before all functions")
 			}
 			name := d.Name.Content
 			c, err := compileExpression(d.Value, make(Scope), globals)
 			if err != nil {
-				return "", err
+				return "", nil, err
 			}
 			code += "var g_" + name + " interface{} = " + c + "\n"
 			globals[name] = true
@@ -1081,33 +1080,26 @@ var _breakpoints = make(map[int]bool)
 			globalsDone = true
 			c, err := compileFunc(d, globals, validBreakpoints)
 			if err != nil {
-				return "", err
+				return "", nil, err
 			}
 			code += c
 		default:
-			return "", errors.New("Unrecognized definition")
+			return "", nil, errors.New("Unrecognized definition")
 		}
 	}
-	breakpointLinenums := make([]string, len(validBreakpoints))
-	i := 0
-	for k := range validBreakpoints {
-		breakpointLinenums[i] = fmt.Sprintf("%d: true", k)
-		i++
-	}
-	code += "var _validBreakpoints = map[int]bool{" + strings.Join(breakpointLinenums, ", ") + "}"
 	code += `
 	
 func main() {
-	go _p.Server(_breakpoints, _validBreakpoints)
+	go _p.PollBreakpoints(&_breakpoints)
 	_main()
 }	
 `
 
-	return code, nil
+	return code, validBreakpoints, nil
 }
 
 // returns code snippet ending with '\n\n'
-func compileFunc(fn FunctionDefinition, globals Scope, validBreakpoints map[int]bool) (string, error) {
+func compileFunc(fn FunctionDefinition, globals Scope, validBreakpoints map[string]bool) (string, error) {
 	locals := make(Scope)
 
 	header := "func " + fn.Name.Content + "("
@@ -1156,22 +1148,25 @@ func compileFunc(fn FunctionDefinition, globals Scope, validBreakpoints map[int]
 
 func genDebugFn(globals, locals Scope) string {
 	s := `debug := func(line int) {
-	_fmt.Printf("About to execute line %v.\n", line)
-	// print globals
-	_fmt.Println("Globals:")
+	var globals = map[string]interface{}{
 `
 	for k := range globals {
-		s += fmt.Sprintf("_fmt.Println(\"%s\", g_%s)\n", k, k)
+		s += fmt.Sprintf("\"%s\": g_%s,\n", k, k)
 	}
-	s += "_fmt.Println(\"Locals:\")\n"
+	s += `}
+	var locals = map[string]interface{}{
+`
 	for k := range locals {
-		s += fmt.Sprintf("_fmt.Println(\"%s\", %s)\n", k, k)
+		s += fmt.Sprintf("\"%s\": %s,\n", k, k)
 	}
-	s += "\n}\n"
+	s += `}
+	_p.PollContinue(globals, locals)
+}
+`
 	return s
 }
 
-func compileIfStatement(s IfStatement, locals, globals Scope, validBreakpoints map[int]bool) (string, error) {
+func compileIfStatement(s IfStatement, locals, globals Scope, validBreakpoints map[string]bool) (string, error) {
 	c, err := compileExpression(s.Condition, locals, globals)
 	if err != nil {
 		return "", err
@@ -1205,7 +1200,7 @@ func compileIfStatement(s IfStatement, locals, globals Scope, validBreakpoints m
 	return code + "\n", nil
 }
 
-func compileWhileStatement(s WhileStatement, locals, globals Scope, validBreakpoints map[int]bool) (string, error) {
+func compileWhileStatement(s WhileStatement, locals, globals Scope, validBreakpoints map[string]bool) (string, error) {
 	c, err := compileExpression(s.Condition, locals, globals)
 	if err != nil {
 		return "", err
@@ -1218,11 +1213,11 @@ func compileWhileStatement(s WhileStatement, locals, globals Scope, validBreakpo
 	return code + c + "}\n", nil
 }
 
-func compileBody(statements []Statement, locals, globals Scope, validBreakpoints map[int]bool) (string, error) {
+func compileBody(statements []Statement, locals, globals Scope, validBreakpoints map[string]bool) (string, error) {
 	var code string
 	for _, s := range statements {
 		line := s.Line()
-		validBreakpoints[line] = true
+		validBreakpoints[strconv.Itoa(line)] = true
 		code += fmt.Sprintf("if _breakpoints[%d] {debug(%d)}\n", line, line)
 		var c string
 		var err error
@@ -1389,52 +1384,52 @@ func Highlight(code []byte) ([]byte, error) {
 	return highlight.AsHTML(code, highlight.OrderedList())
 }
 
-func Run(args []string) error {
-	if len(os.Args) < 3 {
-		fmt.Println("")
-		return errors.New("Must specify a file to run.")
-	}
-
-	inputFilename := os.Args[2]
-
-	data, err := ioutil.ReadFile(inputFilename)
+func CompileAndRun(filename string) error {
+	filename, _, err := Compile(filename)
 	if err != nil {
 		return err
 	}
-	tokens, err := lex(string(data) + "\n")
-	if err != nil {
-		return err
-	}
+	return Run(filename)
+}
 
-	definitions, err := parse(tokens)
-	if err != nil {
-		return err
-	}
-
-	code, err := compile(definitions)
-	if err != nil {
-		return err
-	}
-
-	outputFilename := outputDir + "/" + inputFilename + ".go"
-	err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	err = exec.Command("go", "fmt", outputFilename).Run()
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("go", "run", outputFilename)
+func Run(filename string) error {
+	cmd := exec.Command("go", "run", filename)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// returns map of valid breakpoints
+func Compile(inputFilename string) (string, map[string]bool, error) {
+	data, err := ioutil.ReadFile(inputFilename)
+	if err != nil {
+		return "", nil, err
+	}
+	tokens, err := lex(string(data) + "\n")
+	if err != nil {
+		return "", nil, err
+	}
+	definitions, err := parse(tokens)
+	if err != nil {
+		return "", nil, err
+	}
+	code, validBreakpoints, err := compile(definitions)
+	if err != nil {
+		return "", nil, err
+	}
+	outputFilename := outputDir + "/" + inputFilename + ".go"
+	err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
+	if err != nil {
+		return "", nil, err
+	}
+	err = exec.Command("go", "fmt", outputFilename).Run()
+	if err != nil {
+		return "", nil, err
+	}
+	return outputFilename, validBreakpoints, nil
 }
