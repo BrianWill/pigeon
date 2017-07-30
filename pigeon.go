@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
@@ -35,7 +36,6 @@ func main() {
 	} else {
 		server()
 	}
-
 }
 
 func server() {
@@ -45,11 +45,12 @@ func server() {
 	validBreakpoints := map[string]bool{}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		pigeonFiles := []string{}
 		files, err := ioutil.ReadDir(".")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "500 - cannot read directory")
+			fmt.Fprintf(w, err.Error())
 			return
 		}
 		for _, file := range files {
@@ -62,7 +63,7 @@ func server() {
 		t, err := template.ParseFiles("templates/main.html")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "500 - error loading template")
+			fmt.Fprintf(w, err.Error())
 			return
 		}
 		err = t.Execute(w, pigeonFiles)
@@ -75,25 +76,25 @@ func server() {
 	})
 
 	http.HandleFunc("/code/", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		sourceFile := r.URL.Path[6:]
 		bytes, err := ioutil.ReadFile(sourceFile)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "500 - error reading code file")
+			fmt.Fprintf(w, err.Error())
 			return
 		}
 		bytes, err = dynamicPigeon.Highlight(bytes)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "500 - error highlighting code file")
+			fmt.Fprintf(w, err.Error())
 			return
 		}
 		code := template.HTML(bytes)
 		executablePath, validBreakpoints, err = dynamicPigeon.Compile(sourceFile)
-		fmt.Println("valid breakpoints", validBreakpoints)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Error compiling code: "+err.Error())
+			fmt.Fprintf(w, err.Error())
 			return
 		}
 		t, err := template.ParseFiles("templates/code.html")
@@ -115,6 +116,7 @@ func server() {
 	})
 
 	http.HandleFunc("/setBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		lineStr := strings.TrimPrefix(r.URL.Path, "/setBreakpoint/")
 		line, err := strconv.Atoi(lineStr)
 		if err != nil {
@@ -131,10 +133,12 @@ func server() {
 	})
 
 	http.HandleFunc("/clearBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		lineStr := strings.TrimPrefix(r.URL.Path, "/clearBreakpoint/")
 		line, err := strconv.Atoi(lineStr)
 		if err != nil {
-			fmt.Fprintf(w, "Invalid line number.")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "400 - Invalid line number.")
 			return
 		}
 		delete(breakpoints, lineStr)
@@ -142,38 +146,133 @@ func server() {
 	})
 
 	http.HandleFunc("/getBreakpoints", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		jsonBytes, err := json.Marshal(breakpoints)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, err.Error())
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.Write(jsonBytes)
 	})
 
 	http.HandleFunc("/getValidBreakpoints", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		jsonBytes, err := json.Marshal(validBreakpoints)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, err.Error())
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.Write(jsonBytes)
 	})
 
 	continueSignal := false
 
 	http.HandleFunc("/checkContinue", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		fmt.Fprintf(w, "%v", continueSignal)
 		continueSignal = false
 	})
 
 	http.HandleFunc("/continue", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		continueSignal = true
 		fmt.Fprintf(w, "%v", continueSignal)
 	})
 
+	outputBuffer := []string{}
+	var outputMux sync.Mutex
+	http.HandleFunc("/writeOutput", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		outputMux.Lock()
+		defer outputMux.Unlock()
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, err.Error())
+			return
+		}
+		outputBuffer = append(outputBuffer, string(body))
+		fmt.Println("writeOutput: ", outputBuffer)
+	})
+
+	http.HandleFunc("/readOutput", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		outputMux.Lock()
+		defer outputMux.Unlock()
+		fmt.Println("readOutput: ", outputBuffer)
+		jsonBytes, err := json.Marshal(outputBuffer)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, err.Error())
+			return
+		}
+		outputBuffer = []string{}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonBytes)
+	})
+
+	acceptInput := false
+	inputBuffer := []string{}
+	var inputMux sync.Mutex
+	http.HandleFunc("/writeInput", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		if !acceptInput {
+			fmt.Fprintf(w, "not ready")
+			return
+		}
+		inputMux.Lock()
+		defer inputMux.Unlock()
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, err.Error())
+			return
+		}
+		var line string
+		err = json.Unmarshal(body, &line)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, err.Error())
+			return
+		}
+		inputBuffer = append(inputBuffer, line)
+		acceptInput = false
+	})
+
+	http.HandleFunc("/readInput", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		inputMux.Lock()
+		defer inputMux.Unlock()
+		jsonBytes, err := json.Marshal(inputBuffer)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, err.Error())
+			return
+		}
+		inputBuffer = []string{}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonBytes)
+	})
+
+	http.HandleFunc("/acceptInput", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		acceptInput = true
+		fmt.Fprintf(w, "%v", acceptInput)
+		fmt.Println("accept input: ", acceptInput)
+	})
+
+	http.HandleFunc("/rejectInput", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		acceptInput = false
+		fmt.Fprintf(w, "%v", acceptInput)
+	})
+
 	http.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
 		err := dynamicPigeon.Run(executablePath)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

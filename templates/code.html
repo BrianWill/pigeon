@@ -25,8 +25,19 @@
         .com {
             color: green;
         }
-
-        
+        #output {
+            max-height: 150px;
+            overflow-y: scroll;
+            border: solid black 1px;
+        }
+        #input {
+            border:solid black 1px;
+            width: 70%;
+        }
+        #output div {
+            background-color: #c6bfcc;
+            margin-bottom: 3px;
+        }
         #code ol {
             counter-reset: item;
             list-style: none;
@@ -56,6 +67,8 @@
 <body>
     <h1>{{.FileName}}</h1>
     <button id="runButton">run</button><button id="continueButton">continue</button>
+    <div id="output"></div>
+    <label>Input: </label><input type="text" id="input"/>
     <div id="code">
         {{.Code}}
     </div>
@@ -93,6 +106,25 @@
         }
     }, false);
 
+    var inputBox = document.getElementById('input');
+    inputBox.addEventListener("keydown", function(event) {
+        if (event.keyCode == 13) {
+            event.preventDefault();
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/writeInput');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    if (xhr.responseText !== "not ready") {
+                        inputBox.value = '';
+                    }
+                }
+            };
+            xhr.send(JSON.stringify(inputBox.value));
+
+        }
+    });
+
     (function() {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/getValidBreakpoints');
@@ -111,6 +143,27 @@
         xhr.send();
     })();
     
+    (function() {
+        var output = document.getElementById('output');
+        window.setInterval(function () {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/readOutput');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var lines = JSON.parse(xhr.responseText);
+                    for (var i in lines) {
+                        var div = document.createElement('div');
+                        div.innerText = lines[i];
+                        output.appendChild(div);
+                        output.scrollTop = output.scrollHeight;
+                    }
+                }
+            };
+            xhr.send();
+        }, 200)
+    })();
+
+
     </script>
 </body>
 </html>

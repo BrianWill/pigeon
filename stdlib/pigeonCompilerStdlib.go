@@ -1,13 +1,12 @@
 package stdlib
 
 import (
-	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -18,6 +17,8 @@ type Nil int
 type ListType struct {
 	list []interface{}
 }
+
+const serverURL = "http://localhost:7070/"
 
 type MapType map[interface{}]interface{}
 
@@ -367,8 +368,18 @@ func Print(args ...interface{}) interface{} {
 	if len(args) == 0 {
 		panic("Print operation needs at least one operand.")
 	}
-	fmt.Println(args...)
-	// TODO may need to customize printing for some types
+	s := ""
+	for _, v := range args {
+		s += fmt.Sprint(v) + " "
+	}
+	s = s[:len(s)-1]
+	line := bytes.NewBuffer([]byte(s))
+	resp, err := http.Post(serverURL+"writeOutput", "application/json", line)
+	if err != nil {
+		log.Fatalln(err)
+		return err
+	}
+	defer resp.Body.Close()
 	return Nil(0)
 }
 
@@ -376,12 +387,34 @@ func Prompt(args ...interface{}) interface{} {
 	if len(args) > 1 {
 		Print(args...)
 	}
-	// TODO read console input to first newline
-	// TODO may need to customize printing for some types
-	reader := bufio.NewReader(os.Stdin)
-	text, _ := reader.ReadString('\n')
-	text = text[:len(text)-1] // strip off trailing \n
-	return text
+	resp, err := http.Get(serverURL + "acceptInput")
+	if err != nil {
+		log.Fatalln(err)
+		return nil
+	}
+	for ; ; time.Sleep(pollSleepTime) {
+		defer resp.Body.Close()
+		resp, err = http.Get(serverURL + "readInput")
+		if err != nil {
+			log.Fatalln(err)
+			return nil
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalln(err)
+			return nil
+		}
+		var input []string
+		err = json.Unmarshal(body, &input)
+		if err != nil {
+			log.Fatalln(err)
+			return nil
+		}
+		if len(input) >= 1 {
+			return input[0]
+		}
+	}
 }
 
 func Concat(args ...interface{}) interface{} {
@@ -454,7 +487,7 @@ const pollSleepTime = 300 * time.Millisecond
 
 func PollBreakpoints(breakpoints *map[int]bool) error {
 	for ; ; time.Sleep(pollSleepTime) {
-		resp, err := http.Get("http://localhost:7070/getBreakpoints")
+		resp, err := http.Get(serverURL + "getBreakpoints")
 		if err != nil {
 			return err
 		}
@@ -464,15 +497,14 @@ func PollBreakpoints(breakpoints *map[int]bool) error {
 			log.Fatalln("Error reading response in PollBreakpoints")
 			return err
 		}
-		strBreakpoints := &map[string]bool{}
-		fmt.Println(string(body))
-		err = json.Unmarshal(body, strBreakpoints)
+		strBreakpoints := map[string]bool{}
+		err = json.Unmarshal(body, &strBreakpoints)
 		if err != nil {
 			log.Fatalln("Error unmarshalling breakpoints in PollContinue")
 			return err
 		}
 		*breakpoints = map[int]bool{}
-		for k := range *strBreakpoints {
+		for k := range strBreakpoints {
 			linenum, err := strconv.Atoi(k)
 			if err != nil {
 				log.Fatalln("Error: breakpoint not a valid integer in PollContinue")
@@ -486,7 +518,7 @@ func PollBreakpoints(breakpoints *map[int]bool) error {
 
 func PollContinue(globals, locals map[string]interface{}) error {
 	for ; ; time.Sleep(pollSleepTime) {
-		resp, err := http.Get("http://localhost:7070/checkContinue")
+		resp, err := http.Get(serverURL + "checkContinue")
 		if err != nil {
 			return err
 		}

@@ -18,11 +18,11 @@ func playerMove(currentPlayer interface{}) interface{} {
 			"bottomRow": g_bottomRow,
 		}
 		var locals = map[string]interface{}{
-			"currentPlayer": currentPlayer,
 			"move":          move,
 			"row":           row,
 			"col":           col,
 			"slot":          slot,
+			"currentPlayer": currentPlayer,
 		}
 		_p.PollContinue(globals, locals)
 	}
@@ -146,14 +146,14 @@ func winner() interface{} {
 	_p.NullOp(topRowFull, middleRowFull, bottomRowFull)
 	debug := func(line int) {
 		var globals = map[string]interface{}{
-			"bottomRow": g_bottomRow,
 			"topRow":    g_topRow,
 			"middleRow": g_middleRow,
+			"bottomRow": g_bottomRow,
 		}
 		var locals = map[string]interface{}{
-			"topRowFull":    topRowFull,
 			"middleRowFull": middleRowFull,
 			"bottomRowFull": bottomRowFull,
+			"topRowFull":    topRowFull,
 		}
 		_p.PollContinue(globals, locals)
 	}
