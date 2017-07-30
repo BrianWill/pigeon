@@ -491,12 +491,13 @@ func PollBreakpoints(breakpoints *map[int]bool) error {
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Fatalln("Error reading response in PollBreakpoints")
 			return err
 		}
+		resp.Body.Close() // can't use defer because we're in an infinite loop
 		strBreakpoints := map[string]bool{}
 		err = json.Unmarshal(body, &strBreakpoints)
 		if err != nil {
@@ -512,7 +513,6 @@ func PollBreakpoints(breakpoints *map[int]bool) error {
 			}
 			(*breakpoints)[linenum] = true
 		}
-		return nil
 	}
 }
 
@@ -522,12 +522,12 @@ func PollContinue(globals, locals map[string]interface{}) error {
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Fatalln("Error reading response in PollContinue")
 			return err
 		}
+		resp.Body.Close() // can't use defer because we're in an infinite loop
 		if string(body) == "true" {
 			break
 		}

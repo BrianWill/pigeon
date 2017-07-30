@@ -45,7 +45,6 @@ func server() {
 	validBreakpoints := map[string]bool{}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		pigeonFiles := []string{}
 		files, err := ioutil.ReadDir(".")
 		if err != nil {
@@ -76,7 +75,6 @@ func server() {
 	})
 
 	http.HandleFunc("/code/", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		sourceFile := r.URL.Path[6:]
 		bytes, err := ioutil.ReadFile(sourceFile)
 		if err != nil {
@@ -116,7 +114,6 @@ func server() {
 	})
 
 	http.HandleFunc("/setBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		lineStr := strings.TrimPrefix(r.URL.Path, "/setBreakpoint/")
 		line, err := strconv.Atoi(lineStr)
 		if err != nil {
@@ -133,7 +130,6 @@ func server() {
 	})
 
 	http.HandleFunc("/clearBreakpoint/", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		lineStr := strings.TrimPrefix(r.URL.Path, "/clearBreakpoint/")
 		line, err := strconv.Atoi(lineStr)
 		if err != nil {
@@ -146,7 +142,6 @@ func server() {
 	})
 
 	http.HandleFunc("/getBreakpoints", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		jsonBytes, err := json.Marshal(breakpoints)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -158,7 +153,6 @@ func server() {
 	})
 
 	http.HandleFunc("/getValidBreakpoints", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		jsonBytes, err := json.Marshal(validBreakpoints)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -172,13 +166,11 @@ func server() {
 	continueSignal := false
 
 	http.HandleFunc("/checkContinue", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		fmt.Fprintf(w, "%v", continueSignal)
 		continueSignal = false
 	})
 
 	http.HandleFunc("/continue", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		continueSignal = true
 		fmt.Fprintf(w, "%v", continueSignal)
 	})
@@ -186,7 +178,6 @@ func server() {
 	outputBuffer := []string{}
 	var outputMux sync.Mutex
 	http.HandleFunc("/writeOutput", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		outputMux.Lock()
 		defer outputMux.Unlock()
 		body, err := ioutil.ReadAll(r.Body)
@@ -200,7 +191,6 @@ func server() {
 	})
 
 	http.HandleFunc("/readOutput", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		outputMux.Lock()
 		defer outputMux.Unlock()
 		fmt.Println("readOutput: ", outputBuffer)
@@ -219,7 +209,6 @@ func server() {
 	inputBuffer := []string{}
 	var inputMux sync.Mutex
 	http.HandleFunc("/writeInput", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		if !acceptInput {
 			fmt.Fprintf(w, "not ready")
 			return
@@ -244,7 +233,6 @@ func server() {
 	})
 
 	http.HandleFunc("/readInput", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		inputMux.Lock()
 		defer inputMux.Unlock()
 		jsonBytes, err := json.Marshal(inputBuffer)
@@ -259,20 +247,17 @@ func server() {
 	})
 
 	http.HandleFunc("/acceptInput", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		acceptInput = true
 		fmt.Fprintf(w, "%v", acceptInput)
 		fmt.Println("accept input: ", acceptInput)
 	})
 
 	http.HandleFunc("/rejectInput", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		acceptInput = false
 		fmt.Fprintf(w, "%v", acceptInput)
 	})
 
 	http.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
 		err := dynamicPigeon.Run(executablePath)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
