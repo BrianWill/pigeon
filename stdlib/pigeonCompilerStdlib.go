@@ -491,7 +491,6 @@ func PollBreakpoints(breakpoints *map[int]bool) error {
 		if err != nil {
 			return err
 		}
-
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Fatalln("Error reading response in PollBreakpoints")
@@ -516,9 +515,9 @@ func PollBreakpoints(breakpoints *map[int]bool) error {
 	}
 }
 
-func PollContinue(globals, locals map[string]interface{}) error {
+func PollContinue(line int, globals, locals map[string]interface{}) error {
 	for ; ; time.Sleep(pollSleepTime) {
-		resp, err := http.Get(serverURL + "checkContinue")
+		resp, err := http.Get(serverURL + "checkContinue/" + strconv.Itoa(line))
 		if err != nil {
 			return err
 		}

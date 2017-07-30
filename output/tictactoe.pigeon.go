@@ -24,7 +24,7 @@ func playerMove(currentPlayer interface{}) interface{} {
 			"slot":          slot,
 			"currentPlayer": currentPlayer,
 		}
-		_p.PollContinue(globals, locals)
+		_p.PollContinue(line, globals, locals)
 	}
 	if _breakpoints[7] {
 		debug(7)
@@ -151,11 +151,11 @@ func winner() interface{} {
 			"bottomRow": g_bottomRow,
 		}
 		var locals = map[string]interface{}{
+			"topRowFull":    topRowFull,
 			"middleRowFull": middleRowFull,
 			"bottomRowFull": bottomRowFull,
-			"topRowFull":    topRowFull,
 		}
-		_p.PollContinue(globals, locals)
+		_p.PollContinue(line, globals, locals)
 	}
 	if _breakpoints[45] {
 		debug(45)
@@ -269,7 +269,7 @@ func _main() interface{} {
 			"done":          done,
 			"currentPlayer": currentPlayer,
 		}
-		_p.PollContinue(globals, locals)
+		_p.PollContinue(line, globals, locals)
 	}
 	if _breakpoints[78] {
 		debug(78)

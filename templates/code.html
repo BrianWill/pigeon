@@ -5,10 +5,15 @@
         
     </title>
     <style>
+        body {
+            font-family: "Helvetica";
+        }
         #code {
             white-space: pre;  
             font-family: "Lucida Console", Monaco, monospace;
             font-size: 10pt;
+            height: 400px;
+            overflow-y: scroll;
         }
         #code li {
             margin: -7px 0;
@@ -26,21 +31,26 @@
             color: green;
         }
         #output {
-            max-height: 150px;
+            height: 150px;
             overflow-y: scroll;
+            margin: 6px 0px;
             border: solid black 1px;
+            font-size: 80%;
         }
         #input {
             border:solid black 1px;
             width: 70%;
+            margin-bottom: 8px;
         }
         #output div {
             background-color: #c6bfcc;
-            margin-bottom: 3px;
+            margin: 3px 0px;
+            padding: 2px 10px;
         }
         #code ol {
             counter-reset: item;
             list-style: none;
+            margin-top: -20px;
         }
         #code li {
             counter-increment: item;
@@ -86,19 +96,26 @@
         xhr.send();
     }
     document.getElementById('code').addEventListener('click', function (evt) {
-        var linenum = evt.target.getAttribute('linenum');
+        var ele = evt.target;
+        while (ele.nodeName !== "LI") { 
+            ele = ele.parentElement;
+            if (!ele || ele.id == 'code') {
+                return;
+            }
+        }
+        var linenum = ele.getAttribute('linenum');
         if (linenum) {
             var xhr = new XMLHttpRequest();
             if (breakpoints[linenum]) {
                 delete breakpoints[linenum];
                 xhr.open('GET', '/clearBreakpoint/' + linenum);
-                evt.target.classList.remove('breakpoint');         
+                ele.classList.remove('breakpoint');         
             } else {
                 xhr.open('GET', '/setBreakpoint/' + linenum);
                 xhr.onload = function() {
                     if (xhr.status === 200) {
                         breakpoints[linenum] = true;
-                        evt.target.classList.add('breakpoint');         
+                        ele.classList.add('breakpoint');
                     }
                 };
             } 

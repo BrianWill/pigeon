@@ -163,16 +163,24 @@ func server() {
 		w.Write(jsonBytes)
 	})
 
-	continueSignal := false
+	continueFlag := false
 
-	http.HandleFunc("/checkContinue", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "%v", continueSignal)
-		continueSignal = false
+	http.HandleFunc("/checkContinue/", func(w http.ResponseWriter, r *http.Request) {
+		// the breakpoint line on which the code is currently paused
+		lineStr := strings.TrimPrefix(r.URL.Path, "/checkContinue/")
+		_, err := strconv.Atoi(lineStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "400 - Invalid line number.")
+			return
+		}
+		fmt.Fprintf(w, "%v", continueFlag)
+		continueFlag = false
 	})
 
 	http.HandleFunc("/continue", func(w http.ResponseWriter, r *http.Request) {
-		continueSignal = true
-		fmt.Fprintf(w, "%v", continueSignal)
+		continueFlag = true
+		fmt.Fprintf(w, "%v", continueFlag)
 	})
 
 	outputBuffer := []string{}
@@ -187,13 +195,11 @@ func server() {
 			return
 		}
 		outputBuffer = append(outputBuffer, string(body))
-		fmt.Println("writeOutput: ", outputBuffer)
 	})
 
 	http.HandleFunc("/readOutput", func(w http.ResponseWriter, r *http.Request) {
 		outputMux.Lock()
 		defer outputMux.Unlock()
-		fmt.Println("readOutput: ", outputBuffer)
 		jsonBytes, err := json.Marshal(outputBuffer)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -249,7 +255,6 @@ func server() {
 	http.HandleFunc("/acceptInput", func(w http.ResponseWriter, r *http.Request) {
 		acceptInput = true
 		fmt.Fprintf(w, "%v", acceptInput)
-		fmt.Println("accept input: ", acceptInput)
 	})
 
 	http.HandleFunc("/rejectInput", func(w http.ResponseWriter, r *http.Request) {

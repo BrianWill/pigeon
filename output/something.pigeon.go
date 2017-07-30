@@ -8,7 +8,7 @@ func _main() interface{} {
 	debug := func(line int) {
 		var globals = map[string]interface{}{}
 		var locals = map[string]interface{}{}
-		_p.PollContinue(globals, locals)
+		_p.PollContinue(line, globals, locals)
 	}
 	if _breakpoints[2] {
 		debug(2)

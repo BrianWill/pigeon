@@ -1160,7 +1160,7 @@ func genDebugFn(globals, locals Scope) string {
 		s += fmt.Sprintf("\"%s\": %s,\n", k, k)
 	}
 	s += `}
-	_p.PollContinue(globals, locals)
+	_p.PollContinue(line, globals, locals)
 }
 `
 	return s
