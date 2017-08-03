@@ -18,11 +18,11 @@ func playerMove(currentPlayer interface{}) interface{} {
 			"bottomRow": g_bottomRow,
 		}
 		var locals = map[string]interface{}{
+			"currentPlayer": currentPlayer,
 			"move":          move,
 			"row":           row,
 			"col":           col,
 			"slot":          slot,
-			"currentPlayer": currentPlayer,
 		}
 		_p.PollContinue(line, globals, locals)
 	}
@@ -265,9 +265,9 @@ func _main() interface{} {
 			"bottomRow": g_bottomRow,
 		}
 		var locals = map[string]interface{}{
+			"currentPlayer": currentPlayer,
 			"w":             w,
 			"done":          done,
-			"currentPlayer": currentPlayer,
 		}
 		_p.PollContinue(line, globals, locals)
 	}

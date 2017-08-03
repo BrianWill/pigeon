@@ -1,7 +1,4 @@
 /*
-Read in the file 'example.pigeon' and lex (tokenize) its content.
-
-
 If the file contains tab characters or any non-ASCII character, the lexer
 returns an error. (Only spaces are allowed for indentation.)
 
@@ -1056,7 +1053,7 @@ func compile(definitions []Definition) (string, map[string]bool, error) {
 	globalsDone := false
 	code := `package main
 
-import _p "github.com/BrianWill/pigeon/stdlib"
+import _p "github.com/BrianWill/pigeon/dynamicPigeon/stdlib"
 
 var _breakpoints = make(map[int]bool)
 
@@ -1384,24 +1381,24 @@ func Highlight(code []byte) ([]byte, error) {
 	return highlight.AsHTML(code, highlight.OrderedList())
 }
 
-func CompileAndRun(filename string) error {
+func CompileAndRun(filename string) (*exec.Cmd, error) {
 	filename, _, err := Compile(filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return Run(filename)
 }
 
-func Run(filename string) error {
+func Run(filename string) (*exec.Cmd, error) {
 	cmd := exec.Command("go", "run", filename)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	err := cmd.Start()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return cmd, nil
 }
 
 // returns map of valid breakpoints

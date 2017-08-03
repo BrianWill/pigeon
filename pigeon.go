@@ -27,7 +27,7 @@ func main() {
 				fmt.Println("Must specify a file to run.")
 				return
 			}
-			err := dynamicPigeon.CompileAndRun(os.Args[2])
+			_, err := dynamicPigeon.CompileAndRun(os.Args[2])
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -38,7 +38,22 @@ func main() {
 	}
 }
 
+type runStateEnum string
+
+const (
+	stopped runStateEnum = "stopped"
+	running runStateEnum = "running"
+	paused  runStateEnum = "paused"
+)
+
+type RunState struct {
+	state     runStateEnum
+	lastBreak int
+}
+
 func server() {
+
+	runState := RunState{stopped, 0}
 	// TODO use session state
 	executablePath := ""
 	breakpoints := map[string]bool{}
@@ -75,6 +90,7 @@ func server() {
 	})
 
 	http.HandleFunc("/code/", func(w http.ResponseWriter, r *http.Request) {
+		runState = RunState{stopped, 0}
 		sourceFile := r.URL.Path[6:]
 		bytes, err := ioutil.ReadFile(sourceFile)
 		if err != nil {
@@ -168,11 +184,16 @@ func server() {
 	http.HandleFunc("/checkContinue/", func(w http.ResponseWriter, r *http.Request) {
 		// the breakpoint line on which the code is currently paused
 		lineStr := strings.TrimPrefix(r.URL.Path, "/checkContinue/")
-		_, err := strconv.Atoi(lineStr)
+		line, err := strconv.Atoi(lineStr)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "400 - Invalid line number.")
 			return
+		}
+		if continueFlag {
+			runState = RunState{running, line}
+		} else {
+			runState = RunState{paused, line}
 		}
 		fmt.Fprintf(w, "%v", continueFlag)
 		continueFlag = false
@@ -262,14 +283,32 @@ func server() {
 		fmt.Fprintf(w, "%v", acceptInput)
 	})
 
+	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "%v %v", runState.state, runState.lastBreak)
+	})
+
+	var runningProgram *exec.Cmd
+
 	http.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
-		err := dynamicPigeon.Run(executablePath)
+		var err error
+		runningProgram, err = dynamicPigeon.Run(executablePath)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Error compiling code: "+err.Error())
 			return
 		}
+		runState = RunState{running, 0}
 		fmt.Fprintf(w, "running")
+	})
+
+	http.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
+		if runningProgram != nil {
+			runningProgram.Process.Kill()
+			runState.state = stopped
+			fmt.Fprintf(w, "stopped")
+		} else {
+			fmt.Fprintf(w, "not running")
+		}
 	})
 
 	go func() {

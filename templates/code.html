@@ -71,14 +71,19 @@
         #code li.breakpoint:before {
             background: #c31010;
         }
-        
+        #status, #lastbreakpoint {
+            color: green;
+        }
     </style>
 </head>
 <body>
     <h1>{{.FileName}}</h1>
-    <button id="runButton">run</button><button id="continueButton">continue</button>
+    <button id="runButton">run</button>
+    <button id="continueButton">continue</button>
+    <button id="stopButton">stop</button>
     <div id="output"></div>
     <label>Input: </label><input type="text" id="input"/>
+    <h2>Status: <span id="status">not started</span> Last breakpoint: <span id="lastbreakpoint">0</span></h2>
     <div id="code">
         {{.Code}}
     </div>
@@ -86,6 +91,7 @@
     var breakpoints = {};
 
     document.getElementById('runButton').onclick = function (evt) {
+        document.getElementById('output').innerHTML = '';
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/run');
         xhr.send();
@@ -93,6 +99,11 @@
     document.getElementById('continueButton').onclick = function (evt) {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/continue');
+        xhr.send();
+    }
+    document.getElementById('stopButton').onclick = function (evt) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/stop');
         xhr.send();
     }
     document.getElementById('code').addEventListener('click', function (evt) {
@@ -142,8 +153,8 @@
         }
     });
 
-    (function() {
-        var xhr = new XMLHttpRequest();
+    {
+        let xhr = new XMLHttpRequest();
         xhr.open('GET', '/getValidBreakpoints');
         xhr.onload = function() {
             if (xhr.status === 200) {
@@ -158,10 +169,10 @@
             }
         };
         xhr.send();
-    })();
+    }
     
-    (function() {
-        var output = document.getElementById('output');
+    {
+        let output = document.getElementById('output');
         window.setInterval(function () {
             var xhr = new XMLHttpRequest();
             xhr.open('GET', '/readOutput');
@@ -178,7 +189,24 @@
             };
             xhr.send();
         }, 200)
-    })();
+    }
+
+    {
+        let status = document.getElementById('status');
+        let lastbreakpoint = document.getElementById('lastbreakpoint');
+        window.setInterval(function () {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/status');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var [state, line] = xhr.responseText.split(' ');
+                    status.innerText = state;
+                    lastbreakpoint.innerText = line;
+                }
+            };
+            xhr.send();
+        }, 200)
+    }
 
 
     </script>
