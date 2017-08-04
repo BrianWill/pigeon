@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
+	"github.com/BrianWill/pigeon/staticPigeon"
 )
 
 func main() {
@@ -27,11 +28,20 @@ func main() {
 				fmt.Println("Must specify a file to run.")
 				return
 			}
-			_, err := dynamicPigeon.CompileAndRun(os.Args[2])
-			if err != nil {
-				fmt.Println(err)
-				return
+			if strings.HasSuffix(os.Args[2], ".spigeon") {
+				_, _, err := staticPigeon.Compile(os.Args[2])
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			} else {
+				_, err := dynamicPigeon.CompileAndRun(os.Args[2])
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
 			}
+
 		}
 	} else {
 		server()
