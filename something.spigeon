@@ -1,4 +1,11 @@
+
+func sum a N b N : N
+    return (add a b)
+
 func main
     (print "hi")
+    if foo
+        (prompt "yo")
     (print "yo")
     (print "bla")
+

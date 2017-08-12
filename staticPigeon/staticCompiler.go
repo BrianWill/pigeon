@@ -35,329 +35,9 @@ package staticPigeon
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"strconv"
 	"strings"
 )
-
-// TODO use bytes.Buffer for more efficent string building
-//import "bytes"
-
-// we use arbitrary number values to designate each type of token. Rather than using straight ints, we
-// create a distinct type to help avoid mistreating these values like ints.
-type TokenType int
-
-type Scope map[string]bool // set of variable names declared in scope
-
-const (
-	// every constant is assigned the same expression, but the value of iota is zero in
-	// the first line, then 1 in the second, then 2 in the third, and so forth
-	ReservedWord TokenType = iota
-	OperatorWord
-	IdentifierWord
-	Newline
-	Indentation
-	OpenParen
-	CloseParen
-	NumberLiteral
-	StringLiteral
-	BooleanLiteral
-	NilLiteral
-	OpenSquare
-	CloseSquare
-	Dot
-	Space
-	TypeName
-	OpenAngle
-	CloseAngle
-	Colon
-)
-
-const indentationSpaces = 4
-const outputDir = "output"
-
-var reservedWords = []string{
-	"func",
-	"global",
-	"struct",
-	"interface",
-	"import",
-	"method",
-	"foreach",
-	"typeswitch",
-	"break",
-	"continue",
-	"if",
-	"while",
-	"else",
-	"elseif",
-	"return",
-	"as",
-	"locals",
-	"asinc",
-	"asdec",
-	"asadd",
-	"assub",
-	"asmul",
-	"asdiv",
-	"_p",
-	"_main",
-	"_break",
-	"_breakpoints",
-	"_validBreakpoints",
-}
-
-var operators = []string{
-	"add",
-	"sub",
-	"mul",
-	"div",
-	"mod",
-	"eq",
-	"neq",
-	"id",
-	"not",
-	"lt",
-	"gt",
-	"lte",
-	"gte",
-	"get",
-	"set",
-	"append",
-	"or",
-	"and",
-	"print",
-	"prompt",
-	"concat",
-	"list",
-	"map",
-	"len",
-}
-
-type Token struct {
-	Type       TokenType
-	Content    string // the token itself, e.g. a number 3.7 is stored here as "3.7"
-	LineNumber int    // first line is line 1
-	Column     int    // first character of a line is in column 1
-}
-
-type Statement interface {
-	Statement()
-	Line() int
-}
-
-type Expression interface {
-	Expression()
-	Line() int
-	// Type() DataType
-}
-
-type Definition interface {
-	Definition()
-	Line() int
-}
-
-type DataType interface {
-	DataType()
-}
-
-func (t Token) Expression()        {}
-func (t Variable) Expression()     {}
-func (t FunctionCall) Expression() {}
-func (t Operation) Expression()    {}
-
-func (t FunctionDefinition) Definition()  {}
-func (t GlobalDefinition) Definition()    {}
-func (t ImportDefinition) Definition()    {}
-func (t StructDefinition) Definition()    {}
-func (t InterfaceDefinition) Definition() {}
-func (t MethodDefinition) Definition()    {}
-
-func (t LocalsStatement) Statement()     {}
-func (t IfStatement) Statement()         {}
-func (t WhileStatement) Statement()      {}
-func (t AssignmentStatement) Statement() {}
-func (t ReturnStatement) Statement()     {}
-func (t FunctionCall) Statement()        {}
-func (t Operation) Statement()           {}
-
-func (t LocalsStatement) Line() int {
-	return t.Names[0].LineNumber
-}
-func (t IfStatement) Line() int {
-	return t.Condition.Line()
-}
-func (t WhileStatement) Line() int {
-	return t.Condition.Line()
-}
-func (t AssignmentStatement) Line() int {
-	return t.Target.Line()
-}
-func (t ReturnStatement) Line() int {
-	return t.LineNumber
-}
-func (t Variable) Line() int {
-	return t.LineNumber
-}
-func (t FunctionCall) Line() int {
-	return t.LineNumber
-}
-func (t Operation) Line() int {
-	return t.LineNumber
-}
-
-func (t FunctionDefinition) Line() int {
-	return t.LineNumber
-}
-
-func (t ImportDefinition) Line() int {
-	return t.LineNumber
-}
-
-func (t GlobalDefinition) Line() int {
-	return t.LineNumber
-}
-
-func (t StructDefinition) Line() int {
-	return t.LineNumber
-}
-
-func (t InterfaceDefinition) Line() int {
-	return t.LineNumber
-}
-
-func (t Token) Line() int {
-	return t.LineNumber
-}
-
-func (t MethodDefinition) Line() int {
-	return t.LineNumber
-}
-
-type FunctionDefinition struct {
-	LineNumber int
-	Column     int
-	Name       string
-	Parameters []Variable
-	ReturnType DataType
-	Body       []Statement
-}
-
-type GlobalDefinition struct {
-	LineNumber int
-	Column     int
-	Name       string
-	Value      Expression
-	Type       DataType
-}
-
-type ImportDefinition struct {
-	LineNumber int
-	Column     int
-	Path       string
-	Names      []string
-	Aliases    []string
-}
-
-type StructDefinition struct {
-	LineNumber int
-	Column     int
-	Name       string
-	Members    []Variable
-}
-
-type MethodDefinition struct {
-	LineNumber int
-	Column     int
-	Name       string
-	Receiver   Variable
-	Parameters []Variable
-	ReturnType DataType
-	Body       []Statement
-}
-
-type InterfaceDefinition struct {
-	LineNumber int
-	Column     int
-	Name       string
-	Methods    []Signature
-}
-
-type Signature struct {
-	LineNumber int
-	Column     int
-	ParamTypes []DataType
-	ReturnType DataType
-}
-
-type Variable struct {
-	LineNumber int
-	Column     int
-	Name       string
-	Type       DataType
-}
-
-type FunctionCall struct {
-	LineNumber int
-	Column     int
-	Function   Expression // either an identifier or another function/operator call
-	Arguments  []Expression
-}
-
-type Operation struct {
-	LineNumber int
-	Column     int
-	Operator   string
-	Operands   []Expression
-}
-
-type IfStatement struct {
-	LineNumber int
-	Column     int
-	Condition  Expression
-	Body       []Statement
-	Elifs      []ElseifClause
-	Else       ElseClause
-}
-
-type ElseifClause struct {
-	LineNumber int
-	Column     int
-	Condition  Expression
-	Body       []Statement
-}
-
-type ElseClause struct {
-	LineNumber int
-	Column     int
-	Body       []Statement
-}
-
-type LocalsStatement struct {
-	LineNumber int
-	Column     int
-	Names      []Variable
-}
-
-type WhileStatement struct {
-	LineNumber int
-	Column     int
-	Condition  Expression
-	Body       []Statement
-}
-
-type ReturnStatement struct {
-	LineNumber int
-	Column     int
-	Value      Expression
-}
-
-type AssignmentStatement struct {
-	LineNumber int
-	Column     int
-	Target     Expression
-	Value      Expression
-}
 
 // returns true if rune is a letter of the English alphabet
 func isAlpha(r rune) bool {
@@ -501,8 +181,8 @@ func lex(text string) ([]Token, error) {
 			for {
 				current := runes[endIdx]
 				// loop will never run past end of runes because \n appended to end of file
-				// A word should always end with space, newline, or )
-				if strings.Contains(" \n).[", string(current)) {
+				// A word should always end with space, newline, <, >, ., [, or )
+				if strings.Contains(" \n)<>.[", string(current)) {
 					break
 				} else if !(isAlpha(current) || current == '_' || isNumeral(current)) {
 					return nil, errors.New("Word improperly formed at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
@@ -677,10 +357,16 @@ func parseStruct(tokens []Token, line int) (StructDefinition, int, error) {
 	}
 	idx++
 	name := tokens[idx]
-	if name.Type != IdentifierWord {
+	if name.Type != TypeName {
 		return StructDefinition{}, 0, errors.New("Expected name for struct on line " + lineStr)
 	}
 	idx++
+	for _, v := range builtinTypes {
+		if name.Content == v {
+			return StructDefinition{}, 0, errors.New("Invalid struct name: cannot redefine builtin type " +
+				name.Content + " on line " + lineStr)
+		}
+	}
 	if tokens[idx].Type == Space {
 		idx++
 	}
@@ -691,6 +377,7 @@ func parseStruct(tokens []Token, line int) (StructDefinition, int, error) {
 
 	members := []Variable{}
 	for {
+		lineStr := strconv.Itoa(tokens[idx].LineNumber)
 		if tokens[idx].Type != Indentation {
 			break
 		}
@@ -704,7 +391,7 @@ func parseStruct(tokens []Token, line int) (StructDefinition, int, error) {
 			return StructDefinition{}, 0, errors.New("Expected space on line " + lineStr)
 		}
 		idx++
-		memberType, numTypeTokens, err := parseType(tokens[idx:], line)
+		memberType, numTypeTokens, err := parseType(tokens[idx:], tokens[idx].LineNumber)
 		if err != nil {
 			return StructDefinition{}, 0, err
 		}
@@ -721,7 +408,7 @@ func parseStruct(tokens []Token, line int) (StructDefinition, int, error) {
 	if len(members) == 0 {
 		return StructDefinition{}, 0, errors.New("Struct definition has no members on line " + lineStr)
 	}
-	return StructDefinition{line, tokens[0].Column, name.Content, members}, idx, nil
+	return StructDefinition{line, tokens[0].Column, name.Content, members, nil}, idx, nil
 }
 
 func parseMethod(tokens []Token, line int) (MethodDefinition, int, error) {
@@ -739,14 +426,14 @@ func parseMethod(tokens []Token, line int) (MethodDefinition, int, error) {
 		funcDef.Name,
 		funcDef.Parameters[0],
 		funcDef.Parameters[1:],
-		funcDef.ReturnType,
+		funcDef.ReturnTypes,
 		funcDef.Body,
 	}, numTokens, nil
 }
 
 // used by parseFunction
 // consumes all tokens through end of line
-func parseParameters(tokens []Token, line int) ([]Variable, DataType, int, error) {
+func parseParameters(tokens []Token, line int) ([]Variable, []ParsedDataType, int, error) {
 	lineStr := strconv.Itoa(line)
 	params := []Variable{}
 	idx := 0
@@ -785,21 +472,35 @@ Loop:
 		}
 	}
 
-	// optional colon and return type
-	var returnType DataType
+	// optional colon and return types
+	var returnTypes []ParsedDataType
 	if tokens[idx].Type == Colon {
 		idx++
 		if tokens[idx].Type != Space {
 			return nil, nil, 0, errors.New("Expecting space on line " + lineStr)
 		}
 		idx++
-		var err error
-		var n int
-		returnType, n, err = parseType(tokens[idx:], line)
+		t, n, err := parseType(tokens[idx:], line)
 		if err != nil {
 			return nil, nil, 0, err
 		}
 		idx += n
+		returnTypes = append(returnTypes, t)
+		for {
+			if tokens[idx].Type == Newline || tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
+				break
+			}
+			if tokens[idx].Type != Space {
+				return nil, nil, 0, errors.New("Expecting space on line " + lineStr)
+			}
+			idx++
+			t, n, err := parseType(tokens[idx:], line)
+			if err != nil {
+				return nil, nil, 0, err
+			}
+			idx += n
+			returnTypes = append(returnTypes, t)
+		}
 	}
 
 	// newline
@@ -811,61 +512,80 @@ Loop:
 	}
 	idx++
 
-	return params, returnType, idx, nil
+	return params, returnTypes, idx, nil
 }
 
 // used by parseInterface, not parseFunction
 // consumes all tokens through end of line
 func parseSignature(tokens []Token, line int) (Signature, int, error) {
 	lineStr := strconv.Itoa(line)
-	paramTypes := []DataType{}
+	paramTypes := []ParsedDataType{}
+	returnTypes := []ParsedDataType{}
 	idx := 0
-	expectingSpace := false
-Loop:
-	for {
-		t := tokens[idx]
-		switch t.Type {
-		case Space:
-			expectingSpace = false
+	methodName := tokens[idx]
+	if methodName.Type != IdentifierWord {
+		return Signature{}, 0, errors.New("Expecting method name on line " + lineStr)
+	}
+	idx++
+	if tokens[idx].Type == Space && tokens[idx+1].Type != Newline {
+		expectingSpace := false
+	Loop:
+		for {
+			t := tokens[idx]
+			switch t.Type {
+			case Space:
+				expectingSpace = false
+				idx++
+			case TypeName:
+				dataType, n, err := parseType(tokens[idx:], line)
+				if err != nil {
+					return Signature{}, 0, err
+				}
+				paramTypes = append(paramTypes, dataType)
+				idx += n
+				expectingSpace = true
+			case Colon:
+				if expectingSpace {
+					return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
+				}
+				// don't inc idx
+				break Loop
+			case Newline:
+				break Loop
+			default:
+				return Signature{}, 0, errors.New("Unexpected token on line " + lineStr)
+			}
+		}
+		// optional colon and return types
+		if tokens[idx].Type == Colon {
 			idx++
-		case TypeName:
-			dataType, n, err := parseType(tokens[idx:], line)
+			if tokens[idx].Type != Space {
+				return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
+			}
+			idx++
+			t, n, err := parseType(tokens[idx:], line)
 			if err != nil {
 				return Signature{}, 0, err
 			}
-			paramTypes = append(paramTypes, dataType)
 			idx += n
-			expectingSpace = true
-		case Colon:
-			if expectingSpace {
-				return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
+			returnTypes = append(returnTypes, t)
+			for {
+				if tokens[idx].Type == Newline || tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
+					break
+				}
+				if tokens[idx].Type != Space {
+					return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
+				}
+				idx++
+				t, n, err := parseType(tokens[idx:], line)
+				if err != nil {
+					return Signature{}, 0, err
+				}
+				idx += n
+				returnTypes = append(returnTypes, t)
 			}
-			// don't inc idx
-			break Loop
-		case Newline:
-			break Loop
-		default:
-			return Signature{}, 0, errors.New("Unexpected token on line " + lineStr)
 		}
 	}
-
-	// optional colon and return type
-	var returnType DataType
-	if tokens[idx].Type == Colon {
-		idx++
-		if tokens[idx].Type != Space {
-			return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
-		}
-		idx++
-		var err error
-		var n int
-		returnType, n, err = parseType(tokens[idx:], line)
-		if err != nil {
-			return Signature{}, 0, err
-		}
-		idx += n
-	}
-
 	// newline
 	if tokens[idx].Type == Space {
 		idx++
@@ -874,8 +594,7 @@ Loop:
 		return Signature{}, 0, errors.New("Expecting newline on line " + lineStr)
 	}
 	idx++
-
-	return Signature{line, tokens[0].Column, paramTypes, returnType}, idx, nil
+	return Signature{line, tokens[0].Column, methodName.Content, paramTypes, returnTypes}, idx, nil
 }
 
 func parseInterface(tokens []Token, line int) (InterfaceDefinition, int, error) {
@@ -886,7 +605,7 @@ func parseInterface(tokens []Token, line int) (InterfaceDefinition, int, error) 
 	}
 	idx++
 	name := tokens[idx]
-	if name.Type != IdentifierWord {
+	if name.Type != TypeName {
 		return InterfaceDefinition{}, 0, errors.New("Expected name for interface on line " + lineStr)
 	}
 	idx++
@@ -904,7 +623,7 @@ func parseInterface(tokens []Token, line int) (InterfaceDefinition, int, error) 
 			break
 		}
 		idx++
-		signature, numTokens, err := parseSignature(tokens[idx:], line)
+		signature, numTokens, err := parseSignature(tokens[idx:], tokens[idx].LineNumber)
 		if err != nil {
 			return InterfaceDefinition{}, 0, err
 		}
@@ -918,9 +637,100 @@ func parseInterface(tokens []Token, line int) (InterfaceDefinition, int, error) 
 
 }
 
-func parseType(tokens []Token, line int) (DataType, int, error) {
+func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
+	lineStr := strconv.Itoa(line)
+	idx := 0
+	primary := tokens[idx]
+	if primary.Type != TypeName {
+		return ParsedDataType{}, 0, errors.New("Expecting type name on line " + lineStr)
+	}
+	idx++
+	paramTypes := []ParsedDataType{}
+	returnTypes := []ParsedDataType{}
+	if tokens[idx].Type == OpenAngle {
+		idx++
+		if tokens[idx].Type == Space {
+			idx++
+		}
+		if tokens[idx].Type == Colon {
+			returnTypes, n, err := parseReturnTypes(tokens[idx:], line)
+			if err != nil {
+				return ParsedDataType{}, 0, err
+			}
+			idx += n
+			return ParsedDataType{primary.Content, paramTypes, returnTypes}, idx, nil
+		}
+		dataType, n, err := parseType(tokens[idx:], line)
+		if err != nil {
+			return ParsedDataType{}, 0, err
+		}
+		idx += n
+		paramTypes = append(paramTypes, dataType)
+
+		for {
+			if tokens[idx].Type != Space {
+				break
+			}
+			idx++
+			if tokens[idx].Type == Colon {
+				var n int
+				var err error
+				returnTypes, n, err = parseReturnTypes(tokens[idx:], line)
+				if err != nil {
+					return ParsedDataType{}, 0, err
+				}
+				idx += n
+				break
+			}
+			dataType, n, err := parseType(tokens[idx:], line)
+			if err != nil {
+				return ParsedDataType{}, 0, err
+			}
+			idx += n
+			paramTypes = append(paramTypes, dataType)
+		}
+		if tokens[idx].Type != CloseAngle {
+			return ParsedDataType{}, 0, errors.New("Expecting closing angle bracket on line " + lineStr)
+		}
+		idx++
+	}
+	return ParsedDataType{primary.Content, paramTypes, returnTypes}, idx, nil
+}
+
+// expects to end with newline or >, but does not consume the newline or >
+func parseReturnTypes(tokens []Token, line int) ([]ParsedDataType, int, error) {
+	lineStr := strconv.Itoa(line)
 	idx := 1
-	return nil, idx, nil
+	if tokens[idx].Type != Space {
+		return nil, 0, errors.New("Expecting space on line " + lineStr)
+	}
+	returnTypes := []ParsedDataType{}
+	dataType, n, err := parseType(tokens[idx:], line)
+	if err != nil {
+		return nil, 0, err
+	}
+	returnTypes = append(returnTypes, dataType)
+	idx += n
+	for {
+		if tokens[idx].Type == CloseAngle || tokens[idx].Type == Newline {
+			break
+		}
+		if tokens[idx].Type == Space && (tokens[idx+1].Type == CloseAngle || tokens[idx+1].Type == Newline) {
+			idx++
+			break
+		}
+		if tokens[idx].Type != Space {
+			return nil, 0, errors.New("Expecting space on line " + lineStr)
+		}
+		idx++
+		dataType, n, err := parseType(tokens[idx:], line)
+		if err != nil {
+			return nil, 0, err
+		}
+		idx += n
+		returnTypes = append(returnTypes, dataType)
+	}
+	return returnTypes, idx, nil
 }
 
 func parseGlobal(tokens []Token, line int) (GlobalDefinition, int, error) {
@@ -1156,7 +966,7 @@ func parseFunction(tokens []Token, line int) (FunctionDefinition, int, error) {
 	}
 	idx++
 	var params []Variable
-	var returnType DataType
+	var returnTypes []ParsedDataType
 	var err error
 	if tokens[idx].Type == Newline {
 		idx++
@@ -1168,7 +978,7 @@ func parseFunction(tokens []Token, line int) (FunctionDefinition, int, error) {
 		}
 		idx++
 		var nTokens int
-		params, returnType, nTokens, err = parseParameters(tokens[idx:], line)
+		params, returnTypes, nTokens, err = parseParameters(tokens[idx:], line)
 		if err != nil {
 			return FunctionDefinition{}, 0, err
 		}
@@ -1180,15 +990,12 @@ func parseFunction(tokens []Token, line int) (FunctionDefinition, int, error) {
 	}
 	idx += nTokens
 	return FunctionDefinition{tokens[0].LineNumber, tokens[0].Column, name.Content,
-		params, returnType, body}, idx, nil
+		params, returnTypes, body}, idx, nil
 }
 
 // 'indentation' = number of spaces before 'if'
 func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
-	if len(tokens) < 6 {
-		return IfStatement{}, 0, errors.New("Improper if statement on line " + line)
-	}
 	idx := 1
 	if tokens[idx].Type != Space {
 		return IfStatement{}, 0, errors.New("Missing space on line " + line)
@@ -1244,9 +1051,6 @@ func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
 
 func parseElif(tokens []Token, indentation int) (ElseifClause, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
-	if len(tokens) < 5 {
-		return ElseifClause{}, 0, errors.New("Improper elif clause on line " + line)
-	}
 	idx := 1
 	if tokens[idx].Type != Space {
 		return ElseifClause{}, 0, errors.New("Missing space on line " + line)
@@ -1274,9 +1078,6 @@ func parseElif(tokens []Token, indentation int) (ElseifClause, int, error) {
 
 func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
-	if len(tokens) < 4 {
-		return ElseClause{}, 0, errors.New("Improper else clause on line " + line)
-	}
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
@@ -1329,9 +1130,6 @@ func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
 
 func parseReturn(tokens []Token) (ReturnStatement, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
-	if len(tokens) < 3 {
-		return ReturnStatement{}, 0, errors.New("Improper return statement on line " + line)
-	}
 	idx := 1
 	if tokens[idx].Type != Space {
 		return ReturnStatement{}, 0, errors.New("Missing space on line " + line)
@@ -1342,6 +1140,9 @@ func parseReturn(tokens []Token) (ReturnStatement, int, error) {
 		return ReturnStatement{}, 0, err
 	}
 	idx += nTokens
+	if tokens[idx].Type == Space {
+		idx++
+	}
 	if tokens[idx].Type != Newline {
 		return ReturnStatement{}, 0, errors.New("Return statement not terminated with newline on line " + line)
 	}
@@ -1349,13 +1150,34 @@ func parseReturn(tokens []Token) (ReturnStatement, int, error) {
 	return ReturnStatement{tokens[0].LineNumber, tokens[0].Column, value}, idx, nil
 }
 
+func parseBreak(tokens []Token) (BreakStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return BreakStatement{}, 0, errors.New("Break statement not terminated with newline on line " + line)
+	}
+	return BreakStatement{tokens[0].LineNumber, tokens[0].Column}, idx, nil
+}
+
+func parseContinue(tokens []Token) (ContinueStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return ContinueStatement{}, 0, errors.New("Continue statement not terminated with newline on line " + line)
+	}
+	return ContinueStatement{tokens[0].LineNumber, tokens[0].Column}, idx, nil
+}
+
 // assume first token is reserved word "as"
 // returns number of tokens (including the newline at the end)
 func parseAssignment(tokens []Token) (AssignmentStatement, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
-	if len(tokens) < 4 {
-		return AssignmentStatement{}, 0, errors.New("Improper assignment statement on line " + line)
-	}
 	idx := 1
 	if tokens[idx].Type != Space {
 		return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
@@ -1392,6 +1214,7 @@ func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 	if tokens[idx].Type != Space {
 		return LocalsStatement{}, 0, errors.New("Expecting space on line " + lineStr)
 	}
+	idx++
 	var locals []Variable
 	for idx < len(tokens) {
 		token := tokens[idx]
@@ -1407,6 +1230,7 @@ func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 			}
 			idx += n
 			locals = append(locals, Variable{line, token.Column, token.Content, dataType})
+		} else if token.Type == Space && tokens[idx+1].Type != Newline {
 			idx++
 		} else {
 			break
@@ -1416,7 +1240,7 @@ func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return LocalsStatement{}, 0, errors.New("Expecting newline on line " + lineStr)
+		return LocalsStatement{}, 0, errors.New("Expecting newline in locals statement on line " + lineStr)
 	}
 	idx++
 	return LocalsStatement{tokens[0].LineNumber, tokens[0].Column, locals}, idx, nil
@@ -1457,6 +1281,10 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseLocals(tokens[i:])
 					case "return":
 						statement, numTokens, err = parseReturn(tokens[i:])
+					case "break":
+						statement, numTokens, err = parseBreak(tokens[i:])
+					case "continue":
+						statement, numTokens, err = parseContinue(tokens[i:])
 					default:
 						return nil, 0, errors.New("Improper reserved word '" + t.Content + "' in body: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
 					}
@@ -1470,11 +1298,9 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						return nil, 0, err
 					}
 					statement = expression.(Statement)
-
 					if tokens[i+numTokens].Type != Newline {
 						return nil, 0, errors.New("Statement not terminated with newline on line " + strconv.Itoa(t.LineNumber))
 					}
-
 					numTokens++ // add in the newline
 				default:
 					return nil, 0, errors.New("Improper token. Expected start of statement: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
@@ -1487,392 +1313,4 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 		}
 	}
 	return statements, i, nil
-}
-
-// /* All identifiers get prefixed with _ to avoid collisions with Go reserved words and predefined identifiers */
-// // returns map of valid breakpoints
-// func compile(definitions []Definition) (string, map[string]bool, error) {
-// 	globals := make(Scope)
-// 	globalsDone := false
-// 	code := `package main
-
-// import _p "github.com/BrianWill/pigeon/stdlib"
-
-// var _breakpoints = make(map[int]bool)
-
-// `
-// 	validBreakpoints := make(map[string]bool)
-// 	// TODO check for duplicate global and function names
-// 	for _, def := range definitions {
-// 		switch d := def.(type) {
-// 		case GlobalDefinition:
-// 			if globalsDone {
-// 				return "", nil, errors.New("All globals must be defined before all functions")
-// 			}
-// 			name := d.Name.Content
-// 			c, err := compileExpression(d.Value, make(Scope), globals)
-// 			if err != nil {
-// 				return "", nil, err
-// 			}
-// 			code += "var g_" + name + " interface{} = " + c + "\n"
-// 			globals[name] = true
-// 		case FunctionDefinition:
-// 			globalsDone = true
-// 			c, err := compileFunc(d, globals, validBreakpoints)
-// 			if err != nil {
-// 				return "", nil, err
-// 			}
-// 			code += c
-// 		default:
-// 			return "", nil, errors.New("Unrecognized definition")
-// 		}
-// 	}
-// 	code += `
-
-// func main() {
-// 	go _p.PollBreakpoints(&_breakpoints)
-// 	_main()
-// }
-// `
-
-// 	return code, validBreakpoints, nil
-// }
-
-// // returns code snippet ending with '\n\n'
-// func compileFunc(fn FunctionDefinition, globals Scope, validBreakpoints map[string]bool) (string, error) {
-// 	locals := make(Scope)
-
-// 	header := "func " + fn.Name.Content + "("
-// 	for _, param := range fn.Parameters {
-// 		header += param.Content + " interface{}, "
-// 		locals[param.Content] = true
-// 	}
-// 	if len(fn.Parameters) > 0 {
-// 		header = header[:len(header)-2] // drop last comma and space
-// 	}
-// 	header += ") interface{} {\n"
-// 	if len(fn.Body) < 1 {
-// 		return "", errors.New("Function should contain at least one statement.")
-// 	}
-// 	bodyStatements := fn.Body
-// 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
-// 		localsStr := "var "
-// 		nullOp := "_p.NullOp(" // supresses unused variable compile errors
-// 		for _, name := range localsStatement.Names {
-// 			if locals[name.Content] {
-// 				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
-// 					name.Content, name.LineNumber)
-// 			}
-// 			locals[name.Content] = true
-// 			localsStr += name.Content + ", "
-// 			nullOp += name.Content + ", "
-// 		}
-// 		localsStr = localsStr[:len(localsStr)-2] // hack off last comma
-// 		nullOp = nullOp[:len(nullOp)-2]
-// 		header += localsStr + " interface{}\n" + nullOp + ")\n"
-// 		bodyStatements = bodyStatements[1:]
-// 	}
-// 	header += genDebugFn(globals, locals)
-// 	body, err := compileBody(bodyStatements, locals, globals, validBreakpoints)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	if len(fn.Body) > 0 {
-// 		_, lastIsReturn := fn.Body[len(fn.Body)-1].(ReturnStatement)
-// 		if lastIsReturn {
-// 			return header + body + "}\n", nil
-// 		}
-// 	}
-// 	return header + body + "return nil\n}\n", nil
-// }
-
-// func genDebugFn(globals, locals Scope) string {
-// 	s := `debug := func(line int) {
-// 	var globals = map[string]interface{}{
-// `
-// 	for k := range globals {
-// 		s += fmt.Sprintf("\"%s\": g_%s,\n", k, k)
-// 	}
-// 	s += `}
-// 	var locals = map[string]interface{}{
-// `
-// 	for k := range locals {
-// 		s += fmt.Sprintf("\"%s\": %s,\n", k, k)
-// 	}
-// 	s += `}
-// 	_p.PollContinue(line, globals, locals)
-// }
-// `
-// 	return s
-// }
-
-// func compileIfStatement(s IfStatement, locals, globals Scope, validBreakpoints map[string]bool) (string, error) {
-// 	c, err := compileExpression(s.Condition, locals, globals)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	code := "if " + c + ".(bool)"
-// 	c, err = compileBody(s.Body, locals, globals, validBreakpoints)
-// 	if err != nil {
-// 		return "", nil
-// 	}
-// 	code += " {\n" + c + "}"
-// 	for _, elif := range s.Elifs {
-// 		c, err := compileExpression(elif.Condition, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += " else if " + c + ".(bool) {\n"
-// 		c, err = compileBody(elif.Body, locals, globals, validBreakpoints)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += c + "}"
-// 	}
-
-// 	if len(s.Else.Body) > 0 {
-// 		c, err := compileBody(s.Else.Body, locals, globals, validBreakpoints)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += " else {\n" + c + "}"
-// 	}
-// 	return code + "\n", nil
-// }
-
-// func compileWhileStatement(s WhileStatement, locals, globals Scope, validBreakpoints map[string]bool) (string, error) {
-// 	c, err := compileExpression(s.Condition, locals, globals)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	code := "for " + c + ".(bool) {\n"
-// 	c, err = compileBody(s.Body, locals, globals, validBreakpoints)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return code + c + "}\n", nil
-// }
-
-// func compileBody(statements []Statement, locals, globals Scope, validBreakpoints map[string]bool) (string, error) {
-// 	var code string
-// 	for _, s := range statements {
-// 		line := s.Line()
-// 		validBreakpoints[strconv.Itoa(line)] = true
-// 		code += fmt.Sprintf("if _breakpoints[%d] {debug(%d)}\n", line, line)
-// 		var c string
-// 		var err error
-// 		switch s := s.(type) {
-// 		case IfStatement:
-// 			c, err = compileIfStatement(s, locals, globals, validBreakpoints)
-// 		case WhileStatement:
-// 			c, err = compileWhileStatement(s, locals, globals, validBreakpoints)
-// 		case AssignmentStatement:
-// 			c, err = compileAssignmentStatement(s, locals, globals)
-// 		case ReturnStatement:
-// 			c, err = compileReturnStatement(s, locals, globals)
-// 		case FunctionCall:
-// 			c, err = compileFunctionCall(s, locals, globals)
-// 			c += "\n"
-// 		case Operation:
-// 			c, err = compileOperation(s, locals, globals)
-// 			c += "\n"
-// 		}
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += c
-// 	}
-// 	return code, nil
-// }
-
-// func compileAssignmentStatement(s AssignmentStatement, locals, globals Scope) (string, error) {
-// 	switch target := s.Target.(type) {
-// 	case Token:
-// 		if target.Type != IdentifierWord {
-// 			return "", errors.New("Assignment to non-identifier on line " + strconv.Itoa(target.LineNumber))
-// 		}
-// 		name := target.Content
-// 		if !locals[name] && !globals[name] {
-// 			return "", errors.New("Assignment to non-existent variable on line " + strconv.Itoa(target.LineNumber))
-// 		}
-// 		c, err := compileExpression(s.Value, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		return target.Content + " = " + c + "\n", nil
-// 	case Operation:
-// 		if target.Operator.Content != "get" {
-// 			return "", errors.New("Improper target of assignment on line " + strconv.Itoa(target.Operator.LineNumber))
-// 		}
-// 		// turn the get op into a set op
-// 		target.Operator.Content = "set"
-// 		target.Operands = append(target.Operands, s.Value)
-// 		c, err := compileExpression(target, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		return c + "\n", nil
-// 	case FunctionCall:
-// 		return "", errors.New("Invalid target of assignment on line " + strconv.Itoa(target.LineNumber))
-// 	default:
-// 		// TODO give Expression LineNumber() method so we can get a line number here
-// 		return "", errors.New("Invalid target of assignment.")
-// 	}
-// }
-
-// func compileReturnStatement(s ReturnStatement, locals, globals Scope) (string, error) {
-// 	c, err := compileExpression(s.Value, locals, globals)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return "return " + c + "\n", nil
-// }
-
-// func compileFunctionCall(s FunctionCall, locals, globals Scope) (string, error) {
-// 	var code string
-// 	switch s := s.Function.(type) {
-// 	case Operation:
-// 		c, err := compileOperation(s, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += c
-// 	case FunctionCall:
-// 		c, err := compileFunctionCall(s, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += c
-// 		// TODO have to assert type of function
-// 	case Token: // will always be an identifier
-// 		code += s.Content
-// 	}
-// 	code += "(" // start of arguments
-// 	for _, exp := range s.Arguments {
-// 		c, err := compileExpression(exp, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += c + ", " // Go is OK with comma after last arg, so don't need special case for last arg
-// 	}
-// 	if len(s.Arguments) > 0 {
-// 		code = code[:len(code)-2] // drop last comma and space
-// 	}
-// 	return code + ")", nil
-// }
-
-// func compileOperation(o Operation, locals, globals Scope) (string, error) {
-// 	operator := o.Operator.Content
-
-// 	runes := []rune(operator)
-// 	runes[0] = unicode.ToUpper(runes[0])
-// 	operator = string(runes)
-
-// 	code := "_p." + operator + "("
-// 	for _, exp := range o.Operands {
-// 		c, err := compileExpression(exp, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code += c + ", " // Go is OK with comma after last arg, so don't need special case for last arg
-// 	}
-// 	if len(o.Operands) > 0 {
-// 		code = code[:len(code)-2] // drop last comma and space
-// 	}
-// 	code += ")"
-// 	return code, nil
-// }
-
-// func compileExpression(e Expression, locals, globals Scope) (string, error) {
-// 	var code string
-// 	switch e := e.(type) {
-// 	case Operation:
-// 		c, err := compileOperation(e, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code = c
-// 	case FunctionCall:
-// 		c, err := compileFunctionCall(e, locals, globals)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		code = c
-// 	case Token:
-// 		switch e.Type {
-// 		case IdentifierWord:
-// 			name := e.Content
-// 			if locals[name] {
-// 				code = name
-// 			} else if globals[name] {
-// 				code = "g_" + name
-// 			} else {
-// 				return "", fmt.Errorf("Name %s on line %d is undefined.", name, e.LineNumber)
-// 			}
-// 		case NumberLiteral:
-// 			code = "float64(" + e.Content + ")"
-// 		case StringLiteral, BooleanLiteral:
-// 			code = e.Content
-// 		case NilLiteral:
-// 			code = "_p.Nil(0)"
-// 		}
-// 	}
-// 	return code, nil
-// }
-
-// func Highlight(code []byte) ([]byte, error) {
-// 	return highlight.AsHTML(code, highlight.OrderedList())
-// }
-
-// func CompileAndRun(filename string) (*exec.Cmd, error) {
-// 	filename, _, err := Compile(filename)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return Run(filename)
-// }
-
-// func Run(filename string) (*exec.Cmd, error) {
-// 	cmd := exec.Command("go", "run", filename)
-// 	cmd.Stdin = os.Stdin
-// 	cmd.Stdout = os.Stdout
-// 	cmd.Stderr = os.Stderr
-// 	err := cmd.Start()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return cmd, nil
-// }
-
-// returns map of valid breakpoints
-func Compile(inputFilename string) (string, map[string]bool, error) {
-	data, err := ioutil.ReadFile(inputFilename)
-	if err != nil {
-		return "", nil, err
-	}
-	tokens, err := lex(string(data) + "\n")
-	if err != nil {
-		return "", nil, err
-	}
-	fmt.Println("tokens: ", tokens)
-	definitions, err := parse(tokens)
-	if err != nil {
-		return "", nil, err
-	}
-	fmt.Println("definitions", definitions)
-	return "", nil, nil
-	// code, validBreakpoints, err := compile(definitions)
-	// if err != nil {
-	// 	return "", nil, err
-	// }
-	// outputFilename := outputDir + "/" + inputFilename + ".go"
-	// err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
-	// if err != nil {
-	// 	return "", nil, err
-	// }
-	// err = exec.Command("go", "fmt", outputFilename).Run()
-	// if err != nil {
-	// 	return "", nil, err
-	// }
-	// return outputFilename, validBreakpoints, nil
 }

@@ -1,0 +1,26 @@
+
+
+
+
+
+# data types
+
+I8 I16 I32 I64
+U8 U16 U32 U64
+
+
+
+func foo arr A<I 3>          // without :, implicitly returns void
+
+func foo : P<V>              // returns void pointer
+
+PP<I>               // short-hand for P<P<I>>
+PPP<I>              // P<P<P<I>>>
+AP<3 I>             // A<3 P<I>>
+PA<3 I>             // P<A<3 I>>
+
+AA<I 3 5>           // A<3 A<I 5>>
+
+
+
+
