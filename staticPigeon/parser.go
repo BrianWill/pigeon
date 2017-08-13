@@ -1129,10 +1129,10 @@ func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
 }
 
 func parseReturn(tokens []Token) (ReturnStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	lineStr := strconv.Itoa(tokens[0].LineNumber)
 	idx := 1
 	if tokens[idx].Type != Space {
-		return ReturnStatement{}, 0, errors.New("Missing space on line " + line)
+		return ReturnStatement{}, 0, errors.New("Missing space on line " + lineStr)
 	}
 	idx++
 	value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
@@ -1140,14 +1140,28 @@ func parseReturn(tokens []Token) (ReturnStatement, int, error) {
 		return ReturnStatement{}, 0, err
 	}
 	idx += nTokens
-	if tokens[idx].Type == Space {
+	values := []Expression{value}
+	for {
+		if tokens[idx].Type == Newline {
+			idx++
+			break
+		}
+		if tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
+			idx += 2
+			break
+		}
+		if tokens[idx].Type != Space {
+			return ReturnStatement{}, 0, errors.New("Missing space on line " + lineStr)
+		}
 		idx++
+		value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+		if err != nil {
+			return ReturnStatement{}, 0, err
+		}
+		idx += nTokens
+		values = append(values, value)
 	}
-	if tokens[idx].Type != Newline {
-		return ReturnStatement{}, 0, errors.New("Return statement not terminated with newline on line " + line)
-	}
-
-	return ReturnStatement{tokens[0].LineNumber, tokens[0].Column, value}, idx, nil
+	return ReturnStatement{tokens[0].LineNumber, tokens[0].Column, values}, idx, nil
 }
 
 func parseBreak(tokens []Token) (BreakStatement, int, error) {

@@ -98,10 +98,6 @@ func main() {
 	return code, validBreakpoints, nil
 }
 
-func compileType(dataType DataType) (string, error) {
-	return "", nil
-}
-
 // assumes both are valid types and that all type names are unique
 func isType(child DataType, parent DataType, exact bool) bool {
 	if child == parent {
@@ -196,16 +192,16 @@ func canonicalType(parsed ParsedDataType, types map[string]DataType) (DataType, 
 func compileExpression(e Expression, locals map[string]Variable, globals map[string]GlobalDefinition,
 	types map[string]DataType) (string, []DataType, error) {
 	var code string
-	var returnedType DataType
+	var returnedTypes []DataType
 	var err error
 	switch e := e.(type) {
 	case Operation:
-		code, returnedType, err = compileOperation(e, locals, globals, types)
+		code, returnedTypes, err = compileOperation(e, locals, globals, types)
 		if err != nil {
 			return "", nil, err
 		}
 	case FunctionCall:
-		code, returnedType, err = compileFunctionCall(e, locals, globals, types)
+		code, returnedTypes, err = compileFunctionCall(e, locals, globals, types)
 		if err != nil {
 			return "", nil, err
 		}
@@ -215,33 +211,35 @@ func compileExpression(e Expression, locals map[string]Variable, globals map[str
 			name := e.Content
 			if v, ok := locals[name]; ok {
 				code = name
-				returnedType, err = canonicalType(v.Type, types)
+				rt, err := canonicalType(v.Type, types)
 				if err != nil {
 					return "", nil, err
 				}
+				returnedTypes = []DataType{rt}
 			} else if v, ok := globals[name]; ok {
 				code = "g_" + name
-				returnedType, err = canonicalType(v.Type, types)
+				rt, err := canonicalType(v.Type, types)
 				if err != nil {
 					return "", nil, err
 				}
+				returnedTypes = []DataType{rt}
 			} else {
 				return "", nil, fmt.Errorf("Name %s on line %d is undefined.", name, e.LineNumber)
 			}
 		case NumberLiteral:
 			code = "float64(" + e.Content + ")"
-			returnedType = BuiltinType{"N", nil}
+			returnedTypes = []DataType{BuiltinType{"N", nil}}
 		case StringLiteral:
 			code = e.Content
-			returnedType = BuiltinType{"Str", nil}
+			returnedTypes = []DataType{BuiltinType{"Str", nil}}
 		case BooleanLiteral:
 			code = e.Content
-			returnedType = BuiltinType{"Bool", nil}
+			returnedTypes = []DataType{BuiltinType{"Bool", nil}}
 		case NilLiteral:
 			code = "_p.Nil(0)"
 		}
 	}
-	return code, returnedType, nil
+	return code, returnedTypes, nil
 }
 
 func compileGlobals(globals map[string]GlobalDefinition, types map[string]DataType,
@@ -258,56 +256,95 @@ func compileGlobals(globals map[string]GlobalDefinition, types map[string]DataTy
 			return "", err
 		}
 		code += c
-		c, returnedType, err := compileExpression(g.Value, map[string]Variable{}, globals, types)
+		c, returnedTypes, err := compileExpression(g.Value, map[string]Variable{}, globals, types)
 		if err != nil {
 			return "", err
 		}
-		if t != returnedType {
+		if len(returnedTypes) != 1 {
+			return "", errors.New("Initial value of global does not match the declared type.")
+		}
+		if t != returnedTypes[0] {
 			return "", errors.New("Initial value of global does not match the declared type.")
 		}
 		code += c + "\n"
 		validBreakpoints[strconv.Itoa(g.LineNumber)] = true
 	}
+	return code, nil
+}
+
+func compileType(dt DataType) (string, error) {
 	return "", nil
 }
 
-// // returns code snippet ending with '\n\n'
+// returns code snippet ending with '\n\n'
 func compileFunc(fn FunctionDefinition, globals map[string]GlobalDefinition,
 	types map[string]DataType, validBreakpoints map[string]bool) (string, error) {
-	locals := map[string]Variable{}
 
+	locals := map[string]Variable{}
 	header := "func " + fn.Name + "("
-	for _, param := range fn.Parameters {
-		header += param.Name + " interface{}, "
+	for i, param := range fn.Parameters {
+		dt, err := canonicalType(param.Type, types)
+		if err != nil {
+			return "", err
+		}
+		typeCode, err := compileType(dt)
+		if err != nil {
+			return "", err
+		}
+		header += param.Name + " " + typeCode
+		if i < len(fn.Parameters)-1 {
+			header += ", "
+		}
 		locals[param.Name] = param
 	}
 	if len(fn.Parameters) > 0 {
 		header = header[:len(header)-2] // drop last comma and space
 	}
-	header += ") interface{} {\n"
+	header += ") ("
+	returnTypes := make([]DataType, len(fn.ReturnTypes))
+	for i, rt := range fn.ReturnTypes {
+		dt, err := canonicalType(rt, types)
+		if err != nil {
+			return "", err
+		}
+		returnTypes[i] = dt
+		typeCode, err := compileType(dt)
+		if err != nil {
+			return "", err
+		}
+		header += typeCode
+		if i < len(fn.ReturnTypes)-1 {
+			header += ", "
+		}
+	}
+	header += ") {\n"
 	if len(fn.Body) < 1 {
 		return "", errors.New("Function should contain at least one statement.")
 	}
+
 	bodyStatements := fn.Body
 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
-		localsStr := "var "
-		nullOp := "_p.NullOp(" // supresses unused variable compile errors
-		for _, name := range localsStatement.Names {
-			if locals[name.Content] {
+		for _, v := range localsStatement.Vars {
+			header += "var "
+			if _, ok := locals[v.Name]; ok {
 				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
-					name.Content, name.LineNumber)
+					v.Name, v.LineNumber)
 			}
-			locals[name.Content] = true
-			localsStr += name.Content + ", "
-			nullOp += name.Content + ", "
+			locals[v.Name] = v
+			dt, err := canonicalType(v.Type, types)
+			if err != nil {
+				return "", err
+			}
+			typeCode, err := compileType(dt)
+			if err != nil {
+				return "", err
+			}
+			header += v.Name + " " + typeCode + "\n"
 		}
-		localsStr = localsStr[:len(localsStr)-2] // hack off last comma
-		nullOp = nullOp[:len(nullOp)-2]
-		header += localsStr + " interface{}\n" + nullOp + ")\n"
 		bodyStatements = bodyStatements[1:]
 	}
-	header += genDebugFn(globals, locals)
-	body, err := compileBody(bodyStatements, fn, locals, globals, types, validBreakpoints)
+	header += genDebugFn(locals, globals)
+	body, err := compileBody(bodyStatements, returnTypes, locals, globals, types, validBreakpoints)
 	if err != nil {
 		return "", err
 	}
@@ -343,22 +380,25 @@ func genDebugFn(locals map[string]Variable, globals map[string]GlobalDefinition)
 func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, locals map[string]Variable,
 	globals map[string]GlobalDefinition, types map[string]DataType,
 	validBreakpoints map[string]bool) (string, error) {
-	c, returnedType, err := compileExpression(s.Condition, locals, globals, types)
+	c, returnedTypes, err := compileExpression(s.Condition, locals, globals, types)
 	if err != nil {
 		return "", err
 	}
-	code := "if " + c + ".(bool)"
+	if len(returnedTypes) != 1 || !isType(returnedTypes[0], BuiltinType{"Bool", nil}, true) {
+		return "", fmt.Errorf("if condition does not return one value or returns non-bool on line %d", s.LineNumber)
+	}
+	code := "if " + c
 	c, err = compileBody(s.Body, expectedReturnTypes, locals, globals, types, validBreakpoints)
 	if err != nil {
 		return "", nil
 	}
 	code += " {\n" + c + "}"
 	for _, elif := range s.Elifs {
-		c, returnedType, err := compileExpression(elif.Condition, locals, globals, types)
+		c, returnedTypes, err := compileExpression(elif.Condition, locals, globals, types)
 		if err != nil {
 			return "", err
 		}
-		if !isType(returnedType, BuiltinType{"Bool", nil}, true) {
+		if !isType(returnedTypes[0], BuiltinType{"Bool", nil}, true) {
 			return "", errors.New("Elif condition expression does not return a boolean on line " + strconv.Itoa(elif.LineNumber))
 		}
 		code += " else if " + c + ".(bool) {\n"
@@ -380,11 +420,11 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, locals ma
 
 func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, locals map[string]Variable,
 	globals map[string]GlobalDefinition, types map[string]DataType, validBreakpoints map[string]bool) (string, error) {
-	c, returnedType, err := compileExpression(s.Condition, locals, globals, types)
+	c, returnedTypes, err := compileExpression(s.Condition, locals, globals, types)
 	if err != nil {
 		return "", err
 	}
-	if !isType(returnedType, BuiltinType{"Bool", nil}, true) {
+	if !isType(returnedTypes[0], BuiltinType{"Bool", nil}, true) {
 		return "", errors.New("while condition expression does not return a boolean on line " + strconv.Itoa(s.LineNumber))
 	}
 	code := "for " + c + ".(bool) {\n"
@@ -405,7 +445,6 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, locals 
 		code += fmt.Sprintf("if _breakpoints[%d] {debug(%d)}\n", line, line)
 		var c string
 		var err error
-		var returnedType DataType
 		switch s := s.(type) {
 		case IfStatement:
 			c, err = compileIfStatement(s, expectedReturnTypes, locals, globals, types, validBreakpoints)
@@ -416,10 +455,10 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, locals 
 		case ReturnStatement:
 			c, err = compileReturnStatement(s, expectedReturnTypes, locals, globals, types)
 		case FunctionCall:
-			c, returnedType, err = compileFunctionCall(s, locals, globals, types)
+			c, _, err = compileFunctionCall(s, locals, globals, types)
 			c += "\n"
 		case Operation:
-			c, returnedType, err = compileOperation(s, locals, globals, types)
+			c, _, err = compileOperation(s, locals, globals, types)
 			c += "\n"
 		}
 		if err != nil {
@@ -444,7 +483,7 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 		if !isLocal && !isGlobal {
 			return "", errors.New("Assignment to non-existent variable on line " + lineStr)
 		}
-		c, returnedType, err := compileExpression(s.Value, locals, globals, types)
+		c, returnedTypes, err := compileExpression(s.Value, locals, globals, types)
 		if err != nil {
 			return "", err
 		}
@@ -460,7 +499,7 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 		if err != nil {
 			return "", err
 		}
-		if !isType(dataType, returnedType, false) {
+		if !isType(dataType, returnedTypes[0], false) {
 			return "", errors.New("Value in assignment does not match expected type on line " + lineStr)
 		}
 		return target.Content + " = " + c + "\n", nil
@@ -471,7 +510,8 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 		// turn the get op into a set op
 		target.Operator = "set"
 		target.Operands = append(target.Operands, s.Value)
-		c, returnedType, err := compileExpression(target, locals, globals, types)
+		// TODO check type and handle multiple assignment
+		c, _, err := compileExpression(target, locals, globals, types)
 		if err != nil {
 			return "", err
 		}
@@ -484,31 +524,42 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 
 func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, locals map[string]Variable,
 	globals map[string]GlobalDefinition, types map[string]DataType) (string, error) {
-	c, dataType, err := compileExpression(s.Value, locals, globals, types)
-	if err != nil {
-		return "", err
+	lineStr := strconv.Itoa(s.LineNumber)
+	if len(s.Values) != len(expectedReturnTypes) {
+		return "", errors.New("Return statement has wrong number of values on line " + lineStr)
 	}
-	if !isType(dataType, expectedReturnTypes[0], false) {
-		return "", errors.New("Wrong data type for return on " + strconv.Itoa(s.LineNumber))
+	code := "return "
+	for i, v := range s.Values {
+		c, returnedTypes, err := compileExpression(v, locals, globals, types)
+		if err != nil {
+			return "", err
+		}
+		if len(returnedTypes) != 1 {
+			return "", errors.New("Expression in return statement returns more than one value on line " + lineStr)
+		}
+		code += c
+		if i < len(s.Values)-1 {
+			code += ", "
+		}
 	}
-	return "return " + c + "\n", nil
+	return code + "\n", nil
 }
 
 func compileFunctionCall(s FunctionCall, locals map[string]Variable, globals map[string]GlobalDefinition,
-	types map[string]DataType) (string, DataType, error) {
+	types map[string]DataType) (string, []DataType, error) {
 	var code string
-	var returnedType DataType
+	var returnedTypes []DataType
 	var c string
 	var err error
 	switch s := s.Function.(type) {
 	case Operation:
-		c, returnedType, err = compileOperation(s, locals, globals, types)
+		c, returnedTypes, err = compileOperation(s, locals, globals, types)
 		if err != nil {
 			return "", nil, err
 		}
 		code += c
 	case FunctionCall:
-		c, returnedType, err = compileFunctionCall(s, locals, globals, types)
+		c, returnedTypes, err = compileFunctionCall(s, locals, globals, types)
 		if err != nil {
 			return "", nil, err
 		}
@@ -519,7 +570,7 @@ func compileFunctionCall(s FunctionCall, locals map[string]Variable, globals map
 	}
 	code += "(" // start of arguments
 	for _, exp := range s.Arguments {
-		c, returnedType, err = compileExpression(exp, locals, globals, types)
+		c, returnedTypes, err = compileExpression(exp, locals, globals, types)
 		if err != nil {
 			return "", nil, err
 		}
@@ -528,20 +579,23 @@ func compileFunctionCall(s FunctionCall, locals map[string]Variable, globals map
 	if len(s.Arguments) > 0 {
 		code = code[:len(code)-2] // drop last comma and space
 	}
-	return code + ")", returnedType, nil
+	return code + ")", returnedTypes, nil
 }
 
 func compileOperation(o Operation, locals map[string]Variable, globals map[string]GlobalDefinition,
-	types map[string]DataType) (string, DataType, error) {
+	types map[string]DataType) (string, []DataType, error) {
 	operandCode := make([]string, len(o.Operands))
 	operandTypes := make([]DataType, len(o.Operands))
 	for i, expr := range o.Operands {
-		c, returnType, err := compileExpression(expr, locals, globals, types)
+		c, returnTypes, err := compileExpression(expr, locals, globals, types)
 		if err != nil {
 			return "", nil, err
 		}
+		if len(returnTypes) != 1 {
+			return "", nil, errors.New("operand expression returns more than one value on line " + strconv.Itoa(o.LineNumber))
+		}
 		operandCode[i] = c
-		operandTypes[i] = returnType
+		operandTypes[i] = returnTypes[0]
 	}
 	code := "("
 	var returnType DataType
@@ -814,7 +868,7 @@ func compileOperation(o Operation, locals map[string]Variable, globals map[strin
 	}
 
 	code += ")"
-	return code, returnType, nil
+	return code, []DataType{returnType}, nil
 }
 
 // func Highlight(code []byte) ([]byte, error) {

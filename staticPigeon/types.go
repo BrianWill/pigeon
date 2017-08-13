@@ -171,7 +171,7 @@ func (t BuiltinType) DataType()         {}
 func (t FunctionType) DataType()        {}
 
 func (t LocalsStatement) Line() int {
-	return t.Names[0].LineNumber
+	return t.Vars[0].LineNumber
 }
 func (t IfStatement) Line() int {
 	return t.Condition.Line()
@@ -333,7 +333,7 @@ type ElseClause struct {
 type LocalsStatement struct {
 	LineNumber int
 	Column     int
-	Names      []Variable
+	Vars       []Variable
 }
 
 type WhileStatement struct {
@@ -346,7 +346,7 @@ type WhileStatement struct {
 type ReturnStatement struct {
 	LineNumber int
 	Column     int
-	Value      Expression
+	Values     []Expression
 }
 
 type BreakStatement struct {
