@@ -408,7 +408,7 @@ func parseStruct(tokens []Token, line int) (StructDefinition, int, error) {
 	if len(members) == 0 {
 		return StructDefinition{}, 0, errors.New("Struct definition has no members on line " + lineStr)
 	}
-	return StructDefinition{line, tokens[0].Column, name.Content, members, nil}, idx, nil
+	return StructDefinition{line, tokens[0].Column, name.Content, members}, idx, nil
 }
 
 func parseMethod(tokens []Token, line int) (MethodDefinition, int, error) {

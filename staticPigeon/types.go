@@ -169,6 +169,7 @@ func (t InterfaceDefinition) DataType() {}
 func (t StructDefinition) DataType()    {}
 func (t BuiltinType) DataType()         {}
 func (t FunctionType) DataType()        {}
+func (t Struct) DataType()              {}
 
 func (t LocalsStatement) Line() int {
 	return t.Vars[0].LineNumber
@@ -259,7 +260,15 @@ type StructDefinition struct {
 	Column     int
 	Name       string
 	Members    []Variable
-	Implements []string // names of the interfaces this struct implements
+}
+
+type Struct struct {
+	LineNumber  int
+	Column      int
+	Name        string
+	MemberNames []string
+	MemberTypes []DataType
+	Implements  []string // names of the interfaces this struct implements
 }
 
 type MethodDefinition struct {
@@ -364,4 +373,12 @@ type AssignmentStatement struct {
 	Column     int
 	Target     Expression
 	Value      Expression
+}
+
+type CodeContext struct {
+	Globals          map[string]GlobalDefinition
+	Locals           map[string]Variable
+	Types            map[string]DataType
+	FuncTypes        map[string]FunctionType
+	ValidBreakpoints map[string]bool
 }

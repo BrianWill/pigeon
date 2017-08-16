@@ -79,13 +79,36 @@ import _p "github.com/BrianWill/pigeon/stdlib"
 var _breakpoints = make(map[int]bool)
 
 `
-	validBreakpoints := map[string]bool{}
 
-	c, err := compileGlobals(globals, types, validBreakpoints)
+	var ctx CodeContext
+	ctx.Locals = map[string]Variable{}
+	ctx.Globals = map[string]GlobalDefinition{}
+	ctx.FuncTypes = map[string]FunctionType{}
+	ctx.ValidBreakpoints = map[string]bool{}
+	ctx.Types = types
+	err := processStructs(structs, types)
+	if err != nil {
+		return "", nil, err
+	}
+	err = validateInterfaces(interfaces, types)
+	if err != nil {
+		return "", nil, err
+	}
+	for _, fn := range funcs {
+		fnType, err := getFunctionType(fn, types)
+		if err != nil {
+			return "", nil, err
+		}
+		ctx.FuncTypes[fn.Name] = fnType
+	}
+
+	c, err := compileGlobals(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 	code += c
+
+	// TODO compile functions
 
 	code += `
 
@@ -95,7 +118,107 @@ func main() {
 }
 `
 
-	return code, validBreakpoints, nil
+	return code, ctx.ValidBreakpoints, nil
+}
+
+func validateInterfaces(interfaces map[string]InterfaceDefinition, types map[string]DataType) error {
+	for _, i := range interfaces {
+		for _, m := range i.Methods {
+			_, err := m.getFunctionType(types)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// replace all StructDefinition in types with Structs. Verifies that no Struct is illegally recursive
+func processStructs(structs map[string]StructDefinition, types map[string]DataType) error {
+	var processStruct func(StructDefinition, map[string]DataType, []string) (Struct, error)
+	processStruct = func(st StructDefinition, types map[string]DataType, containingStructs []string) (Struct, error) {
+		if _, ok := types[st.Name]; !ok {
+			return Struct{}, fmt.Errorf("Invalid struct type on line %d.", st.LineNumber)
+		}
+		newStruct := Struct{
+			LineNumber:  st.LineNumber,
+			Column:      st.Column,
+			Name:        st.Name,
+			MemberNames: []string{},
+			MemberTypes: []DataType{},
+			Implements:  []string{},
+		}
+		for i, m := range st.Members {
+			dt, err := canonicalType(m.Type, types)
+			if err != nil {
+				return Struct{}, err
+			}
+			newStruct.MemberNames[i] = m.Name
+			newStruct.MemberTypes[i] = dt
+			switch t := dt.(type) {
+			case StructDefinition:
+				for _, name := range containingStructs {
+					if st.Name == name {
+						return Struct{}, fmt.Errorf("Struct cannot recursively contain itself on line %d", st.LineNumber)
+					}
+				}
+				st, err := processStruct(t, types, append(containingStructs, st.Name))
+				if err != nil {
+					return Struct{}, err
+				}
+				newStruct.MemberTypes[i] = st
+			}
+		}
+		return newStruct, nil
+	}
+	for _, st := range structs {
+		s, err := processStruct(st, types, []string{})
+		if err != nil {
+			return err
+		}
+		types[s.Name] = s
+	}
+	return nil
+}
+
+func getFunctionType(fn FunctionDefinition, types map[string]DataType) (FunctionType, error) {
+	params := make([]DataType, len(fn.Parameters))
+	for i, p := range fn.Parameters {
+		dt, err := canonicalType(p.Type, types)
+		if err != nil {
+			return FunctionType{}, err
+		}
+		params[i] = dt
+	}
+	returnTypes := make([]DataType, len(fn.ReturnTypes))
+	for i, rt := range fn.ReturnTypes {
+		dt, err := canonicalType(rt, types)
+		if err != nil {
+			return FunctionType{}, err
+		}
+		returnTypes[i] = dt
+	}
+	return FunctionType{params, returnTypes}, nil
+}
+
+func (s Signature) getFunctionType(types map[string]DataType) (FunctionType, error) {
+	params := make([]DataType, len(s.ParamTypes))
+	for i, p := range s.ParamTypes {
+		dt, err := canonicalType(p, types)
+		if err != nil {
+			return FunctionType{}, err
+		}
+		params[i] = dt
+	}
+	returnTypes := make([]DataType, len(s.ReturnTypes))
+	for i, rt := range s.ReturnTypes {
+		dt, err := canonicalType(rt, types)
+		if err != nil {
+			return FunctionType{}, err
+		}
+		returnTypes[i] = dt
+	}
+	return FunctionType{params, returnTypes}, nil
 }
 
 // assumes both are valid types and that all type names are unique
@@ -109,7 +232,7 @@ func isType(child DataType, parent DataType, exact bool) bool {
 		case InterfaceDefinition:
 			return c.Name == p.Name
 		}
-	case StructDefinition:
+	case Struct:
 		switch p := parent.(type) {
 		case InterfaceDefinition:
 			if exact {
@@ -172,6 +295,11 @@ func canonicalType(parsed ParsedDataType, types map[string]DataType) (DataType, 
 			return nil, errors.New("Map type has wrong number of type parameters.")
 		}
 		return BuiltinType{"M", params}, nil
+	case "P":
+		if len(params) != 1 {
+			return nil, errors.New("Pointer type has wrong number of type parameters.")
+		}
+		return BuiltinType{"P", params}, nil
 	case "N", "Str", "Bool":
 		if len(params) != 0 {
 			return nil, errors.New("Type " + parsed.Type + " should not have any type parameters.")
@@ -189,19 +317,18 @@ func canonicalType(parsed ParsedDataType, types map[string]DataType) (DataType, 
 	}
 }
 
-func compileExpression(e Expression, locals map[string]Variable, globals map[string]GlobalDefinition,
-	types map[string]DataType) (string, []DataType, error) {
+func compileExpression(e Expression, ctx CodeContext) (string, []DataType, error) {
 	var code string
 	var returnedTypes []DataType
 	var err error
 	switch e := e.(type) {
 	case Operation:
-		code, returnedTypes, err = compileOperation(e, locals, globals, types)
+		code, returnedTypes, err = compileOperation(e, ctx)
 		if err != nil {
 			return "", nil, err
 		}
 	case FunctionCall:
-		code, returnedTypes, err = compileFunctionCall(e, locals, globals, types)
+		code, returnedTypes, err = compileFunctionCall(e, ctx)
 		if err != nil {
 			return "", nil, err
 		}
@@ -209,16 +336,16 @@ func compileExpression(e Expression, locals map[string]Variable, globals map[str
 		switch e.Type {
 		case IdentifierWord:
 			name := e.Content
-			if v, ok := locals[name]; ok {
+			if v, ok := ctx.Locals[name]; ok {
 				code = name
-				rt, err := canonicalType(v.Type, types)
+				rt, err := canonicalType(v.Type, ctx.Types)
 				if err != nil {
 					return "", nil, err
 				}
 				returnedTypes = []DataType{rt}
-			} else if v, ok := globals[name]; ok {
+			} else if v, ok := ctx.Globals[name]; ok {
 				code = "g_" + name
-				rt, err := canonicalType(v.Type, types)
+				rt, err := canonicalType(v.Type, ctx.Types)
 				if err != nil {
 					return "", nil, err
 				}
@@ -242,12 +369,11 @@ func compileExpression(e Expression, locals map[string]Variable, globals map[str
 	return code, returnedTypes, nil
 }
 
-func compileGlobals(globals map[string]GlobalDefinition, types map[string]DataType,
-	validBreakpoints map[string]bool) (string, error) {
+func compileGlobals(ctx CodeContext) (string, error) {
 	code := ""
-	for _, g := range globals {
+	for _, g := range ctx.Globals {
 		code += "var " + g.Name + " "
-		t, err := canonicalType(g.Type, types)
+		t, err := canonicalType(g.Type, ctx.Types)
 		if err != nil {
 			return "", err
 		}
@@ -256,7 +382,7 @@ func compileGlobals(globals map[string]GlobalDefinition, types map[string]DataTy
 			return "", err
 		}
 		code += c
-		c, returnedTypes, err := compileExpression(g.Value, map[string]Variable{}, globals, types)
+		c, returnedTypes, err := compileExpression(g.Value, ctx)
 		if err != nil {
 			return "", err
 		}
@@ -267,7 +393,7 @@ func compileGlobals(globals map[string]GlobalDefinition, types map[string]DataTy
 			return "", errors.New("Initial value of global does not match the declared type.")
 		}
 		code += c + "\n"
-		validBreakpoints[strconv.Itoa(g.LineNumber)] = true
+		ctx.ValidBreakpoints[strconv.Itoa(g.LineNumber)] = true
 	}
 	return code, nil
 }
@@ -277,13 +403,11 @@ func compileType(dt DataType) (string, error) {
 }
 
 // returns code snippet ending with '\n\n'
-func compileFunc(fn FunctionDefinition, globals map[string]GlobalDefinition,
-	types map[string]DataType, validBreakpoints map[string]bool) (string, error) {
-
+func compileFunc(fn FunctionDefinition, ctx CodeContext) (string, error) {
 	locals := map[string]Variable{}
 	header := "func " + fn.Name + "("
 	for i, param := range fn.Parameters {
-		dt, err := canonicalType(param.Type, types)
+		dt, err := canonicalType(param.Type, ctx.Types)
 		if err != nil {
 			return "", err
 		}
@@ -303,7 +427,7 @@ func compileFunc(fn FunctionDefinition, globals map[string]GlobalDefinition,
 	header += ") ("
 	returnTypes := make([]DataType, len(fn.ReturnTypes))
 	for i, rt := range fn.ReturnTypes {
-		dt, err := canonicalType(rt, types)
+		dt, err := canonicalType(rt, ctx.Types)
 		if err != nil {
 			return "", err
 		}
@@ -331,7 +455,7 @@ func compileFunc(fn FunctionDefinition, globals map[string]GlobalDefinition,
 					v.Name, v.LineNumber)
 			}
 			locals[v.Name] = v
-			dt, err := canonicalType(v.Type, types)
+			dt, err := canonicalType(v.Type, ctx.Types)
 			if err != nil {
 				return "", err
 			}
@@ -343,8 +467,8 @@ func compileFunc(fn FunctionDefinition, globals map[string]GlobalDefinition,
 		}
 		bodyStatements = bodyStatements[1:]
 	}
-	header += genDebugFn(locals, globals)
-	body, err := compileBody(bodyStatements, returnTypes, locals, globals, types, validBreakpoints)
+	header += genDebugFn(ctx.Locals, ctx.Globals)
+	body, err := compileBody(bodyStatements, returnTypes, ctx)
 	if err != nil {
 		return "", err
 	}
@@ -377,10 +501,8 @@ func genDebugFn(locals map[string]Variable, globals map[string]GlobalDefinition)
 	return s
 }
 
-func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, locals map[string]Variable,
-	globals map[string]GlobalDefinition, types map[string]DataType,
-	validBreakpoints map[string]bool) (string, error) {
-	c, returnedTypes, err := compileExpression(s.Condition, locals, globals, types)
+func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, ctx CodeContext) (string, error) {
+	c, returnedTypes, err := compileExpression(s.Condition, ctx)
 	if err != nil {
 		return "", err
 	}
@@ -388,13 +510,13 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, locals ma
 		return "", fmt.Errorf("if condition does not return one value or returns non-bool on line %d", s.LineNumber)
 	}
 	code := "if " + c
-	c, err = compileBody(s.Body, expectedReturnTypes, locals, globals, types, validBreakpoints)
+	c, err = compileBody(s.Body, expectedReturnTypes, ctx)
 	if err != nil {
 		return "", nil
 	}
 	code += " {\n" + c + "}"
 	for _, elif := range s.Elifs {
-		c, returnedTypes, err := compileExpression(elif.Condition, locals, globals, types)
+		c, returnedTypes, err := compileExpression(elif.Condition, ctx)
 		if err != nil {
 			return "", err
 		}
@@ -402,14 +524,14 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, locals ma
 			return "", errors.New("Elif condition expression does not return a boolean on line " + strconv.Itoa(elif.LineNumber))
 		}
 		code += " else if " + c + ".(bool) {\n"
-		c, err = compileBody(elif.Body, expectedReturnTypes, locals, globals, types, validBreakpoints)
+		c, err = compileBody(elif.Body, expectedReturnTypes, ctx)
 		if err != nil {
 			return "", err
 		}
 		code += c + "}"
 	}
 	if len(s.Else.Body) > 0 {
-		c, err := compileBody(s.Else.Body, expectedReturnTypes, locals, globals, types, validBreakpoints)
+		c, err := compileBody(s.Else.Body, expectedReturnTypes, ctx)
 		if err != nil {
 			return "", err
 		}
@@ -418,9 +540,8 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, locals ma
 	return code + "\n", nil
 }
 
-func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, locals map[string]Variable,
-	globals map[string]GlobalDefinition, types map[string]DataType, validBreakpoints map[string]bool) (string, error) {
-	c, returnedTypes, err := compileExpression(s.Condition, locals, globals, types)
+func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, ctx CodeContext) (string, error) {
+	c, returnedTypes, err := compileExpression(s.Condition, ctx)
 	if err != nil {
 		return "", err
 	}
@@ -428,37 +549,35 @@ func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, loc
 		return "", errors.New("while condition expression does not return a boolean on line " + strconv.Itoa(s.LineNumber))
 	}
 	code := "for " + c + ".(bool) {\n"
-	c, err = compileBody(s.Body, expectedReturnTypes, locals, globals, types, validBreakpoints)
+	c, err = compileBody(s.Body, expectedReturnTypes, ctx)
 	if err != nil {
 		return "", err
 	}
 	return code + c + "}\n", nil
 }
 
-func compileBody(statements []Statement, expectedReturnTypes []DataType, locals map[string]Variable,
-	globals map[string]GlobalDefinition, types map[string]DataType,
-	validBreakpoints map[string]bool) (string, error) {
+func compileBody(statements []Statement, expectedReturnTypes []DataType, ctx CodeContext) (string, error) {
 	var code string
 	for _, s := range statements {
 		line := s.Line()
-		validBreakpoints[strconv.Itoa(line)] = true
+		ctx.ValidBreakpoints[strconv.Itoa(line)] = true
 		code += fmt.Sprintf("if _breakpoints[%d] {debug(%d)}\n", line, line)
 		var c string
 		var err error
 		switch s := s.(type) {
 		case IfStatement:
-			c, err = compileIfStatement(s, expectedReturnTypes, locals, globals, types, validBreakpoints)
+			c, err = compileIfStatement(s, expectedReturnTypes, ctx)
 		case WhileStatement:
-			c, err = compileWhileStatement(s, expectedReturnTypes, locals, globals, types, validBreakpoints)
+			c, err = compileWhileStatement(s, expectedReturnTypes, ctx)
 		case AssignmentStatement:
-			c, err = compileAssignmentStatement(s, locals, globals, types)
+			c, err = compileAssignmentStatement(s, ctx)
 		case ReturnStatement:
-			c, err = compileReturnStatement(s, expectedReturnTypes, locals, globals, types)
+			c, err = compileReturnStatement(s, expectedReturnTypes, ctx)
 		case FunctionCall:
-			c, _, err = compileFunctionCall(s, locals, globals, types)
+			c, _, err = compileFunctionCall(s, ctx)
 			c += "\n"
 		case Operation:
-			c, _, err = compileOperation(s, locals, globals, types)
+			c, _, err = compileOperation(s, ctx)
 			c += "\n"
 		}
 		if err != nil {
@@ -469,8 +588,7 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, locals 
 	return code, nil
 }
 
-func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variable, globals map[string]GlobalDefinition,
-	types map[string]DataType) (string, error) {
+func compileAssignmentStatement(s AssignmentStatement, ctx CodeContext) (string, error) {
 	switch target := s.Target.(type) {
 	case Token:
 		lineStr := strconv.Itoa(target.LineNumber)
@@ -478,12 +596,12 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 			return "", errors.New("Assignment to non-identifier on line " + lineStr)
 		}
 		name := target.Content
-		local, isLocal := locals[name]
-		global, isGlobal := globals[name]
+		local, isLocal := ctx.Locals[name]
+		global, isGlobal := ctx.Globals[name]
 		if !isLocal && !isGlobal {
 			return "", errors.New("Assignment to non-existent variable on line " + lineStr)
 		}
-		c, returnedTypes, err := compileExpression(s.Value, locals, globals, types)
+		c, returnedTypes, err := compileExpression(s.Value, ctx)
 		if err != nil {
 			return "", err
 		}
@@ -495,7 +613,7 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 			parsedType = global.Type
 
 		}
-		dataType, err := canonicalType(parsedType, types)
+		dataType, err := canonicalType(parsedType, ctx.Types)
 		if err != nil {
 			return "", err
 		}
@@ -511,7 +629,7 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 		target.Operator = "set"
 		target.Operands = append(target.Operands, s.Value)
 		// TODO check type and handle multiple assignment
-		c, _, err := compileExpression(target, locals, globals, types)
+		c, _, err := compileExpression(target, ctx)
 		if err != nil {
 			return "", err
 		}
@@ -522,15 +640,14 @@ func compileAssignmentStatement(s AssignmentStatement, locals map[string]Variabl
 	}
 }
 
-func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, locals map[string]Variable,
-	globals map[string]GlobalDefinition, types map[string]DataType) (string, error) {
+func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, ctx CodeContext) (string, error) {
 	lineStr := strconv.Itoa(s.LineNumber)
 	if len(s.Values) != len(expectedReturnTypes) {
 		return "", errors.New("Return statement has wrong number of values on line " + lineStr)
 	}
 	code := "return "
 	for i, v := range s.Values {
-		c, returnedTypes, err := compileExpression(v, locals, globals, types)
+		c, returnedTypes, err := compileExpression(v, ctx)
 		if err != nil {
 			return "", err
 		}
@@ -545,21 +662,20 @@ func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, l
 	return code + "\n", nil
 }
 
-func compileFunctionCall(s FunctionCall, locals map[string]Variable, globals map[string]GlobalDefinition,
-	types map[string]DataType) (string, []DataType, error) {
+func compileFunctionCall(s FunctionCall, ctx CodeContext) (string, []DataType, error) {
 	var code string
 	var returnedTypes []DataType
 	var c string
 	var err error
 	switch s := s.Function.(type) {
 	case Operation:
-		c, returnedTypes, err = compileOperation(s, locals, globals, types)
+		c, returnedTypes, err = compileOperation(s, ctx)
 		if err != nil {
 			return "", nil, err
 		}
 		code += c
 	case FunctionCall:
-		c, returnedTypes, err = compileFunctionCall(s, locals, globals, types)
+		c, returnedTypes, err = compileFunctionCall(s, ctx)
 		if err != nil {
 			return "", nil, err
 		}
@@ -570,7 +686,7 @@ func compileFunctionCall(s FunctionCall, locals map[string]Variable, globals map
 	}
 	code += "(" // start of arguments
 	for _, exp := range s.Arguments {
-		c, returnedTypes, err = compileExpression(exp, locals, globals, types)
+		c, returnedTypes, err = compileExpression(exp, ctx)
 		if err != nil {
 			return "", nil, err
 		}
@@ -582,12 +698,11 @@ func compileFunctionCall(s FunctionCall, locals map[string]Variable, globals map
 	return code + ")", returnedTypes, nil
 }
 
-func compileOperation(o Operation, locals map[string]Variable, globals map[string]GlobalDefinition,
-	types map[string]DataType) (string, []DataType, error) {
+func compileOperation(o Operation, ctx CodeContext) (string, []DataType, error) {
 	operandCode := make([]string, len(o.Operands))
 	operandTypes := make([]DataType, len(o.Operands))
 	for i, expr := range o.Operands {
-		c, returnTypes, err := compileExpression(expr, locals, globals, types)
+		c, returnTypes, err := compileExpression(expr, ctx)
 		if err != nil {
 			return "", nil, err
 		}
