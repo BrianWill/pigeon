@@ -84,6 +84,7 @@ var operators = []string{
 	"or",
 	"and",
 	"print",
+	"println",
 	"prompt",
 	"concat",
 	"list",
@@ -97,6 +98,7 @@ var builtinTypes = []string{
 	"Bool",
 	"L",
 	"M",
+	"P",
 }
 
 type Token struct {
@@ -132,7 +134,7 @@ type ParsedDataType struct {
 	ReturnTypes []ParsedDataType // non-nil only for functions with return types
 }
 
-// N, Str, Bool, L<>, M<>
+// N, Str, Bool, L<>, M<>, P<>
 type BuiltinType struct {
 	Name   string
 	Params []DataType

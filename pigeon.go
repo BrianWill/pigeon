@@ -18,6 +18,7 @@ import (
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
 	"github.com/BrianWill/pigeon/staticPigeon"
+	"github.com/davecgh/go-spew/spew"
 )
 
 func main() {
@@ -29,11 +30,13 @@ func main() {
 				return
 			}
 			if strings.HasSuffix(os.Args[2], ".spigeon") {
-				_, _, err := staticPigeon.Compile(os.Args[2])
+				code, validBreakpoints, err := staticPigeon.Compile(os.Args[2])
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
+				spew.Dump(code)
+				spew.Dump(validBreakpoints)
 			} else {
 				_, err := dynamicPigeon.CompileAndRun(os.Args[2])
 				if err != nil {
@@ -328,7 +331,7 @@ func server() {
 	log.Fatal(http.ListenAndServe(":7070", nil))
 }
 
-// open opens the specified URL in the default browser of the user.
+// opens the specified URL in the default browser of the user.
 func open(url string) error {
 	var cmd string
 	var args []string

@@ -2,9 +2,16 @@
 func sum a N b N : N
     return (add a b)
 
+func giveNums : N N
+    locals a N
+    as a 5
+    return a 7
+
 func main
-    (print "hi")
-    if foo
+    locals x N y N
+    as x (sum y 3)
+    (print x)
+    if (eq 3 6)
         (prompt "yo")
     (print "yo")
     (print "bla")

@@ -4,29 +4,36 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"os/exec"
+	"reflect"
 	"strconv"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 /* All identifiers get prefixed with _ to avoid collisions with Go reserved words and predefined identifiers */
 // returns map of valid breakpoints
 func compile(definitions []Definition) (string, map[string]bool, error) {
-	globals := make(map[string]GlobalDefinition)
-	structs := make(map[string]StructDefinition)
-	funcs := make(map[string]FunctionDefinition)
-	methods := make(map[string]MethodDefinition)
-	interfaces := make(map[string]InterfaceDefinition)
+	structs := map[string]StructDefinition{}
+	funcs := map[string]FunctionDefinition{}
+	methods := map[string]MethodDefinition{}
+	interfaces := map[string]InterfaceDefinition{}
 	imports := []ImportDefinition{}
 	types := map[string]DataType{}
 	packageNames := map[string]bool{}
+
+	var ctx CodeContext
+	ctx.Locals = map[string]Variable{}
+	ctx.Globals = map[string]GlobalDefinition{}
+	ctx.FuncTypes = map[string]FunctionType{}
+	ctx.ValidBreakpoints = map[string]bool{}
+	ctx.Types = types
 	for _, def := range definitions {
 		switch d := def.(type) {
 		case GlobalDefinition:
 			if packageNames[d.Name] {
 				return "", nil, errors.New("Duplicate top-level name: " + d.Name)
 			}
-			globals[d.Name] = d
+			ctx.Globals[d.Name] = d
 			packageNames[d.Name] = true
 		case FunctionDefinition:
 			if packageNames[d.Name] {
@@ -74,18 +81,41 @@ func compile(definitions []Definition) (string, map[string]bool, error) {
 
 	code := `package main
 
-import _p "github.com/BrianWill/pigeon/stdlib"
+import _fmt "fmt"
 
 var _breakpoints = make(map[int]bool)
 
+type _List *[]interface{}
+
+func _newList(items ...interface{}) _List {
+	return &items
+}
+
+func (l _List) append(item interface{}) {
+	*l = append(*l, item)
+}
+
+func (l _List) set(idx float64, item interface{}) {
+	(*l)[int64(idx)] = item
+}
+
+func (l _List) get(idx float64, item interface{}) interface{} {
+	return (*l)[int64(idx)]
+}
+
+func (l _List) len() float64 {
+	return float64(len(*l))
+}
+
+func _Prompt(args ...interface{}) {
+	if len(args) > 1 {
+		_fmt.Print(args...)
+	}
+	
+}
+
 `
 
-	var ctx CodeContext
-	ctx.Locals = map[string]Variable{}
-	ctx.Globals = map[string]GlobalDefinition{}
-	ctx.FuncTypes = map[string]FunctionType{}
-	ctx.ValidBreakpoints = map[string]bool{}
-	ctx.Types = types
 	err := processStructs(structs, types)
 	if err != nil {
 		return "", nil, err
@@ -108,7 +138,17 @@ var _breakpoints = make(map[int]bool)
 	}
 	code += c
 
-	// TODO compile functions
+	// TODO determine which interfaces implement what interfaces
+
+	// TODO compile methods
+
+	for _, fn := range funcs {
+		c, err := compileFunc(fn, ctx)
+		if err != nil {
+			return "", nil, err
+		}
+		code += c
+	}
 
 	code += `
 
@@ -223,7 +263,7 @@ func (s Signature) getFunctionType(types map[string]DataType) (FunctionType, err
 
 // assumes both are valid types and that all type names are unique
 func isType(child DataType, parent DataType, exact bool) bool {
-	if child == parent {
+	if reflect.DeepEqual(child, parent) {
 		return true
 	}
 	switch c := child.(type) {
@@ -398,13 +438,72 @@ func compileGlobals(ctx CodeContext) (string, error) {
 	return code, nil
 }
 
+// assumes a valid data type. Accepts Struct but not a StructDefinition
 func compileType(dt DataType) (string, error) {
+	switch t := dt.(type) {
+	case BuiltinType:
+		switch t.Name {
+		case "N":
+			return "float64", nil
+		case "Bool":
+			return "bool", nil
+		case "Str":
+			return "string", nil
+		case "L":
+			return "_List", nil
+		case "M":
+			keyType, err := compileType(t.Params[0])
+			if err != nil {
+				return "", err
+			}
+			valType, err := compileType(t.Params[1])
+			if err != nil {
+				return "", err
+			}
+			return "map[" + keyType + "]" + valType, nil
+		case "P":
+			pointerType, err := compileType(t.Params[0])
+			if err != nil {
+				return "", err
+			}
+			return "*" + pointerType, nil
+		}
+	case InterfaceDefinition:
+		return t.Name, nil
+	case Struct:
+		return t.Name, nil
+	case FunctionType:
+		typeStr := "func( "
+		for _, paramType := range t.Params {
+			s, err := compileType(paramType)
+			if err != nil {
+				return "", err
+			}
+			typeStr += s + ", "
+		}
+		typeStr += ") "
+		if len(t.ReturnTypes) > 0 {
+			typeStr += "("
+			for _, returnType := range t.ReturnTypes {
+				s, err := compileType(returnType)
+				if err != nil {
+					return "", err
+				}
+				typeStr += s + ", "
+			}
+			typeStr += ")"
+		}
+		return typeStr, nil
+	case StructDefinition:
+		panic("Invalid type")
+	}
+
 	return "", nil
 }
 
 // returns code snippet ending with '\n\n'
 func compileFunc(fn FunctionDefinition, ctx CodeContext) (string, error) {
-	locals := map[string]Variable{}
+	ctx.Locals = map[string]Variable{}
 	header := "func " + fn.Name + "("
 	for i, param := range fn.Parameters {
 		dt, err := canonicalType(param.Type, ctx.Types)
@@ -419,10 +518,7 @@ func compileFunc(fn FunctionDefinition, ctx CodeContext) (string, error) {
 		if i < len(fn.Parameters)-1 {
 			header += ", "
 		}
-		locals[param.Name] = param
-	}
-	if len(fn.Parameters) > 0 {
-		header = header[:len(header)-2] // drop last comma and space
+		ctx.Locals[param.Name] = param
 	}
 	header += ") ("
 	returnTypes := make([]DataType, len(fn.ReturnTypes))
@@ -450,11 +546,11 @@ func compileFunc(fn FunctionDefinition, ctx CodeContext) (string, error) {
 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
 		for _, v := range localsStatement.Vars {
 			header += "var "
-			if _, ok := locals[v.Name]; ok {
+			if _, ok := ctx.Locals[v.Name]; ok {
 				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
 					v.Name, v.LineNumber)
 			}
-			locals[v.Name] = v
+			ctx.Locals[v.Name] = v
 			dt, err := canonicalType(v.Type, ctx.Types)
 			if err != nil {
 				return "", err
@@ -495,7 +591,7 @@ func genDebugFn(locals map[string]Variable, globals map[string]GlobalDefinition)
 		s += fmt.Sprintf("\"%s\": %s,\n", k, k)
 	}
 	s += `}
-	_p.PollContinue(line, globals, locals)
+	//_p.PollContinue(line, globals, locals)
 }
 `
 	return s
@@ -653,6 +749,9 @@ func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, c
 		}
 		if len(returnedTypes) != 1 {
 			return "", errors.New("Expression in return statement returns more than one value on line " + lineStr)
+		}
+		if !isType(returnedTypes[0], expectedReturnTypes[i], false) {
+			return "", errors.New("Wrong type in return statement on line " + lineStr)
 		}
 		code += c
 		if i < len(s.Values)-1 {
@@ -962,7 +1061,29 @@ func compileOperation(o Operation, ctx CodeContext) (string, []DataType, error) 
 			}
 		}
 	case "print":
+		if len(o.Operands) < 1 {
+			return "", nil, errors.New("'print' operation requires at least one operand")
+		}
+		code += "_fmt.Print("
+		for i := range o.Operands {
+			code += operandCode[i] + ", "
+		}
+		code += ")"
+	case "println":
+		if len(o.Operands) < 1 {
+			return "", nil, errors.New("'println' operation requires at least one operand")
+		}
+		code += "_fmt.Println("
+		for i := range o.Operands {
+			code += operandCode[i] + ", "
+		}
+		code += ")"
 	case "prompt":
+		code += "_Prompt("
+		for i := range o.Operands {
+			code += operandCode[i] + ", "
+		}
+		code += ")"
 	case "concat":
 		if len(o.Operands) < 2 {
 			return "", nil, errors.New("concat operation requires at least two operands")
@@ -983,6 +1104,9 @@ func compileOperation(o Operation, ctx CodeContext) (string, []DataType, error) 
 	}
 
 	code += ")"
+	if returnType == nil {
+		return code, []DataType{}, nil
+	}
 	return code, []DataType{returnType}, nil
 }
 
@@ -1029,17 +1153,18 @@ func Compile(inputFilename string) (string, map[string]bool, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	spew.Dump("breakpoints", validBreakpoints)
-	spew.Dump("compiled", code)
-	return "", nil, nil
-	// outputFilename := outputDir + "/" + inputFilename + ".go"
-	// err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
-	// if err != nil {
-	// 	return "", nil, err
-	// }
-	// err = exec.Command("go", "fmt", outputFilename).Run()
-	// if err != nil {
-	// 	return "", nil, err
-	// }
-	// return outputFilename, validBreakpoints, nil
+
+	// temp
+	outputFilename := "output/test.go"
+	err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
+	if err != nil {
+		return "", nil, err
+	}
+	err = exec.Command("go", "fmt", outputFilename).Run()
+	if err != nil {
+		return "", nil, err
+	}
+
+	return code, validBreakpoints, nil
+
 }
