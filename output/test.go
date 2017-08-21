@@ -33,6 +33,11 @@ func _Prompt(args ...interface{}) {
 
 }
 
+type Foo struct {
+	bar string
+	cat float64
+}
+
 func sum(a float64, b float64) float64 {
 	debug := func(line int) {
 		var globals = map[string]interface{}{}
@@ -66,39 +71,46 @@ func giveNums() (float64, float64) {
 	return a, float64(7)
 }
 func _main() {
-	var x float64
-	var y float64
+	var a Foo
+	var b _List
+	var c map[float64]string
 	debug := func(line int) {
 		var globals = map[string]interface{}{}
 		var locals = map[string]interface{}{
-			"x": x,
-			"y": y,
+			"a": a,
+			"b": b,
+			"c": c,
 		}
 		//_p.PollContinue(line, globals, locals)
-	}
-	if _breakpoints[12] {
-		debug(12)
-	}
-	x = sum(y, float64(3))
-	if _breakpoints[13] {
-		debug(13)
-	}
-	(_fmt.Print(x))
-	if _breakpoints[14] {
-		debug(14)
-	}
-	if float64(3) == float64(6) {
-		if _breakpoints[15] {
-			debug(15)
-		}
-		(_Prompt("yo"))
 	}
 	if _breakpoints[16] {
 		debug(16)
 	}
-	(_fmt.Print("yo"))
+	a = Foo{"hi", float64(3)}
 	if _breakpoints[17] {
 		debug(17)
+	}
+	b = (func() (_list _List) {
+		(*_list) = make([]interface{}, 3)
+		(*_list)[0] = float64(5)
+		(*_list)[1] = float64(2)
+		(*_list)[2] = float64(9)
+		return
+	})()
+	if _breakpoints[18] {
+		debug(18)
+	}
+	c = map[float64]string{float64(5): "hi", float64(9): "yo"}
+	if _breakpoints[19] {
+		debug(19)
+	}
+	b[float64(0)] = float64(3)
+	if _breakpoints[20] {
+		debug(20)
+	}
+	c[float64(3)] = "hi"
+	if _breakpoints[21] {
+		debug(21)
 	}
 	(_fmt.Print("bla"))
 	return nil

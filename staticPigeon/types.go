@@ -87,9 +87,8 @@ var operators = []string{
 	"println",
 	"prompt",
 	"concat",
-	"list",
-	"map",
 	"len",
+	"istype",
 }
 
 var builtinTypes = []string{
@@ -145,10 +144,10 @@ type FunctionType struct {
 	ReturnTypes []DataType
 }
 
-func (t Token) Expression() {}
-
-func (t FunctionCall) Expression() {}
-func (t Operation) Expression()    {}
+func (t Token) Expression()          {}
+func (t FunctionCall) Expression()   {}
+func (t Operation) Expression()      {}
+func (t TypeExpression) Expression() {}
 
 func (t FunctionDefinition) Definition()  {}
 func (t GlobalDefinition) Definition()    {}
@@ -183,7 +182,7 @@ func (t WhileStatement) Line() int {
 	return t.Condition.Line()
 }
 func (t AssignmentStatement) Line() int {
-	return t.Target.Line()
+	return t.Targets[0].Line()
 }
 func (t ReturnStatement) Line() int {
 	return t.LineNumber
@@ -198,6 +197,9 @@ func (t Variable) Line() int {
 	return t.LineNumber
 }
 func (t FunctionCall) Line() int {
+	return t.LineNumber
+}
+func (t TypeExpression) Line() int {
 	return t.LineNumber
 }
 func (t Operation) Line() int {
@@ -319,6 +321,13 @@ type Operation struct {
 	Operands   []Expression
 }
 
+type TypeExpression struct {
+	LineNumber int
+	Column     int
+	Type       ParsedDataType
+	Operands   []Expression
+}
+
 type IfStatement struct {
 	LineNumber int
 	Column     int
@@ -373,7 +382,7 @@ type ContinueStatement struct {
 type AssignmentStatement struct {
 	LineNumber int
 	Column     int
-	Target     Expression
+	Targets    []Expression
 	Value      Expression
 }
 

@@ -18,38 +18,7 @@ import (
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
 	"github.com/BrianWill/pigeon/staticPigeon"
-	"github.com/davecgh/go-spew/spew"
 )
-
-func main() {
-	if len(os.Args) >= 2 {
-		subcommand := os.Args[1]
-		if subcommand == "run" {
-			if len(os.Args) < 3 {
-				fmt.Println("Must specify a file to run.")
-				return
-			}
-			if strings.HasSuffix(os.Args[2], ".spigeon") {
-				code, validBreakpoints, err := staticPigeon.Compile(os.Args[2])
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				spew.Dump(code)
-				spew.Dump(validBreakpoints)
-			} else {
-				_, err := dynamicPigeon.CompileAndRun(os.Args[2])
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-			}
-
-		}
-	} else {
-		server()
-	}
-}
 
 type runStateEnum string
 
@@ -347,4 +316,44 @@ func open(url string) error {
 	}
 	args = append(args, url)
 	return exec.Command(cmd, args...).Start()
+}
+
+func main() {
+	if len(os.Args) >= 2 {
+		subcommand := os.Args[1]
+		if subcommand == "run" {
+			if len(os.Args) < 3 {
+				fmt.Println("Must specify a file to run.")
+				return
+			}
+			if strings.HasSuffix(os.Args[2], ".spigeon") {
+				code, _, err := staticPigeon.Compile(os.Args[2])
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				// temp
+				outputFilename := "output/test.go"
+				err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				err = exec.Command("go", "fmt", outputFilename).Run()
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			} else {
+				_, err := dynamicPigeon.CompileAndRun(os.Args[2])
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			}
+
+		}
+	} else {
+		server()
+	}
 }

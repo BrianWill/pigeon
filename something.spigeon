@@ -7,12 +7,16 @@ func giveNums : N N
     as a 5
     return a 7
 
+struct Foo
+    bar Str
+    cat N
+
 func main
-    locals x N y N
-    as x (sum y 3)
-    (print x)
-    if (eq 3 6)
-        (prompt "yo")
-    (print "yo")
+    locals a Foo b L<N> c M<N Str>
+    as a (Foo "hi" 3)
+    as b (L<N> 5 2 9)
+    as c (M<N Str> 5 "hi" 9 "yo")
+    as b[0] 3
+    as c[3] "hi"
     (print "bla")
 

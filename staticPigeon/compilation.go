@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
-	"os/exec"
 	"reflect"
 	"strconv"
 )
@@ -124,6 +122,13 @@ func _Prompt(args ...interface{}) {
 	if err != nil {
 		return "", nil, err
 	}
+	for _, st := range structs {
+		c, err := compileStruct(types[st.Name].(Struct), types)
+		if err != nil {
+			return "", nil, err
+		}
+		code += c
+	}
 	for _, fn := range funcs {
 		fnType, err := getFunctionType(fn, types)
 		if err != nil {
@@ -161,6 +166,18 @@ func main() {
 	return code, ctx.ValidBreakpoints, nil
 }
 
+func compileStruct(st Struct, types map[string]DataType) (string, error) {
+	code := "type " + st.Name + " struct {\n"
+	for i, n := range st.MemberNames {
+		t, err := compileType(st.MemberTypes[i])
+		if err != nil {
+			return "", err
+		}
+		code += n + " " + t + "\n"
+	}
+	return code + "}\n", nil
+}
+
 func validateInterfaces(interfaces map[string]InterfaceDefinition, types map[string]DataType) error {
 	for _, i := range interfaces {
 		for _, m := range i.Methods {
@@ -184,8 +201,8 @@ func processStructs(structs map[string]StructDefinition, types map[string]DataTy
 			LineNumber:  st.LineNumber,
 			Column:      st.Column,
 			Name:        st.Name,
-			MemberNames: []string{},
-			MemberTypes: []DataType{},
+			MemberNames: make([]string, len(st.Members)),
+			MemberTypes: make([]DataType, len(st.Members)),
 			Implements:  []string{},
 		}
 		for i, m := range st.Members {
@@ -357,6 +374,98 @@ func canonicalType(parsed ParsedDataType, types map[string]DataType) (DataType, 
 	}
 }
 
+// not the same as a 'type assertion'
+func compileTypeExpression(te TypeExpression, ctx CodeContext) (string, []DataType, error) {
+	lineStr := strconv.Itoa(te.LineNumber)
+	dt, err := canonicalType(te.Type, ctx.Types)
+	if err != nil {
+		return "", nil, err
+	}
+	switch t := dt.(type) {
+	case BuiltinType:
+		switch t.Name {
+		case "M":
+			if len(t.Params) != 2 {
+				return "", nil, errors.New("Invalid type expression. Map must have two type parameters. Line " + lineStr)
+			}
+			mapType, err := compileType(t)
+			if err != nil {
+				return "", nil, err
+			}
+			mapType += "{"
+			if len(te.Operands)%2 != 0 {
+				return "", nil, errors.New("Invalid type expression. Map must have even number of operands. Line " + lineStr)
+			}
+			for i := 0; i < len(te.Operands); i += 2 {
+				key, returnedTypes, err := compileExpression(te.Operands[i], ctx)
+				if err != nil {
+					return "", nil, err
+				}
+				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[0], false) {
+					return "", nil, errors.New("Invalid type expression. Map key of wrong type. Line " + lineStr)
+				}
+				val, returnedTypes, err := compileExpression(te.Operands[i+1], ctx)
+				if err != nil {
+					return "", nil, err
+				}
+				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[1], false) {
+					return "", nil, errors.New("Invalid type expression. Map val of wrong type. Line " + lineStr)
+				}
+				mapType += key + ": " + val + ", "
+			}
+			mapType += "}"
+			return mapType, []DataType{t}, nil
+		case "L":
+			if len(t.Params) != 1 {
+				return "", nil, errors.New("Invalid type expression. List must have one type parameter. Line " + lineStr)
+			}
+			expr := "(func () (_list _List) {\n"
+			expr += "(*_list) = make([]interface{}, " + strconv.Itoa(len(te.Operands)) + ")\n"
+			if err != nil {
+				return "", nil, err
+			}
+			for i := 0; i < len(te.Operands); i++ {
+				val, returnedTypes, err := compileExpression(te.Operands[i], ctx)
+				if err != nil {
+					return "", nil, err
+				}
+				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[0], false) {
+					return "", nil, errors.New("Invalid type expression. List val of wrong type. Line " + lineStr)
+				}
+				expr += "(*_list)[" + strconv.Itoa(i) + "] = " + val + "\n"
+			}
+			expr += `return
+		    })()`
+			return expr, []DataType{t}, nil
+		case "N", "P", "Str", "Bool":
+			return "", nil, errors.New("Invalid type expression. Cannot create an N, P, Str, or Bool. Line " + lineStr)
+		}
+	case FunctionType:
+		return "", nil, errors.New("Invalid type expression. Cannot create a function with a type expression. Line " + lineStr)
+	case Struct:
+		if len(t.MemberNames) != len(te.Operands) {
+			return "", nil, errors.New("Invalid type expression. Wrong number of args for creating struct. Line " + lineStr)
+		}
+		code := t.Name + "{"
+		for i, argType := range t.MemberTypes {
+			expr, returnTypes, err := compileExpression(te.Operands[i], ctx)
+			if err != nil {
+				return "", nil, err
+			}
+			if len(returnTypes) != 1 || !isType(returnTypes[0], argType, false) {
+				return "", nil, errors.New("Invalid type expression. Wrong type of arg for creating struct. Line " + lineStr)
+			}
+			code += expr + ", "
+		}
+		code += "}"
+		return code, []DataType{t}, nil
+	case InterfaceDefinition:
+		return "", nil, errors.New("Invalid type expression. Cannot create interface value. Line " + lineStr)
+	}
+	// should be unreachable
+	return "", nil, errors.New("Invalid type expression. Line " + lineStr)
+}
+
 func compileExpression(e Expression, ctx CodeContext) (string, []DataType, error) {
 	var code string
 	var returnedTypes []DataType
@@ -369,6 +478,11 @@ func compileExpression(e Expression, ctx CodeContext) (string, []DataType, error
 		}
 	case FunctionCall:
 		code, returnedTypes, err = compileFunctionCall(e, ctx)
+		if err != nil {
+			return "", nil, err
+		}
+	case TypeExpression:
+		code, returnedTypes, err = compileTypeExpression(e, ctx)
 		if err != nil {
 			return "", nil, err
 		}
@@ -685,55 +799,90 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, ctx Cod
 }
 
 func compileAssignmentStatement(s AssignmentStatement, ctx CodeContext) (string, error) {
-	switch target := s.Target.(type) {
-	case Token:
-		lineStr := strconv.Itoa(target.LineNumber)
-		if target.Type != IdentifierWord {
-			return "", errors.New("Assignment to non-identifier on line " + lineStr)
-		}
-		name := target.Content
-		local, isLocal := ctx.Locals[name]
-		global, isGlobal := ctx.Globals[name]
-		if !isLocal && !isGlobal {
-			return "", errors.New("Assignment to non-existent variable on line " + lineStr)
-		}
-		c, returnedTypes, err := compileExpression(s.Value, ctx)
-		if err != nil {
-			return "", err
-		}
-		// TODO mutiple assignment
-		var parsedType ParsedDataType
-		if isLocal {
-			parsedType = local.Type
-		} else if isGlobal {
-			parsedType = global.Type
-
-		}
-		dataType, err := canonicalType(parsedType, ctx.Types)
-		if err != nil {
-			return "", err
-		}
-		if !isType(dataType, returnedTypes[0], false) {
-			return "", errors.New("Value in assignment does not match expected type on line " + lineStr)
-		}
-		return target.Content + " = " + c + "\n", nil
-	case Operation:
-		if target.Operator != "get" {
-			return "", errors.New("Improper target of assignment on line " + strconv.Itoa(target.LineNumber))
-		}
-		// turn the get op into a set op
-		target.Operator = "set"
-		target.Operands = append(target.Operands, s.Value)
-		// TODO check type and handle multiple assignment
-		c, _, err := compileExpression(target, ctx)
-		if err != nil {
-			return "", err
-		}
-		return c + "\n", nil
-	default:
-		// TODO give Expression LineNumber() method so we can get a line number here
-		return "", errors.New("Invalid target of assignment.")
+	lineStr := strconv.Itoa(s.LineNumber)
+	valCode, returnedTypes, err := compileExpression(s.Value, ctx)
+	if err != nil {
+		return "", err
 	}
+	if len(returnedTypes) != len(s.Targets) {
+		return "", errors.New("Wrong number of targets in assignment on line " + lineStr)
+	}
+	code := ""
+	for i, target := range s.Targets {
+		switch t := target.(type) {
+		case Token:
+			if t.Type != IdentifierWord {
+				return "", errors.New("Assignment to non-identifier on line " + lineStr)
+			}
+			name := t.Content
+			local, isLocal := ctx.Locals[name]
+			global, isGlobal := ctx.Globals[name]
+			if !isLocal && !isGlobal {
+				return "", errors.New("Assignment to non-existent variable on line " + lineStr)
+			}
+			var parsedType ParsedDataType
+			if isLocal {
+				parsedType = local.Type
+			} else if isGlobal {
+				parsedType = global.Type
+			}
+			dataType, err := canonicalType(parsedType, ctx.Types)
+			if err != nil {
+				return "", err
+			}
+			if !isType(dataType, returnedTypes[i], false) {
+				return "", errors.New("Value in assignment does not match expected type on line " + lineStr)
+			}
+			code += t.Content + ", "
+		case Operation:
+			if t.Operator != "get" || len(t.Operands) != 2 {
+				return "", errors.New("Improper target of assignment on line " + lineStr)
+			}
+			collection, collTypes, err := compileExpression(t.Operands[0], ctx)
+			if err != nil {
+				return "", err
+			}
+			if len(collTypes) != 1 {
+				return "", errors.New("Improper target of assignment on line " + lineStr)
+			}
+			index, indexTypes, err := compileExpression(t.Operands[1], ctx)
+			if err != nil {
+				return "", err
+			}
+			if len(indexTypes) != 1 {
+				return "", errors.New("Improper target of assignment on line " + lineStr)
+			}
+			switch ct := collTypes[0].(type) {
+			case BuiltinType:
+				switch ct.Name {
+				case "M":
+					if !isType(indexTypes[0], ct.Params[0], false) {
+						return "", errors.New("Value in assignment does not match expected map key type on line " + lineStr)
+					}
+					if !isType(returnedTypes[i], ct.Params[1], false) {
+						return "", errors.New("Value in assignment does not match expected map value type on line " + lineStr)
+					}
+				case "L":
+					if !isType(indexTypes[0], BuiltinType{"N", nil}, true) {
+						return "", errors.New("Improper target of assignment on line " + lineStr)
+					}
+					if !isType(returnedTypes[i], ct.Params[0], false) {
+						return "", errors.New("Value in assignment does not match expected list value type on line " + lineStr)
+					}
+				default:
+					return "", errors.New("Improper target of assignment. Expected collection. Line " + lineStr)
+				}
+			default:
+				return "", errors.New("Improper target of assignment. Expected collection. Line " + lineStr)
+			}
+			code += collection + "[" + index + "], "
+		default:
+			// TODO give Expression LineNumber() method so we can get a line number here
+			return "", errors.New("Invalid target of assignment.")
+		}
+	}
+	code = code[:len(code)-2] // drop last comma and space
+	return code + " = " + valCode + "\n", nil
 }
 
 func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, ctx CodeContext) (string, error) {
@@ -782,6 +931,7 @@ func compileFunctionCall(s FunctionCall, ctx CodeContext) (string, []DataType, e
 		// TODO have to assert type of function
 	case Token: // will always be an identifier
 		code += s.Content
+		returnedTypes = ctx.FuncTypes[s.Content].ReturnTypes
 	}
 	code += "(" // start of arguments
 	for _, exp := range s.Arguments {
@@ -1098,9 +1248,8 @@ func compileOperation(o Operation, ctx CodeContext) (string, []DataType, error) 
 				code += " + "
 			}
 		}
-	case "list":
-	case "map":
 	case "len":
+	case "istype":
 	}
 
 	code += ")"
@@ -1144,23 +1293,11 @@ func Compile(inputFilename string) (string, map[string]bool, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	fmt.Println("tokens: ", tokens)
 	definitions, err := parse(tokens)
 	if err != nil {
 		return "", nil, err
 	}
 	code, validBreakpoints, err := compile(definitions)
-	if err != nil {
-		return "", nil, err
-	}
-
-	// temp
-	outputFilename := "output/test.go"
-	err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
-	if err != nil {
-		return "", nil, err
-	}
-	err = exec.Command("go", "fmt", outputFilename).Run()
 	if err != nil {
 		return "", nil, err
 	}

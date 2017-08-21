@@ -860,15 +860,18 @@ func parseOpenSquare(tokens []Token, expr Expression, line int) (Expression, int
 // assumes first token is open paren.
 // Returns a FunctionCall or Operation and the number of tokens that make up the Expression.
 func parseOpenParen(tokens []Token) (Expression, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	lineStr := strconv.Itoa(line)
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 
 	functionCall := true
+	typeExpression := false
 	var leadingCall Expression
 	var op Token
+	var dt ParsedDataType
 	t := tokens[idx]
 	switch t.Type {
 	case OperatorWord:
@@ -886,8 +889,17 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 			return nil, 0, err
 		}
 		idx += numTokens
+	case TypeName:
+		typeExpression = true
+		var n int
+		var err error
+		dt, n, err = parseType(tokens[idx:], line)
+		if err != nil {
+			return nil, 0, err
+		}
+		idx += n
 	default:
-		return nil, 0, errors.New("Improper function call or operation on line " + line)
+		return nil, 0, errors.New("Improper function call or operation on line " + lineStr)
 	}
 
 	var arguments []Expression
@@ -910,7 +922,9 @@ Loop:
 	}
 
 	var expr Expression
-	if functionCall {
+	if typeExpression {
+		expr = TypeExpression{tokens[0].LineNumber, tokens[0].Column, dt, arguments}
+	} else if functionCall {
 		if leadingCall == nil {
 			expr = FunctionCall{tokens[0].LineNumber, tokens[0].Column, op, arguments}
 		} else {
@@ -1197,28 +1211,35 @@ func parseAssignment(tokens []Token) (AssignmentStatement, int, error) {
 		return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
 	}
 	idx++
-	target, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
-	if err != nil {
-		return AssignmentStatement{}, 0, err
-	}
-	idx += nTokens
-	if tokens[idx].Type != Space {
-		return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
-	}
-	idx++
-	value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
-	if err != nil {
-		return AssignmentStatement{}, 0, err
-	}
-	idx += nTokens
-	if tokens[idx].Type == Space {
+	exprs := []Expression{}
+	for {
+		expr, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+		if err != nil {
+			return AssignmentStatement{}, 0, err
+		}
+		idx += nTokens
+		exprs = append(exprs, expr)
+		if tokens[idx].Type == Newline {
+			idx++
+			break
+		}
+		if tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
+			idx += 2
+			break
+		}
+		if tokens[idx].Type != Space {
+			return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
+		}
 		idx++
 	}
-	if tokens[idx].Type != Newline {
-		return AssignmentStatement{}, 0, errors.New("Assignment not terminated with newline on line " + line)
+	if len(exprs) < 2 {
+		return AssignmentStatement{}, 0, errors.New("Invalid assignment statement on line " + line)
 	}
-	idx++
-	return AssignmentStatement{tokens[0].LineNumber, tokens[0].Column, target, value}, idx, nil // 3 because: 'as', the target, and the newline at the end
+	return AssignmentStatement{
+		tokens[0].LineNumber,
+		tokens[0].Column,
+		exprs[:len(exprs)-1],
+		exprs[len(exprs)-1]}, idx, nil
 }
 
 func parseLocals(tokens []Token) (LocalsStatement, int, error) {
