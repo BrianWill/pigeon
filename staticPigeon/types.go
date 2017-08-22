@@ -98,6 +98,7 @@ var builtinTypes = []string{
 	"L",
 	"M",
 	"P",
+	"E",
 }
 
 type Token struct {
@@ -148,6 +149,7 @@ func (t Token) Expression()          {}
 func (t FunctionCall) Expression()   {}
 func (t Operation) Expression()      {}
 func (t TypeExpression) Expression() {}
+func (t MethodCall) Expression()     {}
 
 func (t FunctionDefinition) Definition()  {}
 func (t GlobalDefinition) Definition()    {}
@@ -162,6 +164,7 @@ func (t WhileStatement) Statement()      {}
 func (t AssignmentStatement) Statement() {}
 func (t ReturnStatement) Statement()     {}
 func (t FunctionCall) Statement()        {}
+func (t MethodCall) Statement()          {}
 func (t Operation) Statement()           {}
 func (t BreakStatement) Statement()      {}
 func (t ContinueStatement) Statement()   {}
@@ -200,6 +203,9 @@ func (t FunctionCall) Line() int {
 	return t.LineNumber
 }
 func (t TypeExpression) Line() int {
+	return t.LineNumber
+}
+func (t MethodCall) Line() int {
 	return t.LineNumber
 }
 func (t Operation) Line() int {
@@ -272,7 +278,8 @@ type Struct struct {
 	Name        string
 	MemberNames []string
 	MemberTypes []DataType
-	Implements  []string // names of the interfaces this struct implements
+	Implements  map[string]bool // names of the interfaces this struct implements
+	Methods     map[string]FunctionType
 }
 
 type MethodDefinition struct {
@@ -311,6 +318,14 @@ type FunctionCall struct {
 	LineNumber int
 	Column     int
 	Function   Expression // either an identifier or another function/operator call
+	Arguments  []Expression
+}
+
+type MethodCall struct {
+	LineNumber int
+	Column     int
+	MethodName string // either an identifier or another function/operator call
+	Receiver   Expression
 	Arguments  []Expression
 }
 

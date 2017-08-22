@@ -7,13 +7,29 @@ func giveNums : N N
     as a 5
     return a 7
 
+func doNothing
+    (print "hi")
+
 struct Foo
     bar Str
     cat N
 
+interface Roger
+    foo N Str : N Foo
+
+method foo f Foo a N b Str : N Foo
+    (print "hi")
+    return 3 (Foo "hi" 5)
+
+method doStuff f Foo apple N : Str
+    return "hi"
+
 func main
-    locals a Foo b L<N> c M<N Str>
+    locals a Foo b L<N> c M<N Str> d Roger
     as a (Foo "hi" 3)
+    as d a
+    (.foo d 5 "hi")
+    (.doStuff a 4)
     as b (L<N> 5 2 9)
     as c (M<N Str> 5 "hi" 9 "yo")
     as b[0] 3

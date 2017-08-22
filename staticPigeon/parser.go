@@ -869,6 +869,7 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 
 	functionCall := true
 	typeExpression := false
+	methodCall := false
 	var leadingCall Expression
 	var op Token
 	var dt ParsedDataType
@@ -880,6 +881,14 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 		idx++
 	case IdentifierWord:
 		op = t
+		idx++
+	case Dot:
+		idx++
+		if tokens[idx].Type != IdentifierWord {
+			return nil, 0, errors.New("Method call expects a method name after the dot on line " + lineStr)
+		}
+		op = tokens[idx]
+		methodCall = true
 		idx++
 	case OpenParen:
 		var numTokens int
@@ -922,7 +931,12 @@ Loop:
 	}
 
 	var expr Expression
-	if typeExpression {
+	if methodCall {
+		if len(arguments) < 1 {
+			return nil, 0, errors.New("Method call must have a receiver on line " + lineStr)
+		}
+		expr = MethodCall{tokens[0].LineNumber, tokens[0].Column, op.Content, arguments[0], arguments[1:]}
+	} else if typeExpression {
 		expr = TypeExpression{tokens[0].LineNumber, tokens[0].Column, dt, arguments}
 	} else if functionCall {
 		if leadingCall == nil {

@@ -18,7 +18,6 @@ func compile(definitions []Definition) (string, map[string]bool, error) {
 	imports := []ImportDefinition{}
 	types := map[string]DataType{}
 	packageNames := map[string]bool{}
-
 	var ctx CodeContext
 	ctx.Locals = map[string]Variable{}
 	ctx.Globals = map[string]GlobalDefinition{}
@@ -76,7 +75,6 @@ func compile(definitions []Definition) (string, map[string]bool, error) {
 			return "", nil, errors.New("Unrecognized definition")
 		}
 	}
-
 	code := `package main
 
 import _fmt "fmt"
@@ -113,17 +111,22 @@ func _Prompt(args ...interface{}) {
 }
 
 `
-
-	err := processStructs(structs, types)
+	err := processStructs(structs, methods, types)
 	if err != nil {
 		return "", nil, err
 	}
-	err = validateInterfaces(interfaces, types)
+	c, err := compileInterfaces(interfaces, types)
 	if err != nil {
 		return "", nil, err
 	}
+	code += c
 	for _, st := range structs {
-		c, err := compileStruct(types[st.Name].(Struct), types)
+		st := types[st.Name].(Struct)
+		err := findImplementors(&st, interfaces, types)
+		if err != nil {
+			return "", nil, err
+		}
+		c, err := compileStruct(st, types)
 		if err != nil {
 			return "", nil, err
 		}
@@ -136,17 +139,18 @@ func _Prompt(args ...interface{}) {
 		}
 		ctx.FuncTypes[fn.Name] = fnType
 	}
-
-	c, err := compileGlobals(ctx)
+	c, err = compileGlobals(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 	code += c
-
-	// TODO determine which interfaces implement what interfaces
-
-	// TODO compile methods
-
+	for _, fn := range methods {
+		c, err := compileMethod(fn, ctx)
+		if err != nil {
+			return "", nil, err
+		}
+		code += c
+	}
 	for _, fn := range funcs {
 		c, err := compileFunc(fn, ctx)
 		if err != nil {
@@ -154,7 +158,6 @@ func _Prompt(args ...interface{}) {
 		}
 		code += c
 	}
-
 	code += `
 
 func main() {
@@ -162,8 +165,28 @@ func main() {
 	_main()
 }
 `
-
 	return code, ctx.ValidBreakpoints, nil
+}
+
+func findImplementors(st *Struct, interfaces map[string]InterfaceDefinition, types map[string]DataType) error {
+Outer:
+	for _, iface := range interfaces {
+		for _, sig := range iface.Methods {
+			ft, ok := st.Methods[sig.Name]
+			if !ok {
+				continue Outer
+			}
+			mt, err := sig.getFunctionType(types)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(ft, mt) {
+				continue Outer
+			}
+		}
+		st.Implements[iface.Name] = true
+	}
+	return nil
 }
 
 func compileStruct(st Struct, types map[string]DataType) (string, error) {
@@ -178,20 +201,49 @@ func compileStruct(st Struct, types map[string]DataType) (string, error) {
 	return code + "}\n", nil
 }
 
-func validateInterfaces(interfaces map[string]InterfaceDefinition, types map[string]DataType) error {
-	for _, i := range interfaces {
-		for _, m := range i.Methods {
-			_, err := m.getFunctionType(types)
+func compileInterfaces(interfaces map[string]InterfaceDefinition, types map[string]DataType) (string, error) {
+	code := "\n"
+	for _, inter := range interfaces {
+		code += "type " + inter.Name + " interface {\n"
+		for _, sig := range inter.Methods {
+			// validate each method
+			_, err := sig.getFunctionType(types)
 			if err != nil {
-				return err
+				return "", err
 			}
+			code += sig.Name + "("
+			for _, pt := range sig.ParamTypes {
+				t, err := canonicalType(pt, types)
+				if err != nil {
+					return "", err
+				}
+				c, err := compileType(t)
+				if err != nil {
+					return "", err
+				}
+				code += c + ", "
+			}
+			code += ") ("
+			for _, rt := range sig.ReturnTypes {
+				t, err := canonicalType(rt, types)
+				if err != nil {
+					return "", err
+				}
+				c, err := compileType(t)
+				if err != nil {
+					return "", err
+				}
+				code += c + ", "
+			}
+			code += ")\n"
 		}
+		code += "}\n"
 	}
-	return nil
+	return code, nil
 }
 
 // replace all StructDefinition in types with Structs. Verifies that no Struct is illegally recursive
-func processStructs(structs map[string]StructDefinition, types map[string]DataType) error {
+func processStructs(structs map[string]StructDefinition, methods map[string]MethodDefinition, types map[string]DataType) error {
 	var processStruct func(StructDefinition, map[string]DataType, []string) (Struct, error)
 	processStruct = func(st StructDefinition, types map[string]DataType, containingStructs []string) (Struct, error) {
 		if _, ok := types[st.Name]; !ok {
@@ -203,7 +255,8 @@ func processStructs(structs map[string]StructDefinition, types map[string]DataTy
 			Name:        st.Name,
 			MemberNames: make([]string, len(st.Members)),
 			MemberTypes: make([]DataType, len(st.Members)),
-			Implements:  []string{},
+			Implements:  map[string]bool{},
+			Methods:     map[string]FunctionType{},
 		}
 		for i, m := range st.Members {
 			dt, err := canonicalType(m.Type, types)
@@ -235,7 +288,30 @@ func processStructs(structs map[string]StructDefinition, types map[string]DataTy
 		}
 		types[s.Name] = s
 	}
+	for _, meth := range methods {
+		dt, err := canonicalType(meth.Receiver.Type, types)
+		if err != nil {
+			return err
+		}
+		if st, ok := dt.(Struct); ok {
+			funcType, err := meth.getFunctionType(types)
+			if err != nil {
+				return err
+			}
+			st.Methods[meth.Name] = funcType
+		} else {
+			return errors.New("Method has non-struct receiver. Line " + strconv.Itoa(meth.LineNumber))
+		}
+	}
 	return nil
+}
+
+func (m MethodDefinition) getFunctionType(types map[string]DataType) (FunctionType, error) {
+	fd := FunctionDefinition{
+		Parameters:  m.Parameters,
+		ReturnTypes: m.ReturnTypes,
+	}
+	return getFunctionType(fd, types)
 }
 
 func getFunctionType(fn FunctionDefinition, types map[string]DataType) (FunctionType, error) {
@@ -296,8 +372,8 @@ func isType(child DataType, parent DataType, exact bool) bool {
 				return false
 			}
 			// return true if the child implements the parent interface
-			for _, v := range c.Implements {
-				if v == p.Name {
+			for name, ok := range c.Implements {
+				if ok && name == p.Name {
 					return true
 				}
 			}
@@ -357,7 +433,7 @@ func canonicalType(parsed ParsedDataType, types map[string]DataType) (DataType, 
 			return nil, errors.New("Pointer type has wrong number of type parameters.")
 		}
 		return BuiltinType{"P", params}, nil
-	case "N", "Str", "Bool":
+	case "N", "Str", "Bool", "E":
 		if len(params) != 0 {
 			return nil, errors.New("Type " + parsed.Type + " should not have any type parameters.")
 		}
@@ -481,6 +557,12 @@ func compileExpression(e Expression, ctx CodeContext) (string, []DataType, error
 		if err != nil {
 			return "", nil, err
 		}
+	case MethodCall:
+		fmt.Println("compiling method ", e)
+		code, returnedTypes, err = compileMethodCall(e, ctx)
+		if err != nil {
+			return "", nil, err
+		}
 	case TypeExpression:
 		code, returnedTypes, err = compileTypeExpression(e, ctx)
 		if err != nil {
@@ -563,6 +645,8 @@ func compileType(dt DataType) (string, error) {
 			return "bool", nil
 		case "Str":
 			return "string", nil
+		case "E":
+			return "error", nil
 		case "L":
 			return "_List", nil
 		case "M":
@@ -682,13 +766,85 @@ func compileFunc(fn FunctionDefinition, ctx CodeContext) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if len(fn.Body) > 0 {
-		_, lastIsReturn := fn.Body[len(fn.Body)-1].(ReturnStatement)
-		if lastIsReturn {
-			return header + body + "}\n", nil
+	return header + body + "\n}\n", nil
+}
+
+// returns code snippet ending with '\n\n'
+func compileMethod(meth MethodDefinition, ctx CodeContext) (string, error) {
+	ctx.Locals = map[string]Variable{}
+	dt, err := canonicalType(meth.Receiver.Type, ctx.Types)
+	if err != nil {
+		return "", err
+	}
+	receiverType, err := compileType(dt)
+	if err != nil {
+		return "", err
+	}
+	header := "func (" + meth.Receiver.Name + " " + receiverType + ") " + meth.Name + "("
+	for i, param := range meth.Parameters {
+		dt, err := canonicalType(param.Type, ctx.Types)
+		if err != nil {
+			return "", err
+		}
+		typeCode, err := compileType(dt)
+		if err != nil {
+			return "", err
+		}
+		header += param.Name + " " + typeCode
+		if i < len(meth.Parameters)-1 {
+			header += ", "
+		}
+		ctx.Locals[param.Name] = param
+	}
+	header += ") ("
+	returnTypes := make([]DataType, len(meth.ReturnTypes))
+	for i, rt := range meth.ReturnTypes {
+		dt, err := canonicalType(rt, ctx.Types)
+		if err != nil {
+			return "", err
+		}
+		returnTypes[i] = dt
+		typeCode, err := compileType(dt)
+		if err != nil {
+			return "", err
+		}
+		header += typeCode
+		if i < len(meth.ReturnTypes)-1 {
+			header += ", "
 		}
 	}
-	return header + body + "return nil\n}\n", nil
+	header += ") {\n"
+	if len(meth.Body) < 1 {
+		return "", errors.New("Function should contain at least one statement.")
+	}
+
+	bodyStatements := meth.Body
+	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
+		for _, v := range localsStatement.Vars {
+			header += "var "
+			if _, ok := ctx.Locals[v.Name]; ok {
+				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
+					v.Name, v.LineNumber)
+			}
+			ctx.Locals[v.Name] = v
+			dt, err := canonicalType(v.Type, ctx.Types)
+			if err != nil {
+				return "", err
+			}
+			typeCode, err := compileType(dt)
+			if err != nil {
+				return "", err
+			}
+			header += v.Name + " " + typeCode + "\n"
+		}
+		bodyStatements = bodyStatements[1:]
+	}
+	header += genDebugFn(ctx.Locals, ctx.Globals)
+	body, err := compileBody(bodyStatements, returnTypes, ctx)
+	if err != nil {
+		return "", err
+	}
+	return header + body + "\n}\n", nil
 }
 
 func genDebugFn(locals map[string]Variable, globals map[string]GlobalDefinition) string {
@@ -786,6 +942,9 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, ctx Cod
 		case FunctionCall:
 			c, _, err = compileFunctionCall(s, ctx)
 			c += "\n"
+		case MethodCall:
+			c, _, err = compileMethodCall(s, ctx)
+			c += "\n"
 		case Operation:
 			c, _, err = compileOperation(s, ctx)
 			c += "\n"
@@ -830,7 +989,7 @@ func compileAssignmentStatement(s AssignmentStatement, ctx CodeContext) (string,
 			if err != nil {
 				return "", err
 			}
-			if !isType(dataType, returnedTypes[i], false) {
+			if !isType(returnedTypes[i], dataType, false) {
 				return "", errors.New("Value in assignment does not match expected type on line " + lineStr)
 			}
 			code += t.Content + ", "
@@ -908,6 +1067,60 @@ func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, c
 		}
 	}
 	return code + "\n", nil
+}
+
+func compileMethodCall(s MethodCall, ctx CodeContext) (string, []DataType, error) {
+	lineStr := strconv.Itoa(s.LineNumber)
+	if len(s.Arguments) < 1 {
+		return "", nil, errors.New("Method call has not receiver on line " + lineStr)
+	}
+	receiver, receiverTypes, err := compileExpression(s.Receiver, ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(receiverTypes) != 1 {
+		return "", nil, errors.New("Method call receiver expression does not return one value on line " + lineStr)
+	}
+	var ft FunctionType
+Outer:
+	switch receiverType := receiverTypes[0].(type) {
+	case Struct:
+		var ok bool
+		ft, ok = receiverType.Methods[s.MethodName]
+		if !ok {
+			return "", nil, errors.New("Method call struct receiver does not have such a method on line " + lineStr)
+		}
+	case InterfaceDefinition:
+		for _, sig := range receiverType.Methods {
+			if sig.Name == s.MethodName {
+				var err error
+				ft, err = sig.getFunctionType(ctx.Types)
+				if err != nil {
+					return "", nil, err
+				}
+				break Outer
+			}
+		}
+		return "", nil, errors.New("Method call receiver does not have a method of that name on " + lineStr)
+	default:
+		return "", nil, errors.New("Method call receiver must be a struct or interface value on line " + lineStr)
+	}
+
+	code := receiver + "." + s.MethodName + "("
+	for i, exp := range s.Arguments {
+		c, returnedTypes, err := compileExpression(exp, ctx)
+		if err != nil {
+			return "", nil, err
+		}
+		if len(returnedTypes) != 1 {
+			return "", nil, errors.New("Method call argument does not return one value on line " + lineStr)
+		}
+		if !isType(returnedTypes[0], ft.Params[i], false) {
+			return "", nil, errors.New("Method call argument is wrong type on line " + lineStr)
+		}
+		code += c + ", " // Go is OK with comma after last arg, so don't need special case for last arg
+	}
+	return code + ")", ft.ReturnTypes, nil
 }
 
 func compileFunctionCall(s FunctionCall, ctx CodeContext) (string, []DataType, error) {
