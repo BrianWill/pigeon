@@ -911,15 +911,78 @@ func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, ctx
 	if err != nil {
 		return "", err
 	}
+	if len(returnedTypes) != 1 {
+		return "", errors.New("while condition expression must one value (a boolean) on line " + strconv.Itoa(s.LineNumber))
+	}
 	if !isType(returnedTypes[0], BuiltinType{"Bool", nil}, true) {
 		return "", errors.New("while condition expression does not return a boolean on line " + strconv.Itoa(s.LineNumber))
 	}
-	code := "for " + c + ".(bool) {\n"
+	code := "for " + c + " {\n"
 	c, err = compileBody(s.Body, expectedReturnTypes, ctx)
 	if err != nil {
 		return "", err
 	}
 	return code + c + "}\n", nil
+}
+
+func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType, ctx CodeContext) (string, error) {
+	lineStr := strconv.Itoa(s.LineNumber)
+	if _, ok := ctx.Locals[s.IndexName]; ok {
+		return "", errors.New("foreach index name conflicts with an existing local variable on line " + lineStr)
+	}
+	if _, ok := ctx.Locals[s.ValName]; ok {
+		return "", errors.New("foreach val name conflicts with an existing local variable on line " + lineStr)
+	}
+	locals := map[string]Variable{}
+	for k, v := range ctx.Locals {
+		locals[k] = v
+	}
+	locals[s.IndexName] = Variable{s.LineNumber, s.Column, s.IndexName, s.IndexType}
+	locals[s.ValName] = Variable{s.LineNumber, s.Column, s.ValName, s.ValType}
+	ctx.Locals = locals
+	collExpr, returnedTypes, err := compileExpression(s.Collection, ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(returnedTypes) != 1 {
+		return "", errors.New("foreach collection expression improperly returns more than one value on line " + lineStr)
+	}
+	collType, ok := returnedTypes[0].(BuiltinType)
+	if !ok || (collType.Name != "L" && collType.Name != "M") {
+		return "", errors.New("foreach collection type must be a list or map on line " + lineStr)
+	}
+	indexType, err := canonicalType(s.IndexType, ctx.Types)
+	if err != nil {
+		return "", err
+	}
+	valType, err := canonicalType(s.ValType, ctx.Types)
+	if err != nil {
+		return "", err
+	}
+	if collType.Name == "L" {
+		if !isType(indexType, BuiltinType{"N", nil}, true) {
+			return "", errors.New("Expected foreach index variable to be a number on line " + lineStr)
+		}
+		if !isType(collType.Params[0], valType, false) {
+			return "", errors.New("Improper foreach val type for list on line " + lineStr)
+		}
+	} else if collType.Name == "M" {
+		if !isType(collType.Params[0], indexType, false) {
+			return "", errors.New("Improper foreach index type for map on line " + lineStr)
+		}
+		if !isType(collType.Params[1], valType, false) {
+			return "", errors.New("Improper foreach val type for map on line " + lineStr)
+		}
+	}
+	code := "for _i, _v := range " + collExpr + " { \n"
+	code += s.IndexName + " = _i \n"
+	code += s.ValName + " = _v \n"
+	body, err := compileBody(s.Body, expectedReturnTypes, ctx)
+	if err != nil {
+		return "", err
+	}
+	code += body + "}\n"
+	return code, nil
 }
 
 func compileBody(statements []Statement, expectedReturnTypes []DataType, ctx CodeContext) (string, error) {
@@ -935,6 +998,8 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, ctx Cod
 			c, err = compileIfStatement(s, expectedReturnTypes, ctx)
 		case WhileStatement:
 			c, err = compileWhileStatement(s, expectedReturnTypes, ctx)
+		case ForeachStatement:
+			c, err = compileForeachStatement(s, expectedReturnTypes, ctx)
 		case AssignmentStatement:
 			c, err = compileAssignmentStatement(s, ctx)
 		case ReturnStatement:

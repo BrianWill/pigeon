@@ -46,9 +46,10 @@ var reservedWords = []string{
 	"break",
 	"continue",
 	"if",
-	"while",
 	"else",
 	"elseif",
+	"while",
+	"foreach",
 	"return",
 	"as",
 	"locals",
@@ -161,6 +162,7 @@ func (t MethodDefinition) Definition()    {}
 func (t LocalsStatement) Statement()     {}
 func (t IfStatement) Statement()         {}
 func (t WhileStatement) Statement()      {}
+func (t ForeachStatement) Statement()    {}
 func (t AssignmentStatement) Statement() {}
 func (t ReturnStatement) Statement()     {}
 func (t FunctionCall) Statement()        {}
@@ -183,6 +185,9 @@ func (t IfStatement) Line() int {
 }
 func (t WhileStatement) Line() int {
 	return t.Condition.Line()
+}
+func (t ForeachStatement) Line() int {
+	return t.Collection.Line()
 }
 func (t AssignmentStatement) Line() int {
 	return t.Targets[0].Line()
@@ -375,6 +380,17 @@ type WhileStatement struct {
 	LineNumber int
 	Column     int
 	Condition  Expression
+	Body       []Statement
+}
+
+type ForeachStatement struct {
+	LineNumber int
+	Column     int
+	IndexName  string
+	IndexType  ParsedDataType
+	ValName    string
+	ValType    ParsedDataType
+	Collection Expression
 	Body       []Statement
 }
 

@@ -24,15 +24,19 @@ method foo f Foo a N b Str : N Foo
 method doStuff f Foo apple N : Str
     return "hi"
 
+// Any, foreach, Pointers, typeswitch, istype
+
 func main
-    locals a Foo b L<N> c M<N Str> d Roger
+    locals a Foo b L<Str> c M<N Str> d Roger
     as a (Foo "hi" 3)
+    foreach i N v Str b
+        (print i v)
     as d a
     (.foo d 5 "hi")
     (.doStuff a 4)
-    as b (L<N> 5 2 9)
+    as b (L<Str> "yo" "byte")
     as c (M<N Str> 5 "hi" 9 "yo")
-    as b[0] 3
+    as b[0] "asdf"
     as c[3] "hi"
     (print "bla")
 

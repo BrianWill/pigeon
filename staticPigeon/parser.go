@@ -1121,6 +1121,70 @@ func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
 	return ElseClause{tokens[0].LineNumber, tokens[0].Column, body}, idx, nil
 }
 
+func parseForeach(tokens []Token, indentation int) (ForeachStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type != Space {
+		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	if tokens[idx].Type != IdentifierWord {
+		return ForeachStatement{}, 0, errors.New("Expecting identifier for the indexes in foreach on line " + line)
+	}
+	indexName := tokens[idx].Content
+	idx++
+	if tokens[idx].Type != Space {
+		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	indexType, nTokens, err := parseType(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return ForeachStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Space {
+		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	if tokens[idx].Type != IdentifierWord {
+		return ForeachStatement{}, 0, errors.New("Expecting identifier for the values in foreach on line " + line)
+	}
+	valName := tokens[idx].Content
+	idx++
+	if tokens[idx].Type != Space {
+		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	valType, nTokens, err := parseType(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return ForeachStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Space {
+		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	collection, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return ForeachStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Newline {
+		return ForeachStatement{}, 0, errors.New("Foreach statement collection expression not followed by newline on line " + line)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return ForeachStatement{}, 0, err
+	}
+	idx += numTokens
+	return ForeachStatement{
+		tokens[0].LineNumber, tokens[0].Column,
+		indexName, indexType,
+		valName, valType,
+		collection, body}, idx, nil
+}
+
 func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
 	idx := 1
@@ -1128,22 +1192,11 @@ func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
 		return WhileStatement{}, 0, errors.New("Missing space on line " + line)
 	}
 	idx++
-	var condition Expression
-	var numConditionTokens int
-	switch tokens[idx].Type {
-	case IdentifierWord, StringLiteral, NumberLiteral, BooleanLiteral, NilLiteral:
-		condition = tokens[idx]
-		numConditionTokens = 1
-	case OpenParen:
-		var err error
-		condition, numConditionTokens, err = parseOpenParen(tokens[idx:])
-		if err != nil {
-			return WhileStatement{}, 0, err
-		}
-	default:
-		return WhileStatement{}, 0, errors.New("Improper condition in while statement on line " + line)
+	condition, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return WhileStatement{}, 0, err
 	}
-	idx += numConditionTokens
+	idx += nTokens
 	if tokens[idx].Type != Newline {
 		return WhileStatement{}, 0, errors.New("While statement condition not followed by newline on line " + line)
 	}
@@ -1326,6 +1379,8 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseIf(tokens[i:], indentation)
 					case "while":
 						statement, numTokens, err = parseWhile(tokens[i:], indentation)
+					case "foreach":
+						statement, numTokens, err = parseForeach(tokens[i:], indentation)
 					case "locals":
 						statement, numTokens, err = parseLocals(tokens[i:])
 					case "return":
