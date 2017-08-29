@@ -658,7 +658,7 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 				return ParsedDataType{}, 0, err
 			}
 			idx += n
-			return ParsedDataType{primary.Content, paramTypes, returnTypes}, idx, nil
+			return ParsedDataType{line, primary.Content, paramTypes, returnTypes}, idx, nil
 		}
 		dataType, n, err := parseType(tokens[idx:], line)
 		if err != nil {
@@ -694,7 +694,7 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 		}
 		idx++
 	}
-	return ParsedDataType{primary.Content, paramTypes, returnTypes}, idx, nil
+	return ParsedDataType{line, primary.Content, paramTypes, returnTypes}, idx, nil
 }
 
 // expects to end with newline or >, but does not consume the newline or >
@@ -784,6 +784,14 @@ func parseExpression(tokens []Token, line int) (Expression, int, error) {
 	case IdentifierWord:
 		expr = token
 		idx++
+	case TypeName:
+		var err error
+		var nTokens int
+		expr, nTokens, err = parseType(tokens, line)
+		if err != nil {
+			return nil, 0, err
+		}
+		idx += nTokens
 	case OpenParen:
 		var err error
 		expr, idx, err = parseOpenParen(tokens)
@@ -1021,7 +1029,111 @@ func parseFunction(tokens []Token, line int) (FunctionDefinition, int, error) {
 		params, returnTypes, body}, idx, nil
 }
 
-// 'indentation' = number of spaces before 'if'
+func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type != Space {
+		return TypeswitchStatement{}, 0, errors.New("Missing space on line " + line)
+	}
+	idx++
+	value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return TypeswitchStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return TypeswitchStatement{}, 0, errors.New("Typeswitch expected newline on line " + line)
+	}
+	idx++
+	var cases []TypeswitchCase
+	for idx+1 < len(tokens) {
+		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "case" {
+			idx++
+			c, nTokens, err := parseTypeswitchCase(tokens[idx:], indentation)
+			if err != nil {
+				return TypeswitchStatement{}, 0, err
+			}
+			cases = append(cases, c)
+			idx += nTokens
+		} else {
+			break
+		}
+	}
+	var defaultBody []Statement
+	if idx+1 < len(tokens) {
+		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "default" {
+			idx++
+			var nTokens int
+			var err error
+			defaultBody, nTokens, err = parseDefaultCase(tokens[idx:], indentation)
+			if err != nil {
+				return TypeswitchStatement{}, 0, err
+			}
+			idx += nTokens
+		}
+	}
+	return TypeswitchStatement{tokens[0].LineNumber, tokens[0].Column, value, cases, defaultBody}, idx, nil
+}
+
+func parseTypeswitchCase(tokens []Token, indentation int) (TypeswitchCase, int, error) {
+	line := tokens[0].LineNumber
+	lineStr := strconv.Itoa(line)
+	idx := 1
+	if tokens[idx].Type != Space {
+		return TypeswitchCase{}, 0, errors.New("Missing space on line " + lineStr)
+	}
+	idx++
+	if tokens[idx].Type != IdentifierWord {
+		return TypeswitchCase{}, 0, errors.New("Expecting identifier on line " + lineStr)
+	}
+	name := tokens[idx].Content
+	idx++
+	if tokens[idx].Type != Space {
+		return TypeswitchCase{}, 0, errors.New("Missing space on line " + lineStr)
+	}
+	idx++
+	dt, nTokens, err := parseType(tokens[idx:], tokens[0].LineNumber)
+	if err != nil {
+		return TypeswitchCase{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return TypeswitchCase{}, 0, errors.New("typeswitch case type not followed by newline on line " + lineStr)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return TypeswitchCase{}, 0, err
+	}
+	idx += numTokens
+	v := Variable{tokens[0].LineNumber, tokens[0].Column, name, dt}
+	return TypeswitchCase{tokens[0].LineNumber, tokens[0].Column, v, body}, idx, nil
+}
+
+func parseDefaultCase(tokens []Token, indentation int) ([]Statement, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	if tokens[idx].Type != Newline {
+		return nil, 0, errors.New("Default case not followed by newline on line " + line)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return nil, 0, err
+	}
+	idx += numTokens
+	return body, idx, nil
+}
+
 func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
 	idx := 1
@@ -1111,7 +1223,7 @@ func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return ElseClause{}, 0, errors.New("Elif clause condition not followed by newline on line " + line)
+		return ElseClause{}, 0, errors.New("Else clause not followed by newline on line " + line)
 	}
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
 	if err != nil {
@@ -1385,6 +1497,8 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseLocals(tokens[i:])
 					case "return":
 						statement, numTokens, err = parseReturn(tokens[i:])
+					case "typeswitch":
+						statement, numTokens, err = parseTypeswitch(tokens[i:], indentation)
 					case "break":
 						statement, numTokens, err = parseBreak(tokens[i:])
 					case "continue":

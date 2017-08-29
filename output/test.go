@@ -4,25 +4,21 @@ import _fmt "fmt"
 
 var _breakpoints = make(map[int]bool)
 
-type _List *[]interface{}
+type _List []interface{}
 
-func _newList(items ...interface{}) _List {
+func _newList(items ...interface{}) *_List {
 	return &items
 }
 
-func (l _List) append(item interface{}) {
+func (l *_List) append(item interface{}) {
 	*l = append(*l, item)
 }
 
-func (l _List) set(idx float64, item interface{}) {
+func (l *_List) set(idx float64, item interface{}) {
 	(*l)[int64(idx)] = item
 }
 
-func (l _List) get(idx float64, item interface{}) interface{} {
-	return (*l)[int64(idx)]
-}
-
-func (l _List) len() float64 {
+func (l *_List) len() float64 {
 	return float64(len(*l))
 }
 
@@ -45,8 +41,8 @@ func (f Foo) foo(a float64, b string) (float64, Foo) {
 	debug := func(line int) {
 		var globals = map[string]interface{}{}
 		var locals = map[string]interface{}{
-			"b": b,
 			"a": a,
+			"b": b,
 		}
 		//_p.PollContinue(line, globals, locals)
 	}
@@ -74,12 +70,129 @@ func (f Foo) doStuff(apple float64) string {
 	return "hi"
 
 }
+func testing() {
+	var n float64
+	var p *float64
+	debug := func(line int) {
+		var globals = map[string]interface{}{}
+		var locals = map[string]interface{}{
+			"n": n,
+			"p": p,
+		}
+		//_p.PollContinue(line, globals, locals)
+	}
+	if _breakpoints[33] {
+		debug(33)
+	}
+	p = (&n)
+	if _breakpoints[34] {
+		debug(34)
+	}
+	n = (*p)
+
+}
+func _main() {
+	var a Foo
+	var b *_List
+	var c map[float64]string
+	var d Roger
+	var e bool
+	debug := func(line int) {
+		var globals = map[string]interface{}{}
+		var locals = map[string]interface{}{
+			"a": a,
+			"b": b,
+			"c": c,
+			"d": d,
+			"e": e,
+		}
+		//_p.PollContinue(line, globals, locals)
+	}
+	if _breakpoints[38] {
+		debug(38)
+	}
+	(b.append("hi"))
+	if _breakpoints[39] {
+		debug(39)
+	}
+	a = Foo{"hi", float64(3)}
+	if _breakpoints[40] {
+		debug(40)
+	}
+	for _i, _v := range b {
+		i = _i
+		v = _v
+		if _breakpoints[41] {
+			debug(41)
+		}
+		(_fmt.Print(i, v))
+	}
+	if _breakpoints[42] {
+		debug(42)
+	}
+	d = a
+	if _breakpoints[43] {
+		debug(43)
+	}
+	d.foo(float64(5), "hi")
+	if _breakpoints[44] {
+		debug(44)
+	}
+	a.doStuff(float64(4))
+	if _breakpoints[45] {
+		debug(45)
+	}
+	{
+		_inter := d
+		if a, _ok := _inter.(Foo); _ok {
+			if _breakpoints[47] {
+				debug(47)
+			}
+			(_fmt.Println("d is Foo"))
+		} else {
+			if _breakpoints[49] {
+				debug(49)
+			}
+			(_fmt.Println("d is not Foo"))
+		}
+	}
+	if _breakpoints[50] {
+		debug(50)
+	}
+	b = (func() (_list _List) {
+		(*_list) = make([]interface{}, 2)
+		(*_list)[0] = "yo"
+		(*_list)[1] = "byte"
+		return
+	})()
+	if _breakpoints[51] {
+		debug(51)
+	}
+	c = map[float64]string{float64(5): "hi", float64(9): "yo"}
+	if _breakpoints[52] {
+		debug(52)
+	}
+	(*b[int64(float64(0))].(string))
+	if _breakpoints[53] {
+		debug(53)
+	}
+	(*b[int64(float64(0))].(string)) = "asdf"
+	if _breakpoints[54] {
+		debug(54)
+	}
+	(c[float64(3)]) = "hi"
+	if _breakpoints[55] {
+		debug(55)
+	}
+	(_fmt.Print("bla"))
+
+}
 func sum(a float64, b float64) float64 {
 	debug := func(line int) {
 		var globals = map[string]interface{}{}
 		var locals = map[string]interface{}{
-			"b": b,
 			"a": a,
+			"b": b,
 		}
 		//_p.PollContinue(line, globals, locals)
 	}
@@ -118,75 +231,6 @@ func doNothing() {
 		debug(11)
 	}
 	(_fmt.Print("hi"))
-
-}
-func _main() {
-	var a Foo
-	var b _List
-	var c map[float64]string
-	var d Roger
-	debug := func(line int) {
-		var globals = map[string]interface{}{}
-		var locals = map[string]interface{}{
-			"a": a,
-			"b": b,
-			"c": c,
-			"d": d,
-		}
-		//_p.PollContinue(line, globals, locals)
-	}
-	if _breakpoints[31] {
-		debug(31)
-	}
-	a = Foo{"hi", float64(3)}
-	if _breakpoints[32] {
-		debug(32)
-	}
-	for _i, _v := range b {
-		i = _i
-		v = _v
-		if _breakpoints[33] {
-			debug(33)
-		}
-		(_fmt.Print(i, v))
-	}
-	if _breakpoints[34] {
-		debug(34)
-	}
-	d = a
-	if _breakpoints[35] {
-		debug(35)
-	}
-	d.foo(float64(5), "hi")
-	if _breakpoints[36] {
-		debug(36)
-	}
-	a.doStuff(float64(4))
-	if _breakpoints[37] {
-		debug(37)
-	}
-	b = (func() (_list _List) {
-		(*_list) = make([]interface{}, 2)
-		(*_list)[0] = "yo"
-		(*_list)[1] = "byte"
-		return
-	})()
-	if _breakpoints[38] {
-		debug(38)
-	}
-	c = map[float64]string{float64(5): "hi", float64(9): "yo"}
-	if _breakpoints[39] {
-		debug(39)
-	}
-	b[float64(0)] = "asdf"
-	if _breakpoints[40] {
-		debug(40)
-	}
-	c[float64(3)] = "hi"
-	if _breakpoints[41] {
-		debug(41)
-	}
-	(_fmt.Print("bla"))
 
 }
 

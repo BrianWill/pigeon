@@ -43,6 +43,8 @@ var reservedWords = []string{
 	"method",
 	"foreach",
 	"typeswitch",
+	"case",
+	"default",
 	"break",
 	"continue",
 	"if",
@@ -82,6 +84,8 @@ var operators = []string{
 	"get",
 	"set",
 	"append",
+	"ref",
+	"dr",
 	"or",
 	"and",
 	"print",
@@ -100,6 +104,7 @@ var builtinTypes = []string{
 	"M",
 	"P",
 	"E",
+	"Type",
 }
 
 type Token struct {
@@ -130,6 +135,7 @@ type DataType interface {
 }
 
 type ParsedDataType struct {
+	LineNumber  int
 	Type        string
 	Params      []ParsedDataType
 	ReturnTypes []ParsedDataType // non-nil only for functions with return types
@@ -151,6 +157,7 @@ func (t FunctionCall) Expression()   {}
 func (t Operation) Expression()      {}
 func (t TypeExpression) Expression() {}
 func (t MethodCall) Expression()     {}
+func (t ParsedDataType) Expression() {}
 
 func (t FunctionDefinition) Definition()  {}
 func (t GlobalDefinition) Definition()    {}
@@ -168,6 +175,7 @@ func (t ReturnStatement) Statement()     {}
 func (t FunctionCall) Statement()        {}
 func (t MethodCall) Statement()          {}
 func (t Operation) Statement()           {}
+func (t TypeswitchStatement) Statement() {}
 func (t BreakStatement) Statement()      {}
 func (t ContinueStatement) Statement()   {}
 
@@ -205,6 +213,12 @@ func (t Variable) Line() int {
 	return t.LineNumber
 }
 func (t FunctionCall) Line() int {
+	return t.LineNumber
+}
+func (t TypeswitchStatement) Line() int {
+	return t.LineNumber
+}
+func (t ParsedDataType) Line() int {
 	return t.LineNumber
 }
 func (t TypeExpression) Line() int {
@@ -355,6 +369,21 @@ type IfStatement struct {
 	Body       []Statement
 	Elifs      []ElseifClause
 	Else       ElseClause
+}
+
+type TypeswitchStatement struct {
+	LineNumber int
+	Column     int
+	Value      Expression
+	Cases      []TypeswitchCase
+	Default    []Statement
+}
+
+type TypeswitchCase struct {
+	LineNumber int
+	Column     int
+	Variable   Variable
+	Body       []Statement
 }
 
 type ElseifClause struct {

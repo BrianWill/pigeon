@@ -24,19 +24,32 @@ method foo f Foo a N b Str : N Foo
 method doStuff f Foo apple N : Str
     return "hi"
 
-// Any, foreach, Pointers, typeswitch, istype
+// typeswitch
+// break, continue
+// check lists, _newList
+
+func testing
+    locals n N p P<N>
+    as p (ref n)
+    as n (dr p)
 
 func main
-    locals a Foo b L<Str> c M<N Str> d Roger
+    locals a Foo b L<Str> c M<N Str> d Roger e Bool
+    (append b "hi")
     as a (Foo "hi" 3)
     foreach i N v Str b
         (print i v)
     as d a
     (.foo d 5 "hi")
     (.doStuff a 4)
+    typeswitch d
+    case a Foo
+        (println "d is Foo")
+    default
+        (println "d is not Foo")
     as b (L<Str> "yo" "byte")
     as c (M<N Str> 5 "hi" 9 "yo")
+    (get b 0)
     as b[0] "asdf"
     as c[3] "hi"
     (print "bla")
-
