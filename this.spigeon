@@ -1,0 +1,6 @@
+
+import "other.spigeon"
+    foo
+
+func main
+    (print (foo))

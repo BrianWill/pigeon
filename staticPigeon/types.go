@@ -266,6 +266,7 @@ type FunctionDefinition struct {
 	Parameters  []Variable
 	ReturnTypes []ParsedDataType
 	Body        []Statement
+	Pkg         *Package
 }
 
 type GlobalDefinition struct {
@@ -274,6 +275,7 @@ type GlobalDefinition struct {
 	Name       string
 	Value      Expression
 	Type       ParsedDataType
+	Pkg        *Package
 }
 
 type ImportDefinition struct {
@@ -282,6 +284,7 @@ type ImportDefinition struct {
 	Path       string
 	Names      []string
 	Aliases    []string
+	Pkg        *Package
 }
 
 type StructDefinition struct {
@@ -289,6 +292,7 @@ type StructDefinition struct {
 	Column     int
 	Name       string
 	Members    []Variable
+	Pkg        *Package
 }
 
 type Struct struct {
@@ -299,6 +303,7 @@ type Struct struct {
 	MemberTypes []DataType
 	Implements  map[string]bool // names of the interfaces this struct implements
 	Methods     map[string]FunctionType
+	Pkg         *Package
 }
 
 type MethodDefinition struct {
@@ -309,6 +314,7 @@ type MethodDefinition struct {
 	Parameters  []Variable
 	ReturnTypes []ParsedDataType
 	Body        []Statement
+	Pkg         *Package
 }
 
 type InterfaceDefinition struct {
@@ -316,6 +322,7 @@ type InterfaceDefinition struct {
 	Column     int
 	Name       string
 	Methods    []Signature
+	Pkg        *Package
 }
 
 type Signature struct {
@@ -446,10 +453,38 @@ type AssignmentStatement struct {
 	Value      Expression
 }
 
-type CodeContext struct {
+type Package struct {
 	Globals          map[string]GlobalDefinition
-	Locals           map[string]Variable
 	Types            map[string]DataType
-	FuncTypes        map[string]FunctionType
 	ValidBreakpoints map[string]bool
+	StructDefs       map[string]StructDefinition
+	Structs          map[string]Struct
+	Funcs            map[string]FunctionDefinition
+	Methods          map[string]map[string]MethodDefinition // method name:, struct name:, def
+	Interfaces       map[string]InterfaceDefinition
+	FullPath         string
+	Prefix           string
+	ImportDefs       map[string]ImportDefinition
+	ImportedPackages map[string]*Package
+	Code             string
+}
+
+func (p *Package) getExportedDefinition(name string) Definition {
+	g, ok := p.Globals[name]
+	if ok {
+		return g
+	}
+	st, ok := p.StructDefs[name]
+	if ok {
+		return st
+	}
+	f, ok := p.Funcs[name]
+	if ok {
+		return f
+	}
+	inter, ok := p.Interfaces[name]
+	if ok {
+		return inter
+	}
+	return nil
 }

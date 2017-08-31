@@ -176,7 +176,7 @@ func lex(text string) ([]Token, error) {
 			tokens = append(tokens, Token{NumberLiteral, string(runes[i:endIdx]), line, column})
 			column += (endIdx - i)
 			i = endIdx
-		} else if isAlpha(r) || r == '_' { // start of a word
+		} else if isAlpha(r) { // start of a word (identifiers beginning with _ are not allowed)
 			endIdx := i + 1
 			for {
 				current := runes[endIdx]
@@ -244,7 +244,7 @@ func lex(text string) ([]Token, error) {
 }
 
 // parse the top-level definitions
-func parse(tokens []Token) ([]Definition, error) {
+func parse(tokens []Token, pkg *Package) ([]Definition, error) {
 	var definitions []Definition
 	for i := 0; i < len(tokens); {
 		t := tokens[i]
@@ -256,17 +256,17 @@ func parse(tokens []Token) ([]Definition, error) {
 			var err error
 			switch t.Content {
 			case "import":
-				definition, numTokens, err = parseImport(tokens[i:], line)
+				definition, numTokens, err = parseImport(tokens[i:], line, pkg)
 			case "struct":
-				definition, numTokens, err = parseStruct(tokens[i:], line)
+				definition, numTokens, err = parseStruct(tokens[i:], line, pkg)
 			case "interface":
-				definition, numTokens, err = parseInterface(tokens[i:], line)
+				definition, numTokens, err = parseInterface(tokens[i:], line, pkg)
 			case "method":
-				definition, numTokens, err = parseMethod(tokens[i:], line)
+				definition, numTokens, err = parseMethod(tokens[i:], line, pkg)
 			case "func":
-				definition, numTokens, err = parseFunction(tokens[i:], line)
+				definition, numTokens, err = parseFunction(tokens[i:], line, pkg)
 			case "global":
-				definition, numTokens, err = parseGlobal(tokens[i:], line)
+				definition, numTokens, err = parseGlobal(tokens[i:], line, pkg)
 			default:
 				return nil, errors.New("Improper reserved word at top level of code: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
 			}
@@ -292,17 +292,18 @@ func parse(tokens []Token) ([]Definition, error) {
 	return definitions, nil
 }
 
-func parseImport(tokens []Token, line int) (ImportDefinition, int, error) {
+func parseImport(tokens []Token, line int, pkg *Package) (ImportDefinition, int, error) {
 	lineStr := strconv.Itoa(line)
 	idx := 1
 	if tokens[idx].Type != Space {
 		return ImportDefinition{}, 0, errors.New("Expected space on line " + lineStr)
 	}
 	idx++
-	path := tokens[idx]
-	if path.Type != StringLiteral {
+	pathToken := tokens[idx]
+	if pathToken.Type != StringLiteral {
 		return ImportDefinition{}, 0, errors.New("Expected string literal on line " + lineStr)
 	}
+	path := strings.Trim(pathToken.Content, "\"")
 	idx++
 	if tokens[idx].Type == Space {
 		idx++
@@ -346,10 +347,11 @@ func parseImport(tokens []Token, line int) (ImportDefinition, int, error) {
 	if len(importedNames) == 0 {
 		return ImportDefinition{}, 0, errors.New("Import statement has no imported names on line " + lineStr)
 	}
-	return ImportDefinition{line, tokens[0].Column, path.Content, importedNames, importedAliases}, idx, nil
+
+	return ImportDefinition{line, tokens[0].Column, path, importedNames, importedAliases, pkg}, idx, nil
 }
 
-func parseStruct(tokens []Token, line int) (StructDefinition, int, error) {
+func parseStruct(tokens []Token, line int, pkg *Package) (StructDefinition, int, error) {
 	lineStr := strconv.Itoa(line)
 	idx := 1
 	if tokens[idx].Type != Space {
@@ -408,12 +410,12 @@ func parseStruct(tokens []Token, line int) (StructDefinition, int, error) {
 	if len(members) == 0 {
 		return StructDefinition{}, 0, errors.New("Struct definition has no members on line " + lineStr)
 	}
-	return StructDefinition{line, tokens[0].Column, name.Content, members}, idx, nil
+	return StructDefinition{line, tokens[0].Column, name.Content, members, pkg}, idx, nil
 }
 
-func parseMethod(tokens []Token, line int) (MethodDefinition, int, error) {
+func parseMethod(tokens []Token, line int, pkg *Package) (MethodDefinition, int, error) {
 	lineStr := strconv.Itoa(line)
-	funcDef, numTokens, err := parseFunction(tokens, line)
+	funcDef, numTokens, err := parseFunction(tokens, line, pkg)
 	if err != nil {
 		return MethodDefinition{}, 0, err
 	}
@@ -428,6 +430,7 @@ func parseMethod(tokens []Token, line int) (MethodDefinition, int, error) {
 		funcDef.Parameters[1:],
 		funcDef.ReturnTypes,
 		funcDef.Body,
+		pkg,
 	}, numTokens, nil
 }
 
@@ -597,7 +600,7 @@ func parseSignature(tokens []Token, line int) (Signature, int, error) {
 	return Signature{line, tokens[0].Column, methodName.Content, paramTypes, returnTypes}, idx, nil
 }
 
-func parseInterface(tokens []Token, line int) (InterfaceDefinition, int, error) {
+func parseInterface(tokens []Token, line int, pkg *Package) (InterfaceDefinition, int, error) {
 	lineStr := strconv.Itoa(line)
 	idx := 1
 	if tokens[idx].Type != Space {
@@ -633,7 +636,7 @@ func parseInterface(tokens []Token, line int) (InterfaceDefinition, int, error) 
 	if len(methods) == 0 {
 		return InterfaceDefinition{}, 0, errors.New("Interface definition has no method signatures on line " + lineStr)
 	}
-	return InterfaceDefinition{line, tokens[0].Column, name.Content, methods}, idx, nil
+	return InterfaceDefinition{line, tokens[0].Column, name.Content, methods, pkg}, idx, nil
 
 }
 
@@ -733,7 +736,7 @@ func parseReturnTypes(tokens []Token, line int) ([]ParsedDataType, int, error) {
 	return returnTypes, idx, nil
 }
 
-func parseGlobal(tokens []Token, line int) (GlobalDefinition, int, error) {
+func parseGlobal(tokens []Token, line int, pkg *Package) (GlobalDefinition, int, error) {
 	lineStr := strconv.Itoa(line)
 	idx := 1
 	if tokens[idx].Type != Space {
@@ -767,7 +770,7 @@ func parseGlobal(tokens []Token, line int) (GlobalDefinition, int, error) {
 		return GlobalDefinition{}, 0, errors.New("Global not terminated with newline on line " + lineStr)
 	}
 	idx++
-	return GlobalDefinition{line, tokens[0].Column, target.Content, value, globalType}, idx, nil
+	return GlobalDefinition{line, tokens[0].Column, target.Content, value, globalType, pkg}, idx, nil
 }
 
 func parseExpression(tokens []Token, line int) (Expression, int, error) {
@@ -987,7 +990,7 @@ func debug(args ...interface{}) {
 	fmt.Println(args...)
 }
 
-func parseFunction(tokens []Token, line int) (FunctionDefinition, int, error) {
+func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, int, error) {
 	lineStr := strconv.Itoa(tokens[0].LineNumber)
 	idx := 1
 	if tokens[idx].Type == Space {
@@ -1025,8 +1028,13 @@ func parseFunction(tokens []Token, line int) (FunctionDefinition, int, error) {
 		return FunctionDefinition{}, 0, err
 	}
 	idx += nTokens
-	return FunctionDefinition{tokens[0].LineNumber, tokens[0].Column, name.Content,
-		params, returnTypes, body}, idx, nil
+	return FunctionDefinition{
+		tokens[0].LineNumber, tokens[0].Column,
+		name.Content,
+		params, returnTypes,
+		body,
+		pkg,
+	}, idx, nil
 }
 
 func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int, error) {

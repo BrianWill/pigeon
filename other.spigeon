@@ -1,0 +1,2 @@
+func foo : N
+    return 5

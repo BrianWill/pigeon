@@ -327,22 +327,23 @@ func main() {
 				return
 			}
 			if strings.HasSuffix(os.Args[2], ".spigeon") {
-				code, _, err := staticPigeon.Compile(os.Args[2])
+				_, packages, err := staticPigeon.Compile(os.Args[2])
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
-				// temp
-				outputFilename := "output/test.go"
-				err = ioutil.WriteFile(outputFilename, []byte(code), os.ModePerm)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				err = exec.Command("go", "fmt", outputFilename).Run()
-				if err != nil {
-					fmt.Println(err)
-					return
+				for _, p := range packages {
+					outputFilename := "output/" + p.Prefix + ".go"
+					err = ioutil.WriteFile(outputFilename, []byte(p.Code), os.ModePerm)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					err = exec.Command("go", "fmt", outputFilename).Run()
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
 				}
 			} else {
 				_, err := dynamicPigeon.CompileAndRun(os.Args[2])
