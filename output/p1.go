@@ -29,9 +29,13 @@ func _Prompt(args ...interface{}) {
 
 }
 
-func foo() float64 {
+var G_bar float64 = float64(4)
+
+func Foo() float64 {
 	debug := func(line int) {
-		var globals = map[string]interface{}{}
+		var globals = map[string]interface{}{
+			"bar": g_bar,
+		}
 		var locals = map[string]interface{}{}
 		//_p.PollContinue(line, globals, locals)
 	}

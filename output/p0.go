@@ -30,28 +30,22 @@ func _Prompt(args ...interface{}) {
 
 }
 
-func foo() float64 {
-	debug := func(line int) {
-		var globals = map[string]interface{}{}
-		var locals = map[string]interface{}{}
-		//_p.PollContinue(line, globals, locals)
-	}
-	if _breakpoints[2] {
-		debug(2)
-	}
-	return float64(5)
-
-}
 func _main() {
 	debug := func(line int) {
-		var globals = map[string]interface{}{}
+		var globals = map[string]interface{}{
+			"bar": g_bar,
+		}
 		var locals = map[string]interface{}{}
 		//_p.PollContinue(line, globals, locals)
 	}
-	if _breakpoints[6] {
-		debug(6)
+	if _breakpoints[7] {
+		debug(7)
 	}
-	(_fmt.Print(foo()))
+	(_fmt.Print(_p1.Foo()))
+	if _breakpoints[8] {
+		debug(8)
+	}
+	(_fmt.Print(_p1.G_bar))
 
 }
 

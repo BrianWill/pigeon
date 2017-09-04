@@ -176,7 +176,7 @@ func lex(text string) ([]Token, error) {
 			tokens = append(tokens, Token{NumberLiteral, string(runes[i:endIdx]), line, column})
 			column += (endIdx - i)
 			i = endIdx
-		} else if isAlpha(r) { // start of a word (identifiers beginning with _ are not allowed)
+		} else if isAlpha(r) { // start of a word (_ is not a valid identifier character in Pigeon)
 			endIdx := i + 1
 			for {
 				current := runes[endIdx]
@@ -184,7 +184,7 @@ func lex(text string) ([]Token, error) {
 				// A word should always end with space, newline, <, >, ., [, or )
 				if strings.Contains(" \n)<>.[", string(current)) {
 					break
-				} else if !(isAlpha(current) || current == '_' || isNumeral(current)) {
+				} else if !(isAlpha(current) || isNumeral(current)) {
 					return nil, errors.New("Word improperly formed at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
 				}
 				endIdx++

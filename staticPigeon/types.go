@@ -32,7 +32,6 @@ const (
 )
 
 const indentationSpaces = 4
-const outputDir = "output"
 
 var reservedWords = []string{
 	"func",
@@ -455,10 +454,11 @@ type AssignmentStatement struct {
 
 type Package struct {
 	Globals          map[string]GlobalDefinition
-	Types            map[string]DataType
+	Types            map[string]DataType // all types of current package and those brought into current namespace
+	ImportedTypes    map[DataType]bool   // all types of imported packages (directly and indirectly)
 	ValidBreakpoints map[string]bool
-	StructDefs       map[string]StructDefinition
-	Structs          map[string]Struct
+	StructDefs       map[string]StructDefinition // parsed form of struct
+	Structs          map[string]Struct           // processed form of struct
 	Funcs            map[string]FunctionDefinition
 	Methods          map[string]map[string]MethodDefinition // method name:, struct name:, def
 	Interfaces       map[string]InterfaceDefinition

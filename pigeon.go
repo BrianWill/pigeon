@@ -273,7 +273,7 @@ func server() {
 
 	http.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		runningProgram, err = dynamicPigeon.Run(executablePath)
+		runningProgram, err = Run(executablePath)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Error compiling code: "+err.Error())
@@ -318,6 +318,26 @@ func open(url string) error {
 	return exec.Command(cmd, args...).Start()
 }
 
+// func CompileAndRun(filename string) (*exec.Cmd, error) {
+// 	filename, _, err := Compile(filename)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return Run(filename)
+// }
+
+func Run(filename string) (*exec.Cmd, error) {
+	cmd := exec.Command("go", "run", filename)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	return cmd, nil
+}
+
 func main() {
 	if len(os.Args) >= 2 {
 		subcommand := os.Args[1]
@@ -327,13 +347,22 @@ func main() {
 				return
 			}
 			if strings.HasSuffix(os.Args[2], ".spigeon") {
-				_, packages, err := staticPigeon.Compile(os.Args[2])
+				gopath := os.Getenv("GOPATH")
+				basedir := gopath + "/src/pigeon_output/"
+				_, packages, err := staticPigeon.Compile(os.Args[2], "pigeon_output/")
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
+				if _, err := os.Stat(basedir); os.IsNotExist(err) {
+					os.Mkdir(basedir, os.ModePerm)
+				}
 				for _, p := range packages {
-					outputFilename := "output/" + p.Prefix + ".go"
+					pkgDir := basedir + p.Prefix
+					if _, err := os.Stat(pkgDir); os.IsNotExist(err) {
+						os.Mkdir(pkgDir, os.ModePerm)
+					}
+					outputFilename := pkgDir + "/" + p.Prefix + ".go"
 					err = ioutil.WriteFile(outputFilename, []byte(p.Code), os.ModePerm)
 					if err != nil {
 						fmt.Println(err)
@@ -345,14 +374,12 @@ func main() {
 						return
 					}
 				}
-			} else {
-				_, err := dynamicPigeon.CompileAndRun(os.Args[2])
+				_, err = Run(basedir + "p0/p0.go")
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
 			}
-
 		}
 	} else {
 		server()

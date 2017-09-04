@@ -1381,26 +1381,6 @@ func Highlight(code []byte) ([]byte, error) {
 	return highlight.AsHTML(code, highlight.OrderedList())
 }
 
-func CompileAndRun(filename string) (*exec.Cmd, error) {
-	filename, _, err := Compile(filename)
-	if err != nil {
-		return nil, err
-	}
-	return Run(filename)
-}
-
-func Run(filename string) (*exec.Cmd, error) {
-	cmd := exec.Command("go", "run", filename)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-	return cmd, nil
-}
-
 // returns map of valid breakpoints
 func Compile(inputFilename string) (string, map[string]bool, error) {
 	data, err := ioutil.ReadFile(inputFilename)

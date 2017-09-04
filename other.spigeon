@@ -1,2 +1,4 @@
 func foo : N
     return 5
+
+global bar N 4
