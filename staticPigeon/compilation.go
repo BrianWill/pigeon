@@ -251,6 +251,7 @@ func processStructs(pkg *Package) error {
 			MemberTypes: make([]DataType, len(st.Members)),
 			Implements:  map[string]bool{},
 			Methods:     map[string]FunctionType{},
+			Pkg:         st.Pkg,
 		}
 		pkg.Structs[s.Name] = s
 		pkg.Types[s.Name] = s
@@ -472,8 +473,8 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			if len(t.Params) != 1 {
 				return "", nil, errors.New("Invalid type expression. List must have one type parameter. Line " + lineStr)
 			}
-			expr := "(func () (_list _List) {\n"
-			expr += "(*_list) = make([]interface{}, " + strconv.Itoa(len(te.Operands)) + ")\n"
+			expr := "(func () *_List {\n"
+			expr += "var _list _List = make([]interface{}, " + strconv.Itoa(len(te.Operands)) + ")\n"
 			if err != nil {
 				return "", nil, err
 			}
@@ -485,9 +486,9 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[0], false) {
 					return "", nil, errors.New("Invalid type expression. List val of wrong type. Line " + lineStr)
 				}
-				expr += "(*_list)[" + strconv.Itoa(i) + "] = " + val + "\n"
+				expr += "_list[" + strconv.Itoa(i) + "] = " + val + "\n"
 			}
-			expr += `return
+			expr += `return &_list
 		    })()`
 			return expr, []DataType{t}, nil
 		case "N", "P", "Str", "Bool":
@@ -787,7 +788,15 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			header += v.Name + " " + typeCode + "\n"
+			header += v.Name + " " + typeCode
+			if t, ok := dt.(BuiltinType); ok {
+				if t.Name == "L" {
+					header += " = new(_List)"
+				} else if t.Name == "M" {
+					header += " = make(" + typeCode + ")"
+				}
+			}
+			header += "\n"
 		}
 		bodyStatements = bodyStatements[1:]
 	}
@@ -980,7 +989,9 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 		if i > 0 {
 			code += " else "
 		}
-		code += "if " + name + ", _ok := _inter.(" + t + "); _ok { \n" + body + "}"
+		code += "if " + name + ", _ok := _inter.(" + t + "); _ok { \n"
+		code += genDebugFn(newLocals, pkg.Globals, pkg)
+		code += body + "}"
 	}
 	if s.Default != nil {
 		body, err := compileBody(s.Default, expectedReturnTypes, pkg, locals)
@@ -1044,6 +1055,7 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 	if err != nil {
 		return "", err
 	}
+	code := "for _i, _v := range "
 	if collType.Name == "L" {
 		if !isType(indexType, BuiltinType{"N", nil}, true) {
 			return "", errors.New("Expected foreach index variable to be a number on line " + lineStr)
@@ -1051,6 +1063,7 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 		if !isType(collType.Params[0], valType, false) {
 			return "", errors.New("Improper foreach val type for list on line " + lineStr)
 		}
+		code += "*"
 	} else if collType.Name == "M" {
 		if !isType(collType.Params[0], indexType, false) {
 			return "", errors.New("Improper foreach index type for map on line " + lineStr)
@@ -1059,10 +1072,11 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 			return "", errors.New("Improper foreach val type for map on line " + lineStr)
 		}
 	}
-	code := "for _i, _v := range " + collExpr + " { \n"
-	code += s.IndexName + " = _i \n"
-	code += s.ValName + " = _v \n"
-	body, err := compileBody(s.Body, expectedReturnTypes, pkg, locals)
+	code += collExpr + " { \n"
+	code += s.IndexName + " := _i \n"
+	code += s.ValName + " := _v \n"
+	code += genDebugFn(newLocals, pkg.Globals, pkg)
+	body, err := compileBody(s.Body, expectedReturnTypes, pkg, newLocals)
 	if err != nil {
 		return "", err
 	}
@@ -1074,7 +1088,8 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 	var code string
 	for _, s := range statements {
 		line := s.Line()
-		pkg.ValidBreakpoints[strconv.Itoa(line)] = true
+		lineStr := strconv.Itoa(line)
+		pkg.ValidBreakpoints[lineStr] = true
 		code += fmt.Sprintf("if _breakpoints[%d] {debug(%d)}\n", line, line)
 		var c string
 		var err error
@@ -1098,6 +1113,11 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 			c, _, err = compileMethodCall(s, pkg, locals)
 			c += "\n"
 		case Operation:
+			if s.Operator != "set" && s.Operator != "print" && s.Operator != "println" &&
+				s.Operator != "prompt" && s.Operator != "append" {
+				return "", errors.New("Improper operation as statement. Only set, append, print, println, " +
+					"and prompt can be standalone statements. Line " + lineStr)
+			}
 			c, _, err = compileOperation(s, pkg, locals)
 			c += "\n"
 		}
@@ -1128,6 +1148,10 @@ func compileAssignmentStatement(s AssignmentStatement, pkg *Package, locals map[
 		case Operation:
 			if t.Operator != "dr" && t.Operator != "get" && t.Operator != "ref" {
 				return "", errors.New("Improper target of assignment on line " + lineStr)
+			}
+			if t.Operator == "get" {
+				t.Operator = "asget"
+				target = t
 			}
 		default:
 			return "", errors.New("Improper target of assignment on line " + lineStr)
@@ -1523,7 +1547,29 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			if !isType(operandTypes[1], BuiltinType{"N", nil}, true) {
 				return "", nil, errors.New("get operation requires a number as second operand")
 			}
-			code += "*" + operandCode[0] + "[int64(" + operandCode[1] + ")].(" + dt + ")"
+			code += "(*" + operandCode[0] + ")[int64(" + operandCode[1] + ")].(" + dt + ")"
+		}
+	case "asget": // get as target of assignment
+		if len(o.Operands) != 2 {
+			return "", nil, errors.New("get operation requires two operands")
+		}
+		t, ok := operandTypes[0].(BuiltinType)
+		if !ok || (t.Name != "L" && t.Name != "M") {
+			return "", nil, errors.New("get operation requires a list or map as first operand. Line " + lineStr)
+		}
+		switch t.Name {
+		case "M":
+			returnType = t.Params[1]
+			if !isType(operandTypes[1], t.Params[0], true) {
+				return "", nil, errors.New("get operation on map has wrong type as second operand")
+			}
+			code += operandCode[0] + "[" + operandCode[1] + "]"
+		case "L":
+			returnType = t.Params[0]
+			if !isType(operandTypes[1], BuiltinType{"N", nil}, true) {
+				return "", nil, errors.New("get operation requires a number as second operand")
+			}
+			code += "(*" + operandCode[0] + ")[int64(" + operandCode[1] + ")]"
 		}
 	case "set":
 		if len(o.Operands) != 3 {

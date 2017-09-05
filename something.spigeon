@@ -49,7 +49,6 @@ func main
         (println "d is not Foo")
     as b (L<Str> "yo" "byte")
     as c (M<N Str> 5 "hi" 9 "yo")
-    (get b 0)
     as b[0] "asdf"
     as c[3] "hi"
     (print "bla")
