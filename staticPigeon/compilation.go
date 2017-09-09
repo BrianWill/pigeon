@@ -1576,7 +1576,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			return "", nil, errors.New("set operation requires three operands")
 		}
 		t, ok := operandTypes[0].(BuiltinType)
-		if !ok || (t.Name != "N" && t.Name != "M") {
+		if !ok || (t.Name != "L" && t.Name != "M") {
 			return "", nil, errors.New("set operation requires a list or map as first operand")
 		}
 		switch t.Name {
@@ -1674,7 +1674,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 				return "", nil, errors.New("get operation requires two operands")
 			}
 			t, ok := operandTypes[0].(BuiltinType)
-			if !ok || (t.Name != "N" && t.Name != "M") {
+			if !ok || (t.Name != "L" && t.Name != "M") {
 				return "", nil, errors.New("get operation requires a list or map as first operand")
 			}
 			switch t.Name {
@@ -1806,13 +1806,13 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 // }
 
 // returns map of valid breakpoints
-func Compile(inputFilename string, outputDir string) (*Package, map[string]*Package, error) {
+func Compile(inputFilename string, outputDir string) (map[string]*Package, error) {
 	packages := map[string]*Package{}
-	pkg, err := ProcessPackage(inputFilename, packages, []string{}, outputDir)
+	_, err := ProcessPackage(inputFilename, packages, []string{}, outputDir)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return pkg, packages, nil
+	return packages, nil
 }
 
 var packagePrefixNum = 0

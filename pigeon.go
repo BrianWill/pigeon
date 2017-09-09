@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
+	"github.com/BrianWill/pigeon/goPigeon"
 	"github.com/BrianWill/pigeon/staticPigeon"
 )
 
@@ -346,16 +347,16 @@ func main() {
 				fmt.Println("Must specify a file to run.")
 				return
 			}
+			gopath := os.Getenv("GOPATH")
+			basedir := gopath + "/src/pigeon_output/"
+			if _, err := os.Stat(basedir); os.IsNotExist(err) {
+				os.Mkdir(basedir, os.ModePerm)
+			}
 			if strings.HasSuffix(os.Args[2], ".spigeon") {
-				gopath := os.Getenv("GOPATH")
-				basedir := gopath + "/src/pigeon_output/"
-				_, packages, err := staticPigeon.Compile(os.Args[2], "pigeon_output/")
+				packages, err := staticPigeon.Compile(os.Args[2], "pigeon_output/")
 				if err != nil {
 					fmt.Println(err)
 					return
-				}
-				if _, err := os.Stat(basedir); os.IsNotExist(err) {
-					os.Mkdir(basedir, os.ModePerm)
 				}
 				for _, p := range packages {
 					pkgDir := basedir + p.Prefix
@@ -374,11 +375,36 @@ func main() {
 						return
 					}
 				}
-				_, err = Run(basedir + "p0/p0.go")
+			} else if strings.HasSuffix(os.Args[2], ".gopigeon") {
+				packages, err := goPigeon.Compile(os.Args[2], "pigeon_output/")
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
+				for _, p := range packages {
+					pkgDir := basedir + p.Prefix
+					if _, err := os.Stat(pkgDir); os.IsNotExist(err) {
+						os.Mkdir(pkgDir, os.ModePerm)
+					}
+					outputFilename := pkgDir + "/" + p.Prefix + ".go"
+					err = ioutil.WriteFile(outputFilename, []byte(p.Code), os.ModePerm)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					err = exec.Command("go", "fmt", outputFilename).Run()
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+				}
+			} else {
+				log.Fatal("File has improper extension.")
+			}
+			_, err := Run(basedir + "p0/p0.go")
+			if err != nil {
+				fmt.Println(err)
+				return
 			}
 		}
 	} else {
