@@ -2,12 +2,6 @@ func sum a I64 b I64 : I64
     return (add a b)
 
 func main
-    locals a F64 b S<I64> c A<I64 10>
-    (println (len b))
-    as b (append b 60)
-    as b (append b 800)
-    as b (slice b 0 1)
-    (println (len b))
-    (println (slice c 3 8))
-    (set b 0 70)
-    (print b)
+    localfunc adam a I64 : I64
+        return (sum a 9)
+    (println (adam 2))

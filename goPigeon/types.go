@@ -41,6 +41,7 @@ var reservedWords = []string{
 	"import",
 	"method",
 	"foreach",
+	"go",
 	"typeswitch",
 	"case",
 	"default",
@@ -54,6 +55,7 @@ var reservedWords = []string{
 	"return",
 	"as",
 	"locals",
+	"localfunc",
 	"asinc",
 	"asdec",
 	"asadd",
@@ -95,6 +97,8 @@ var operators = []string{
 	"concat",
 	"len",
 	"istype",
+	"send",
+	"rcv",
 }
 
 var builtinTypes = []string{
@@ -110,12 +114,13 @@ var builtinTypes = []string{
 	"F64",
 	"Str",
 	"Bool",
-	"A", // array
-	"S", // slice
-	"L",
-	"M",
-	"P",
-	"E",
+	"A",  // array
+	"S",  // slice
+	"Ch", // channel
+	"L",  // list
+	"M",  // map
+	"P",  // pointer
+	"E",  // error
 	"Type",
 }
 
@@ -183,6 +188,7 @@ func (t InterfaceDefinition) Definition() {}
 func (t MethodDefinition) Definition()    {}
 
 func (t LocalsStatement) Statement()     {}
+func (t LocalFuncStatement) Statement()  {}
 func (t IfStatement) Statement()         {}
 func (t WhileStatement) Statement()      {}
 func (t ForeachStatement) Statement()    {}
@@ -194,6 +200,7 @@ func (t Operation) Statement()           {}
 func (t TypeswitchStatement) Statement() {}
 func (t BreakStatement) Statement()      {}
 func (t ContinueStatement) Statement()   {}
+func (t GoStatement) Statement()         {}
 
 func (t InterfaceDefinition) DataType() {}
 func (t StructDefinition) DataType()    {}
@@ -224,6 +231,12 @@ func (t BreakStatement) Line() int {
 	return t.LineNumber
 }
 func (t ContinueStatement) Line() int {
+	return t.LineNumber
+}
+func (t GoStatement) Line() int {
+	return t.LineNumber
+}
+func (t LocalFuncStatement) Line() int {
 	return t.LineNumber
 }
 func (t Variable) Line() int {
@@ -386,6 +399,15 @@ type TypeExpression struct {
 	Operands   []Expression
 }
 
+type LocalFuncStatement struct {
+	LineNumber  int
+	Column      int
+	Name        string
+	Parameters  []Variable
+	ReturnTypes []ParsedDataType
+	Body        []Statement
+}
+
 type IfStatement struct {
 	LineNumber int
 	Column     int
@@ -421,6 +443,12 @@ type ElseClause struct {
 	LineNumber int
 	Column     int
 	Body       []Statement
+}
+
+type GoStatement struct {
+	LineNumber int
+	Column     int
+	Call       Expression // FunctionCall or MethodCall
 }
 
 type LocalsStatement struct {

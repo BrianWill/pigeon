@@ -419,6 +419,11 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 			return nil, errors.New("List type has wrong number of type parameters.")
 		}
 		return BuiltinType{"S", params}, nil
+	case "Ch":
+		if len(params) != 1 {
+			return nil, errors.New("Channel type has wrong number of type parameters.")
+		}
+		return BuiltinType{"Ch", params}, nil
 	case "M":
 		if len(params) != 2 {
 			return nil, errors.New("Map type has wrong number of type parameters.")
@@ -541,6 +546,29 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			expr += `return &_list
 		    })()`
 			return expr, []DataType{t}, nil
+		case "Ch":
+			if len(t.Params) != 1 {
+				return "", nil, errors.New("Invalid type expression. Channel must have one type parameter. Line " + lineStr)
+			}
+			if len(te.Operands) != 1 {
+				return "", nil, errors.New("Invalid type expression. Must specify size for channel. Line " + lineStr)
+			}
+			size, returnedTypes, err := compileExpression(te.Operands[0], pkg, locals)
+			if err != nil {
+				return "", nil, err
+			}
+			if len(returnedTypes) != 1 {
+				return "", nil, errors.New("Invalid type expression. Channel must have one (and just one) operand. Line " + lineStr)
+			}
+			if !isInteger(returnedTypes[0]) {
+				return "", nil, errors.New("Invalid type expression. Channel must have an integer operand. Line " + lineStr)
+			}
+			channelType, err := compileType(t.Params[0], pkg)
+			if err != nil {
+				return "", nil, err
+			}
+			code := "make(chan " + channelType + ", " + size + ")"
+			return code, []DataType{t}, nil
 		default:
 			return "", nil, errors.New("Invalid type expression. Cannot create type " + t.Name + ". Line " + lineStr)
 		}
@@ -737,6 +765,25 @@ func isNumber(dt DataType) bool {
 		t.Name == "F32" || t.Name == "F64"
 }
 
+func isChannel(dt DataType) (bool, DataType) {
+	t, ok := dt.(BuiltinType)
+	if !ok || t.Name != "Ch" {
+		return false, nil
+	}
+	return true, t.Params[0]
+}
+
+func isInteger(dt DataType) bool {
+	t, ok := dt.(BuiltinType)
+	if !ok {
+		return false
+	}
+	return t.Name == "I8" || t.Name == "I16" ||
+		t.Name == "I32" || t.Name == "I64" ||
+		t.Name == "U8" || t.Name == "U16" ||
+		t.Name == "U32" || t.Name == "U64"
+}
+
 func isMap(dt DataType) (DataType, DataType, bool) {
 	t, ok := dt.(BuiltinType)
 	if !ok || t.Name != "M" {
@@ -786,6 +833,12 @@ func compileType(dt DataType, pkg *Package) (string, error) {
 				return "", err
 			}
 			return "[]" + param, nil
+		case "Ch":
+			param, err := compileType(t.Params[0], pkg)
+			if err != nil {
+				return "", err
+			}
+			return "chan " + param, nil
 		case "M":
 			keyType, err := compileType(t.Params[0], pkg)
 			if err != nil {
@@ -888,7 +941,6 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 	if len(fn.Body) < 1 {
 		return "", errors.New("Function should contain at least one statement.")
 	}
-
 	bodyStatements := fn.Body
 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
 		for _, v := range localsStatement.Vars {
@@ -916,6 +968,21 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 			}
 			header += "\n"
 		}
+		bodyStatements = bodyStatements[1:]
+	}
+	for {
+		if len(bodyStatements) == 0 {
+			break
+		}
+		localFunc, ok := bodyStatements[0].(LocalFuncStatement)
+		if !ok {
+			break
+		}
+		code, err := compileLocalFunc(localFunc, fn.Pkg, locals)
+		if err != nil {
+			return "", err
+		}
+		header += code + "\n"
 		bodyStatements = bodyStatements[1:]
 	}
 	header += genDebugFn(locals, fn.Pkg.Globals, fn.Pkg)
@@ -974,7 +1041,6 @@ func compileMethod(meth MethodDefinition) (string, error) {
 	if len(meth.Body) < 1 {
 		return "", errors.New("Function should contain at least one statement.")
 	}
-
 	bodyStatements := meth.Body
 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
 		for _, v := range localsStatement.Vars {
@@ -996,8 +1062,114 @@ func compileMethod(meth MethodDefinition) (string, error) {
 		}
 		bodyStatements = bodyStatements[1:]
 	}
+	for {
+		if len(bodyStatements) == 0 {
+			break
+		}
+		localFunc, ok := bodyStatements[0].(LocalFuncStatement)
+		if !ok {
+			break
+		}
+		code, err := compileLocalFunc(localFunc, meth.Pkg, locals)
+		if err != nil {
+			return "", err
+		}
+		header += code + "\n"
+		bodyStatements = bodyStatements[1:]
+	}
 	header += genDebugFn(locals, meth.Pkg.Globals, meth.Pkg)
 	body, err := compileBody(bodyStatements, returnTypes, meth.Pkg, locals)
+	if err != nil {
+		return "", err
+	}
+	return header + body + "\n}\n", nil
+}
+
+func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[string]Variable) (string, error) {
+	if _, ok := outerLocals[fn.Name]; ok {
+		return "", errors.New("Local func cannot have same name as another local. Line " + strconv.Itoa(fn.LineNumber))
+	}
+	paramTypes := make([]ParsedDataType, len(fn.Parameters))
+	for i, v := range fn.Parameters {
+		paramTypes[i] = v.Type
+	}
+	outerLocals[fn.Name] = Variable{fn.LineNumber, fn.Column, fn.Name,
+		ParsedDataType{fn.LineNumber, "F", paramTypes, fn.ReturnTypes},
+	}
+	locals := map[string]Variable{}
+	header := fn.Name + " := func("
+	for i, param := range fn.Parameters {
+		dt, err := getDataType(param.Type, pkg)
+		if err != nil {
+			return "", err
+		}
+		typeCode, err := compileType(dt, pkg)
+		if err != nil {
+			return "", err
+		}
+		header += param.Name + " " + typeCode
+		if i < len(fn.Parameters)-1 {
+			header += ", "
+		}
+		locals[param.Name] = param
+	}
+	header += ") ("
+	returnTypes := make([]DataType, len(fn.ReturnTypes))
+	for i, rt := range fn.ReturnTypes {
+		dt, err := getDataType(rt, pkg)
+		if err != nil {
+			return "", err
+		}
+		returnTypes[i] = dt
+		typeCode, err := compileType(dt, pkg)
+		if err != nil {
+			return "", err
+		}
+		header += typeCode
+		if i < len(fn.ReturnTypes)-1 {
+			header += ", "
+		}
+	}
+	header += ") {\n"
+	if len(fn.Body) < 1 {
+		return "", errors.New("Function should contain at least one statement.")
+	}
+	bodyStatements := fn.Body
+	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
+		for _, v := range localsStatement.Vars {
+			header += "var "
+			if _, ok := locals[v.Name]; ok {
+				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
+					v.Name, v.LineNumber)
+			}
+			locals[v.Name] = v
+			dt, err := getDataType(v.Type, pkg)
+			if err != nil {
+				return "", err
+			}
+			typeCode, err := compileType(dt, pkg)
+			if err != nil {
+				return "", err
+			}
+			header += v.Name + " " + typeCode
+			if t, ok := dt.(BuiltinType); ok {
+				if t.Name == "L" {
+					header += " = new(_List)"
+				} else if t.Name == "M" {
+					header += " = make(" + typeCode + ")"
+				}
+			}
+			header += "\n"
+		}
+		bodyStatements = bodyStatements[1:]
+	}
+	header += genDebugFn(locals, pkg.Globals, pkg)
+	for name, v := range outerLocals {
+		if _, ok := locals[name]; !ok {
+			locals[name] = v
+		}
+	}
+	body, err := compileBody(bodyStatements, returnTypes, pkg, locals)
 	if err != nil {
 		return "", err
 	}
@@ -1027,6 +1199,14 @@ func genDebugFn(locals map[string]Variable, globals map[string]GlobalDefinition,
 }
 `
 	return s
+}
+
+func compileGoStatement(s GoStatement, pkg *Package, locals map[string]Variable) (string, error) {
+	expr, _, err := compileExpression(s.Call, pkg, locals)
+	if err != nil {
+		return "", err
+	}
+	return "go " + expr + "\n", nil
 }
 
 func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
@@ -1218,6 +1398,8 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 			c, err = compileWhileStatement(s, expectedReturnTypes, pkg, locals)
 		case ForeachStatement:
 			c, err = compileForeachStatement(s, expectedReturnTypes, pkg, locals)
+		case GoStatement:
+			c, err = compileGoStatement(s, pkg, locals)
 		case AssignmentStatement:
 			c, err = compileAssignmentStatement(s, pkg, locals)
 		case TypeswitchStatement:
@@ -1416,6 +1598,7 @@ func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]Variabl
 			if !ok {
 				return "", nil, errors.New("calling non-function on line " + lineStr)
 			}
+			code += s.Content
 		} else {
 			fnDef, ok := pkg.Funcs[s.Content] // previous check means we don't have to check for zero val
 			if !ok {
@@ -1677,6 +1860,29 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			}
 			code += operandCode[i] + " >= " + operandCode[i+1]
 		}
+	case "send":
+		if len(o.Operands) != 2 {
+			return "", nil, errors.New("send operation requires two operands")
+		}
+		ok, param := isChannel(operandTypes[0])
+		if !ok {
+			return "", nil, errors.New("send operation's first operand must be a channel")
+		}
+		if !isType(operandTypes[0], param, false) {
+			return "", nil, errors.New("send operation's second operand is wrong type for the channel")
+		}
+		code += operandCode[0] + " <- " + operandCode[1]
+		returnType = nil
+	case "rcv":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("rcv operation requires one operand")
+		}
+		ok, param := isChannel(operandTypes[0])
+		if !ok {
+			return "", nil, errors.New("rcv operation's first operand must be a channel")
+		}
+		code += " <- " + operandCode[0]
+		returnType = param
 	case "get", "asget": // get as target of assignment
 		if len(o.Operands) != 2 {
 			return "", nil, errors.New("get operation requires two operands")
