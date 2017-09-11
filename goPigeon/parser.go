@@ -1272,6 +1272,152 @@ func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
 	return ElseClause{tokens[0].LineNumber, tokens[0].Column, body}, idx, nil
 }
 
+func parseSelect(tokens []Token, indentation int) (SelectStatement, int, error) {
+	lineStr := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type != Newline {
+		return SelectStatement{}, 0, errors.New("Expecting newline. Line " + lineStr)
+	}
+	idx++
+	var clauses []SelectClause
+	var defaultClause SelectDefaultClause
+loop:
+	for idx < len(tokens) {
+		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation {
+			idx++
+			if tokens[idx].Type != ReservedWord {
+				return SelectStatement{}, 0, errors.New("Expecting 'send' or 'rcv', or 'default'. Line " + lineStr)
+			}
+			switch tokens[idx].Content {
+			case "sending":
+				clause, n, err := parseSendClause(tokens[idx:], indentation)
+				if err != nil {
+					return SelectStatement{}, 0, err
+				}
+				clauses = append(clauses, clause)
+				idx += n
+			case "rcving":
+				clause, n, err := parseRcvClause(tokens[idx:], indentation)
+				if err != nil {
+					return SelectStatement{}, 0, err
+				}
+				clauses = append(clauses, clause)
+				idx += n
+			case "default":
+				var n int
+				var err error
+				defaultClause, n, err = parseSelectDefault(tokens[idx:], indentation)
+				if err != nil {
+					return SelectStatement{}, 0, err
+				}
+				idx += n
+				break loop
+			}
+		} else {
+			break
+		}
+	}
+	return SelectStatement{tokens[0].LineNumber, tokens[0].Column, clauses, defaultClause}, idx, nil
+}
+
+func parseSendClause(tokens []Token, indentation int) (SelectSendClause, int, error) {
+	line := tokens[0].LineNumber
+	lineStr := strconv.Itoa(line)
+	idx := 1
+	if tokens[idx].Type != Space {
+		return SelectSendClause{}, 0, errors.New("Missing space on line " + lineStr)
+	}
+	idx++
+	channelExpr, numConditionTokens, err := parseExpression(tokens[idx:], line)
+	if err != nil {
+		return SelectSendClause{}, 0, errors.New("Improper channel expression in select send clause. Line " + lineStr)
+	}
+	idx += numConditionTokens
+	if tokens[idx].Type != Space {
+		return SelectSendClause{}, 0, errors.New("Missing space on line " + lineStr)
+	}
+	idx++
+	valExpr, numConditionTokens, err := parseExpression(tokens[idx:], line)
+	if err != nil {
+		return SelectSendClause{}, 0, errors.New("Improper value expression in select send clause. Line " + lineStr)
+	}
+	idx += numConditionTokens
+	if tokens[idx].Type != Newline {
+		return SelectSendClause{}, 0, errors.New("Expecting newline in select send clause. Line " + lineStr)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return SelectSendClause{}, 0, err
+	}
+	idx += numTokens
+	return SelectSendClause{tokens[0].LineNumber, tokens[0].Column, channelExpr, valExpr, body}, idx, nil
+}
+
+func parseRcvClause(tokens []Token, indentation int) (SelectRcvClause, int, error) {
+	line := tokens[0].LineNumber
+	lineStr := strconv.Itoa(line)
+	idx := 1
+	if tokens[idx].Type != Space {
+		return SelectRcvClause{}, 0, errors.New("Missing space on line " + lineStr)
+	}
+	idx++
+	if tokens[idx].Type != IdentifierWord {
+		return SelectRcvClause{}, 0, errors.New("Expecting variable name for target of select rcv clause. Line " + lineStr)
+	}
+	targetName := tokens[idx].Content
+	idx++
+	if tokens[idx].Type != Space {
+		return SelectRcvClause{}, 0, errors.New("Missing space on line " + lineStr)
+	}
+	idx++
+	dt, n, err := parseType(tokens[idx:], line)
+	if err != nil {
+		return SelectRcvClause{}, 0, err
+	}
+	idx += n
+	if tokens[idx].Type != Space {
+		return SelectRcvClause{}, 0, errors.New("Missing space on line " + lineStr)
+	}
+	idx++
+	expr, n, err := parseExpression(tokens[idx:], line)
+	if err != nil {
+		return SelectRcvClause{}, 0, err
+	}
+	idx += n
+	if tokens[idx].Type != Newline {
+		return SelectRcvClause{}, 0, errors.New("Expecting newline in select rcv clause. Line " + lineStr)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return SelectRcvClause{}, 0, err
+	}
+	idx += numTokens
+
+	return SelectRcvClause{
+		tokens[0].LineNumber, tokens[0].Column,
+		Variable{tokens[0].LineNumber, tokens[0].Column, targetName, dt},
+		expr,
+		body,
+	}, idx, nil
+}
+
+func parseSelectDefault(tokens []Token, indentation int) (SelectDefaultClause, int, error) {
+	line := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type != Newline {
+		return SelectDefaultClause{}, 0, errors.New("Elseif clause condition not followed by newline on line " + line)
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return SelectDefaultClause{}, 0, err
+	}
+	idx += numTokens
+	return SelectDefaultClause{tokens[0].LineNumber, tokens[0].Column, body}, idx, nil
+}
+
 func parseForeach(tokens []Token, indentation int) (ForeachStatement, int, error) {
 	line := strconv.Itoa(tokens[0].LineNumber)
 	idx := 1
@@ -1585,6 +1731,8 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseReturn(tokens[i:])
 					case "typeswitch":
 						statement, numTokens, err = parseTypeswitch(tokens[i:], indentation)
+					case "select":
+						statement, numTokens, err = parseSelect(tokens[i:], indentation)
 					case "break":
 						statement, numTokens, err = parseBreak(tokens[i:])
 					case "continue":

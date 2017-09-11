@@ -56,6 +56,9 @@ var reservedWords = []string{
 	"as",
 	"locals",
 	"localfunc",
+	"select",
+	"sending",
+	"rcving",
 	"asinc",
 	"asdec",
 	"asadd",
@@ -173,6 +176,10 @@ type FunctionType struct {
 	ReturnTypes []DataType
 }
 
+type SelectClause interface {
+	SelectClause()
+}
+
 func (t Token) Expression()          {}
 func (t FunctionCall) Expression()   {}
 func (t Operation) Expression()      {}
@@ -201,6 +208,7 @@ func (t TypeswitchStatement) Statement() {}
 func (t BreakStatement) Statement()      {}
 func (t ContinueStatement) Statement()   {}
 func (t GoStatement) Statement()         {}
+func (t SelectStatement) Statement()     {}
 
 func (t InterfaceDefinition) DataType() {}
 func (t StructDefinition) DataType()    {}
@@ -208,6 +216,9 @@ func (t BuiltinType) DataType()         {}
 func (t FunctionType) DataType()        {}
 func (t Struct) DataType()              {}
 func (t ArrayType) DataType()           {}
+
+func (s SelectSendClause) SelectClause() {}
+func (s SelectRcvClause) SelectClause()  {}
 
 func (t LocalsStatement) Line() int {
 	return t.Vars[0].LineNumber
@@ -234,6 +245,9 @@ func (t ContinueStatement) Line() int {
 	return t.LineNumber
 }
 func (t GoStatement) Line() int {
+	return t.LineNumber
+}
+func (t SelectStatement) Line() int {
 	return t.LineNumber
 }
 func (t LocalFuncStatement) Line() int {
@@ -408,15 +422,6 @@ type LocalFuncStatement struct {
 	Body        []Statement
 }
 
-type IfStatement struct {
-	LineNumber int
-	Column     int
-	Condition  Expression
-	Body       []Statement
-	Elifs      []ElseifClause
-	Else       ElseClause
-}
-
 type TypeswitchStatement struct {
 	LineNumber int
 	Column     int
@@ -432,6 +437,15 @@ type TypeswitchCase struct {
 	Body       []Statement
 }
 
+type IfStatement struct {
+	LineNumber int
+	Column     int
+	Condition  Expression
+	Body       []Statement
+	Elifs      []ElseifClause
+	Else       ElseClause
+}
+
 type ElseifClause struct {
 	LineNumber int
 	Column     int
@@ -440,6 +454,35 @@ type ElseifClause struct {
 }
 
 type ElseClause struct {
+	LineNumber int
+	Column     int
+	Body       []Statement
+}
+
+type SelectStatement struct {
+	LineNumber int
+	Column     int
+	Clauses    []SelectClause
+	Default    SelectDefaultClause
+}
+
+type SelectSendClause struct {
+	LineNumber int
+	Column     int
+	Channel    Expression
+	Value      Expression
+	Body       []Statement
+}
+
+type SelectRcvClause struct {
+	LineNumber int
+	Column     int
+	Target     Variable
+	Channel    Expression
+	Body       []Statement
+}
+
+type SelectDefaultClause struct {
 	LineNumber int
 	Column     int
 	Body       []Statement

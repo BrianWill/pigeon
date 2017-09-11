@@ -960,9 +960,10 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 			}
 			header += v.Name + " " + typeCode
 			if t, ok := dt.(BuiltinType); ok {
-				if t.Name == "L" {
+				switch t.Name {
+				case "L":
 					header += " = new(_List)"
-				} else if t.Name == "M" {
+				case "M", "Ch":
 					header += " = make(" + typeCode + ")"
 				}
 			}
@@ -1057,6 +1058,15 @@ func compileMethod(meth MethodDefinition) (string, error) {
 			typeCode, err := compileType(dt, meth.Pkg)
 			if err != nil {
 				return "", err
+			}
+			header += v.Name + " " + typeCode
+			if t, ok := dt.(BuiltinType); ok {
+				switch t.Name {
+				case "L":
+					header += " = new(_List)"
+				case "M", "Ch":
+					header += " = make(" + typeCode + ")"
+				}
 			}
 			header += v.Name + " " + typeCode + "\n"
 		}
@@ -1153,9 +1163,10 @@ func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[strin
 			}
 			header += v.Name + " " + typeCode
 			if t, ok := dt.(BuiltinType); ok {
-				if t.Name == "L" {
+				switch t.Name {
+				case "L":
 					header += " = new(_List)"
-				} else if t.Name == "M" {
+				case "M", "Ch":
 					header += " = make(" + typeCode + ")"
 				}
 			}
@@ -1341,10 +1352,6 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 	if len(returnedTypes) != 1 {
 		return "", errors.New("foreach collection expression improperly returns more than one value on line " + lineStr)
 	}
-	collType, ok := returnedTypes[0].(BuiltinType)
-	if !ok || (collType.Name != "L" && collType.Name != "M") {
-		return "", errors.New("foreach collection type must be a list or map on line " + lineStr)
-	}
 	indexType, err := getDataType(s.IndexType, pkg)
 	if err != nil {
 		return "", err
@@ -1354,21 +1361,36 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 		return "", err
 	}
 	code := "for _i, _v := range "
-	if collType.Name == "L" {
+	switch t := returnedTypes[0].(type) {
+	case BuiltinType:
+		if t.Name != "L" && t.Name != "M" && t.Name != "S" {
+			return "", errors.New("foreach collection type must be a list or map on line " + lineStr)
+		}
+		if t.Name == "L" {
+			if !isNumber(indexType) {
+				return "", errors.New("Expected foreach index variable to be a number on line " + lineStr)
+			}
+			if !isType(t.Params[0], valType, false) {
+				return "", errors.New("Improper foreach val type for list on line " + lineStr)
+			}
+			code += "*"
+		} else if t.Name == "M" {
+			if !isType(t.Params[0], indexType, false) {
+				return "", errors.New("Improper foreach index type for map on line " + lineStr)
+			}
+			if !isType(t.Params[1], valType, false) {
+				return "", errors.New("Improper foreach val type for map on line " + lineStr)
+			}
+		}
+	case ArrayType:
 		if !isNumber(indexType) {
 			return "", errors.New("Expected foreach index variable to be a number on line " + lineStr)
 		}
-		if !isType(collType.Params[0], valType, false) {
-			return "", errors.New("Improper foreach val type for list on line " + lineStr)
+		if !isType(t.Type, valType, false) {
+			return "", errors.New("Improper foreach val type for array on line " + lineStr)
 		}
-		code += "*"
-	} else if collType.Name == "M" {
-		if !isType(collType.Params[0], indexType, false) {
-			return "", errors.New("Improper foreach index type for map on line " + lineStr)
-		}
-		if !isType(collType.Params[1], valType, false) {
-			return "", errors.New("Improper foreach val type for map on line " + lineStr)
-		}
+	default:
+		return "", errors.New("foreach collection type must be a list, map, slice, or array. Line " + lineStr)
 	}
 	code += collExpr + " { \n"
 	code += s.IndexName + " := _i \n"
@@ -1402,6 +1424,8 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 			c, err = compileGoStatement(s, pkg, locals)
 		case AssignmentStatement:
 			c, err = compileAssignmentStatement(s, pkg, locals)
+		case SelectStatement:
+			c, err = compileSelectStatement(s, expectedReturnTypes, pkg, locals)
 		case TypeswitchStatement:
 			c, err = compileTypeswitchStatement(s, expectedReturnTypes, pkg, locals)
 		case ReturnStatement:
@@ -1427,6 +1451,83 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 		code += c
 	}
 	return code, nil
+}
+
+func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
+	code := "select {\n"
+	for _, clause := range s.Clauses {
+		switch clause := clause.(type) {
+		case SelectSendClause:
+			ch, channelTypes, err := compileExpression(clause.Channel, pkg, locals)
+			if err != nil {
+				return "", err
+			}
+			if len(channelTypes) != 1 {
+				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+			}
+			ok, param := isChannel(channelTypes[0])
+			if !ok {
+				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+			}
+			val, valTypes, err := compileExpression(clause.Value, pkg, locals)
+			if err != nil {
+				return "", err
+			}
+			if len(valTypes) != 1 {
+				return "", errors.New("Select send clause expecting expression returning one value. Line " + strconv.Itoa(clause.LineNumber))
+			}
+			if !isType(valTypes[0], param, false) {
+				return "", errors.New("Select send clause expecting expression with type matching its channel. Line " + strconv.Itoa(clause.LineNumber))
+			}
+			code += "case " + ch + " <- " + val + ":\n"
+			c, err := compileBody(clause.Body, expectedReturnTypes, pkg, locals)
+			if err != nil {
+				return "", err
+			}
+			code += c + "\n"
+		case SelectRcvClause:
+			ch, channelTypes, err := compileExpression(clause.Channel, pkg, locals)
+			if err != nil {
+				return "", err
+			}
+			if len(channelTypes) != 1 {
+				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+			}
+			ok, param := isChannel(channelTypes[0])
+			if !ok {
+				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+			}
+			dt, err := getDataType(clause.Target.Type, pkg)
+			if err != nil {
+				return "", err
+			}
+			// because we must use := syntax, must be exact match
+			if !isType(param, dt, true) {
+				return "", errors.New("Select rcv clause has improper type target variable. Line " + strconv.Itoa(clause.LineNumber))
+			}
+			code += "case " + clause.Target.Name + " := <- " + ch + ":\n"
+			newLocals := map[string]Variable{}
+			for name, v := range locals {
+				newLocals[name] = v
+			}
+			newLocals[clause.Target.Name] = clause.Target
+			code += genDebugFn(newLocals, pkg.Globals, pkg)
+			c, err := compileBody(clause.Body, expectedReturnTypes, pkg, newLocals)
+			if err != nil {
+				return "", err
+			}
+			code += c + "\n"
+		}
+	}
+	if s.Default.Body != nil {
+		c, err := compileBody(s.Default.Body, expectedReturnTypes, pkg, locals)
+		if err != nil {
+			return "", err
+		}
+		code += "default:\n" + c
+	}
+
+	return code + "\n}\n", nil
 }
 
 func compileAssignmentStatement(s AssignmentStatement, pkg *Package, locals map[string]Variable) (string, error) {
