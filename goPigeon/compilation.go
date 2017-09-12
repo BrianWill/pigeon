@@ -2226,6 +2226,38 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 		returnType = dt.Params[0]
 		code += "*" + operandCode[0]
+	case "band":
+		if len(o.Operands) != 2 {
+			return "", nil, errors.New("'band' operation requires two operands")
+		}
+		if !isNumber(operandTypes[0]) || !isNumber(operandTypes[1]) {
+			return "", nil, errors.New("'band' operation requires two number operands")
+		}
+		code += operandCode[0] + " & " + operandCode[1]
+	case "bor":
+		if len(o.Operands) != 2 {
+			return "", nil, errors.New("'bor' operation requires two operands")
+		}
+		if !isNumber(operandTypes[0]) || !isNumber(operandTypes[1]) {
+			return "", nil, errors.New("'bor' operation requires two number operands")
+		}
+		code += operandCode[0] + " | " + operandCode[1]
+	case "bxor":
+		if len(o.Operands) != 2 {
+			return "", nil, errors.New("'bxor' operation requires two operands")
+		}
+		if !isNumber(operandTypes[0]) || !isNumber(operandTypes[1]) {
+			return "", nil, errors.New("'bxor' operation requires two number operands")
+		}
+		code += operandCode[0] + " ^ " + operandCode[1]
+	case "bnot":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("'bnot' operation requires one operand")
+		}
+		if !isNumber(operandTypes[0]) {
+			return "", nil, errors.New("'bnot' operation requires one number operand")
+		}
+		code += "^" + operandCode[1]
 	case "print":
 		if len(o.Operands) < 1 {
 			return "", nil, errors.New("'print' operation requires at least one operand")

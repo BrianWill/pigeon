@@ -102,6 +102,10 @@ var operators = []string{
 	"istype",
 	"send",
 	"rcv",
+	"band", // bitwise and
+	"bor",  // bitwise or
+	"bxor", // bitwise xor
+	"bnot", // bitwise not
 }
 
 var builtinTypes = []string{
