@@ -166,7 +166,7 @@ func compileStruct(st *Struct, types map[string]DataType) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		code += n + " " + t + "\n"
+		code += strings.Title(n) + " " + t + "\n"
 	}
 	return code + "}\n", nil
 }
@@ -407,7 +407,7 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 		returnTypes[i] = t
 	}
 	switch parsed.Type {
-	case "F":
+	case "Fn":
 		return FunctionType{params, returnTypes}, nil
 	case "L":
 		if len(params) != 1 {
@@ -434,7 +434,7 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 			return nil, errors.New("Pointer type has wrong number of type parameters.")
 		}
 		return BuiltinType{"P", params}, nil
-	case "I8", "I16", "I32", "I64", "U8", "U16", "U32", "U164", "F32", "F64", "Str", "Bool", "E", "Any":
+	case "I", "F", "Str", "Bool", "Err", "Any":
 		if len(params) != 0 {
 			return nil, errors.New("Type " + parsed.Type + " should not have any type parameters.")
 		}
@@ -462,7 +462,7 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 	switch t := dt.(type) {
 	case BuiltinType:
 		switch t.Name {
-		case "I8", "I16", "I32", "I64", "U8", "U16", "U32", "U64", "F32", "F64":
+		case "I", "F":
 			if len(t.Params) != 0 {
 				return "", nil, errors.New("Invalid type expression. " + t.Name + " cannot have type parameters. Line " + lineStr)
 			}
@@ -480,16 +480,8 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 				return "", nil, errors.New("Invalid type expression. " + t.Name + " must have number operand. Line " + lineStr)
 			}
 			var numberTypes = map[string]string{
-				"I8":  "int8",
-				"I16": "int16",
-				"I32": "int32",
-				"I64": "int64",
-				"U8":  "uint8",
-				"U16": "uint16",
-				"U32": "uint32",
-				"U64": "uint64",
-				"F32": "float32",
-				"F64": "float64",
+				"I": "int64",
+				"F": "float64",
 			}
 			code := numberTypes[t.Name] + "(" + expr + ")"
 			return code, []DataType{t}, nil
@@ -695,10 +687,10 @@ func compileExpression(e Expression, pkg *Package, locals map[string]Variable) (
 		case NumberLiteral:
 			if strings.Index(e.Content, ".") == -1 {
 				code = "int64(" + e.Content + ")"
-				returnedTypes = []DataType{BuiltinType{"I64", nil}}
+				returnedTypes = []DataType{BuiltinType{"I", nil}}
 			} else {
 				code = "float64(" + e.Content + ")"
-				returnedTypes = []DataType{BuiltinType{"F64", nil}}
+				returnedTypes = []DataType{BuiltinType{"F", nil}}
 			}
 		case StringLiteral:
 			code = e.Content
@@ -758,11 +750,7 @@ func isNumber(dt DataType) bool {
 	if !ok {
 		return false
 	}
-	return t.Name == "I8" || t.Name == "I16" ||
-		t.Name == "I32" || t.Name == "I64" ||
-		t.Name == "U8" || t.Name == "U16" ||
-		t.Name == "U32" || t.Name == "U64" ||
-		t.Name == "F32" || t.Name == "F64"
+	return t.Name == "I" || t.Name == "F" || t.Name == "Byte"
 }
 
 func isChannel(dt DataType) (bool, DataType) {
@@ -778,10 +766,7 @@ func isInteger(dt DataType) bool {
 	if !ok {
 		return false
 	}
-	return t.Name == "I8" || t.Name == "I16" ||
-		t.Name == "I32" || t.Name == "I64" ||
-		t.Name == "U8" || t.Name == "U16" ||
-		t.Name == "U32" || t.Name == "U64"
+	return t.Name == "I" || t.Name == "Byte"
 }
 
 func isMap(dt DataType) (DataType, DataType, bool) {
@@ -797,31 +782,17 @@ func compileType(dt DataType, pkg *Package) (string, error) {
 	switch t := dt.(type) {
 	case BuiltinType:
 		switch t.Name {
-		case "I8":
-			return "int8", nil
-		case "I16":
-			return "int16", nil
-		case "I32":
-			return "int32", nil
-		case "I64":
+		case "I":
 			return "int64", nil
-		case "U8":
-			return "uint8", nil
-		case "U16":
-			return "uint16", nil
-		case "U32":
-			return "uint32", nil
-		case "U64":
-			return "uint64", nil
-		case "F32":
-			return "float32", nil
-		case "F64":
+		case "F":
 			return "float64", nil
+		case "Byte":
+			return "byte", nil
 		case "Bool":
 			return "bool", nil
 		case "Str":
 			return "string", nil
-		case "E":
+		case "Err":
 			return "error", nil
 		case "Any":
 			return "interface{}", nil
@@ -1104,7 +1075,7 @@ func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[strin
 		paramTypes[i] = v.Type
 	}
 	outerLocals[fn.Name] = Variable{fn.LineNumber, fn.Column, fn.Name,
-		ParsedDataType{fn.LineNumber, "F", paramTypes, fn.ReturnTypes},
+		ParsedDataType{fn.LineNumber, "Fn", paramTypes, fn.ReturnTypes},
 	}
 	locals := map[string]Variable{}
 	header := fn.Name + " := func("
@@ -1737,11 +1708,36 @@ func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]Variabl
 	return code + ")", ft.ReturnTypes, nil
 }
 
+func (s Struct) getMemberType(name string) (DataType, error) {
+	for i, n := range s.MemberNames {
+		if n == name {
+			return s.MemberTypes[i], nil
+		}
+	}
+	return nil, errors.New("Struct does not contain member '" + name + "'")
+}
+
 func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
 	lineStr := strconv.Itoa(o.LineNumber)
 	operandCode := make([]string, len(o.Operands))
 	operandTypes := make([]DataType, len(o.Operands))
 	for i, expr := range o.Operands {
+		if i == 1 && (o.Operator == "get" || o.Operator == "asget") {
+			if st, ok := operandTypes[i].(Struct); ok {
+				var returnType DataType
+				if token, ok := expr.(Token); ok {
+					if token.Type == IdentifierWord {
+						var err error
+						returnType, err = st.getMemberType(token.Content)
+						if err != nil {
+							return "", nil, err
+						}
+						return operandCode[0] + "." + strings.Title(token.Content),
+							[]DataType{returnType}, nil
+					}
+				}
+			}
+		}
 		c, returnTypes, err := compileExpression(expr, pkg, locals)
 		if err != nil {
 			return "", nil, err
@@ -1984,9 +1980,9 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 		code += " <- " + operandCode[0]
 		returnType = param
-	case "get", "asget": // get as target of assignment
-		if len(o.Operands) != 2 {
-			return "", nil, errors.New("get operation requires two operands")
+	case "get", "asget":
+		if len(o.Operands) < 2 {
+			return "", nil, errors.New("get operation has too few operands")
 		}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
@@ -2012,7 +2008,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 					code += "("
 				}
 				code += operandCode[0] + ")[int64(" + operandCode[1] + ")]"
-				if o.Operator == "get" {
+				if t.Name == "L" && o.Operator == "get" {
 					code += ".(" + dt + ")"
 				}
 			default:
@@ -2020,17 +2016,10 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			}
 		case ArrayType:
 			returnType = t.Type
-			dt, err := compileType(returnType, pkg)
-			if err != nil {
-				return "", nil, err
-			}
 			if !isNumber(operandTypes[1]) {
-				return "", nil, errors.New("get operation on list or slice requires a number as second operand")
+				return "", nil, errors.New("get operation on an array requires a number as second operand")
 			}
 			code += operandCode[0] + "[int64(" + operandCode[1] + ")]"
-			if o.Operator == "get" {
-				code += ".(" + dt + ")"
-			}
 		default:
 			return "", nil, errors.New("get operation requires a list or map as first operand. Line " + lineStr)
 		}
@@ -2300,7 +2289,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		if len(o.Operands) != 1 {
 			return "", nil, errors.New("len operation requires one operand")
 		}
-		returnType = BuiltinType{"I64", nil}
+		returnType = BuiltinType{"I", nil}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
 			switch t.Name {

@@ -109,25 +109,18 @@ var operators = []string{
 }
 
 var builtinTypes = []string{
-	"I8",
-	"I16",
-	"I32",
-	"I64",
-	"U8",
-	"U16",
-	"U32",
-	"U64",
-	"F32",
-	"F64",
+	"I",
+	"F",
+	"Fn",
 	"Str",
 	"Bool",
-	"A",  // array
-	"S",  // slice
-	"Ch", // channel
-	"L",  // list
-	"M",  // map
-	"P",  // pointer
-	"E",  // error
+	"A",   // array
+	"S",   // slice
+	"Ch",  // channel
+	"L",   // list
+	"M",   // map
+	"P",   // pointer
+	"Err", // error
 	"Type",
 }
 
