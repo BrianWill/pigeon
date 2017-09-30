@@ -4,14 +4,14 @@ The DynamicPigeon language is a reductively simple programming language for educ
 
 ## common elements of high-level languages
 
-All commonly used high-level languages have these features (though they may go by different names in some languages):
+All commonly used high-level languages have these features:
 
  - data types
  - operators
  - declaration statements
  - assignment statements
- - `if` statements
- - `while` statements
+ - branches (`if` statements)
+ - loops (usually called `while` statements)
  - functions
 
 In any code, we deal with data, and data comes in different types. Every language has a set of built-in ***data types***, such as types for representing numbers and strings (pieces of text data). 
@@ -30,23 +30,21 @@ A `while` statement is just like an `if`, but with one difference: after the con
 
 A ***function*** is a series of statements that we give a name, such that we can run that series of statements in other parts of code by just referring to the name. A function can also receive input values and produce an output value. A function, in a sense, is like an operator created by the programmer.
 
-# Pigeon data types and operands
-
 ## comments
 
-It's sometimes useful to leave notes in code, and so we need some way of telling the compiler or interpreter to ignore a chunk of text. These ignored chunks of text are called ***comments***. In Pigeon, a comment starts with # and includes all text through the rest of that line:
+It's sometimes useful to leave notes in code, and so we need some way of telling the compiler or interpreter to ignore a chunk of text. These ignored chunks of text are called ***comments***. In Pigeon, a comment starts with // and includes all text through the rest of that line:
 
 ```
-# This number sign and everything after it on the line is ignored by the language
+// This number sign and everything after it on the line is ignored by the language
 ```
 
-## data types
+## DynamicPigeon data types
 
 Numbers are written as you would expect:
 
 ```
-3      # integer
--7.3   # floating-point
+3      // integer
+-7.3   // floating-point
 ```
 
 A boolean is a data type with just two values:
@@ -61,25 +59,25 @@ Much like a bit, what a boolean represents depends entirely upon context.
 Strings (pieces of text) are written enclosed in double-quote marks:
 
 ```
-"hi there"    # string with the characters: h i space t h e r e
+"hi there"    //string with the characters: h i space t h e r e
 ```
 
 Because double-quote marks are used to denote the end of the string, you must write `\"` to include a double-quote mark in the string:
 
 ```
-"foo\"bar"     # string with the characters: f o o " b a r
+"foo\"bar"     // string with the characters: f o o " b a r
 ```
 
 A string cannot span multiple lines. To include a newline in a string, you must write `\n`. The actual ASCII/Unicode character(s) this denotes depends upon the platform: on Windows, it denotes CR and LF (carriage return, line feed); on Linux and Mac, it denotes just LF (line feed).
 
 ```
-"foo\nbar"     # string with the characters: f o o newline b a r
+"foo\nbar"     // string with the characters: f o o newline b a r
 ```
 
 Because backslash is used to denote certain special characters, you must write `\\` to include a backslash in the string:
 
 ```
-"foo\\bar"     # string with the characters: f o o \ b a r
+"foo\\bar"     // string with the characters: f o o \ b a r
 ```
 
 ## arithmetic operators
@@ -87,10 +85,10 @@ Because backslash is used to denote certain special characters, you must write `
 Every operation in Pigeon is written as a pair of parentheses containing the name of the operator followed by the operands (the inputs). The arithmetic operators are `add` (addition), `sub` (subtraction), `mul` (multiplication), and `div` (division):
 
 ```
-(add 3 5)      #  add 3 to 5, producing 8
-(sub 3 5)      #  subtract 5 from 3, producing -2
-(mul 3 5)      #  multiply 3 and 5, producing 15
-(div 3 5)      #  divide 3 by 5, producing 0.6
+(add 3 5)      //  add 3 to 5, producing 8
+(sub 3 5)      //  subtract 5 from 3, producing -2
+(mul 3 5)      //  multiply 3 and 5, producing 15
+(div 3 5)      //  divide 3 by 5, producing 0.6
 ```
 
 Pigeon is a high-level language that spares us from having to think about the bit-representation of numbers. The math operators always return the mathmatically correct answer, and you don't have to worry about overflow or underflow. (This convenience does come at significant efficiency costs, but for many tasks, the costs won't really matter.)
@@ -98,20 +96,20 @@ Pigeon is a high-level language that spares us from having to think about the bi
 The arithmetic operators expect only numbers as inputs. The wrong type of input will trigger an error that aborts the program:
 
 ```
-(sub 3 "hi")    # error: cannot subtract a string
+(sub 3 "hi")    // error: cannot subtract a string
 ```
 
 An operation can itself be used as an operand, in which case the value it produces is used as input to the containing operation:
 
 ```
-(mul 2 (add 3 5))    # multiply 2 with the result of (add 3 5), producing 16
+(mul 2 (add 3 5))    // multiply 2 with the result of (add 3 5), producing 16
 ```
 
 The `mod` (modulus) operator returns the remainder of division:
 
 ```
-(mod 11 3)     # produces 2  (11 divided by 3 has remainder 2)
-(mod 12 3)     # produces 0  (12 divided by 3 has no remainder)
+(mod 11 3)     // produces 2  (11 divided by 3 has remainder 2)
+(mod 12 3)     // produces 0  (12 divided by 3 has no remainder)
 ```
 
 ### equality and logic operators
@@ -119,40 +117,40 @@ The `mod` (modulus) operator returns the remainder of division:
 The `eq` (equality) operator produces the boolean value if its operands are equal; otherwise, it produces false:
 
 ```
-(eq 2 2 2)        # all operands are equal, produces true
-(eq 3 8 3)        # not all operands are equal, produces false
-(eq "hi" "hi")    # produces true
-(eq "hi" "bye")   # produces false
+(eq 2 2 2)        // all operands are equal, produces true
+(eq 3 8 3)        // not all operands are equal, produces false
+(eq "hi" "hi")    // produces true
+(eq "hi" "bye")   // produces false
 ```
 
 The `not` operator takes a single boolean operand and returns the opposite:
 
 ```
-(not false)       # produces true
-(not true)        # produces false
+(not false)       // produces true
+(not true)        // produces false
 ```
 
 The `neq` (not equal) operator is a convenient way to combine `not` and `eq` in one operation:
 
 ```
-(not (eq 2 2 2))   # produces false
-(neq 2 2 2)        # produces false
+(not (eq 2 2 2))   // produces false
+(neq 2 2 2)        // produces false
 ``` 
 
 The `and` operator returns true only if every operand is true:
 
 ```
-(and true true true)     # true
-(and true false true)    # false
-(and false false false)  # false
+(and true true true)     // true
+(and true false true)    // false
+(and false false false)  // false
 ```
 
 The `or` operator returns true if any operand is true:
 
 ```
-(or true true true)     # true
-(or true false true)    # true
-(or false false false)  # false (no operands are true)
+(or true true true)     // true
+(or true false true)    // true
+(or false false false)  // false (no operands are true)
 ```
 
 # relational operators
@@ -160,33 +158,33 @@ The `or` operator returns true if any operand is true:
 The `gt` (greater than) operator returns true only if every operand is greater than the operand to its right:
 
 ```
-(gt 8 5 2)         # true
-(gt 8 5 6)         # false
-(gt 8 8 2)         # false (8 is not greater than 8)
+(gt 8 5 2)         // true
+(gt 8 5 6)         // false
+(gt 8 8 2)         // false (8 is not greater than 8)
 ```
 
 The `gte` (greater than or equal) operator returns true only if every operand is greater than or equal to the operand to its right:
 
 ```
-(gt 8 5 2)         # true
-(gt 8 5 6)         # false
-(gt 8 8 2)         # true
+(gt 8 5 2)         // true
+(gt 8 5 6)         // false
+(gt 8 8 2)         // true
 ```
 
 The `lt` (less than) operator returns true only if every operand is less than the operand to its right:
 
 ```
-(lt 2 5 8)         # true
-(lt 7 5 8)         # false
-(lt 7 7 8)         # false (7 is not less than 7)
+(lt 2 5 8)         // true
+(lt 7 5 8)         // false
+(lt 7 7 8)         // false (7 is not less than 7)
 ```
 
 The `lte` (less than or equal) operator returns true only if every operand is less than or equal to the operand to its right:
 
 ```
-(lte 2 5 8)         # true
-(lte 7 5 8)         # false
-(lte 7 7 8)         # true
+(lte 2 5 8)         // true
+(lte 7 5 8)         // false
+(lte 7 7 8)         // true
 ```
 
 ## concat
@@ -194,72 +192,34 @@ The `lte` (less than or equal) operator returns true only if every operand is le
 The `concat` (concatenate) operator produces a string that is the concatenation of the operands:
 
 ```
-(concat "FOO" "BAR")                         # produces "FOOBAR"
-(concat "rubber " "baby" " buggy bumper")    # produces "rubber baby buggy bumper"
+(concat "FOO" "BAR")                         // produces "FOOBAR"
+(concat "rubber " "baby" " buggy bumper")    // produces "rubber baby buggy bumper"
 ```
 
 ## input/output
 
-As discussed earlier, performing input and output ultimately requires system calls. Because Pigeon is a simple, educational language, it has no facility for performing system calls, but it does provide two operators for doing very basic input/output.
+Performing input and output ultimately requires [system calls](https://en.wikipedia.org/wiki/System_call). Because Pigeon is a simple, educational language, it has no facility for performing system calls, but it does provide two operators for doing very basic input/output.
 
 The `print` operator displays text on screen:
 
 ```
-(print "hello")    # display "hello" on screen
-(print 35)         # display "35" on screen
+(print "hello")    // display "hello" on screen
+(print 35)         // display "35" on screen
 ```
 
 The `prompt` operator takes no operands. It prompts the user on screen to type something and hit enter. The text entered by the user is returned as a string:
 
 ```
-(print (prompt))       # wait for the user to type something and hit enter; display what they typed
+(print (prompt))       // wait for the user to type something and hit enter; display what they typed
 ```
 
 (Note that, unlike every other operation, `prompt` waits for user action before execution continues.)
 
-# Pigeon variables
+# functions
 
-A variable is either `global` (accessible in all parts of code) or `local` (accessible only within a single function).
+A DynamicPigeon program is primarily composed of functions. As discussed, a function is a chunk of statements that is given a name such that we can execute the chunk anywhere else in code by just writing the name.
 
-Global variables are created with a global statement
-
-Each function has its own set of variables, called its local variables.
-
-Variables in Pigeon do not store values directly. Instead, assignment stores the *address* of the value. (This distinction is significant when we deal with lists in a later lesson.)
-
-An assignment statement starts with the word `as` followed by a variable name and a value to assign to the variable:
-
-```
-as foo 3       # assign 3 to the variable 'foo'
-```
-
-Once we create a variable, we can use its value in subsequent operations and assignments:
-
-```
-var foo
-var bar
-as foo 3       
-(print foo)    # display 3
-as foo 7       # assign a new value, 7, to 'foo'
-(print foo)    # display 7
-as bar foo     # assign 7 to variable 'bar'
-as foo 29      # assign 29 to variable 'foo'
-(print bar)    # display 7
-```
-
-The value assigned can be produced by an operation:
-
-```
-as foo (sub 10 2)    # assign 8 to the variable 'foo'
-as foo (add foo 4)   # assign 12 to the variable 'foo'
-(print foo)          # display 12
-```
-
-# Pigeon functions
-
-A Pigeon program is primarily composed of functions. As discussed, a function is a chunk of statements that is given a name such that we can execute the chunk anywhere else in code by just writing the name.
-
-A function definition in Pigeon starts with the reserved word `func`, then the name you've chosen for the funciton. The body (the statements to execute when the function is called) are written indented on the next lines. For example:
+A function definition in DynamiPigeon starts with the reserved word `func`, then the name you've chosen for the funciton. The body (the statements to execute when the function is called) are written indented on the next lines. For example:
 
 ```
 // a function named 'david' with a body of two statements
@@ -278,10 +238,9 @@ func heidi
 
 ## the main function
 
-Execution of a Pigeon program begins by calling the function named `main`:
+Execution of a DynamicPigeon program begins by calling the function named `main`:
 
 ```
-
 func jill
     (print "hi")
 
@@ -296,7 +255,7 @@ func ted
 
 ## `return` statements
 
-A function call returns a value. A `return` statement ends the function call and specifies the value to return:
+A function call returns a value. When encountered, a `return` statement ends the current function call and specifies the value to return:
 
 ```
 func karen
@@ -405,7 +364,7 @@ func main
 
 Each call to a function creates its own set of the local variables, and each set disappears when its call ends. So, say, local variable 'x' in one call is separate from local variable 'x' in another call to that same function.
 
-(Variables in Pigeon do not actually store values *directly*. Instead, assignment stores the *address* of the value. This distinction will be significant when we deal with lists and maps later.)
+(Variables in DynamicPigeon do not actually store values *directly*. Instead, assignment stores the *address* of the value. This distinction will be significant when we deal with lists and maps later.)
 
 ## global variables
 
@@ -458,7 +417,7 @@ You cannot create variables with reserved word names:
 as sub 3      # error
 ```
 
-# Pigeon `if` and `while` statements
+## `if` and `while` statements
 
 An `if` statement in Pigeon begins with the word `if` followed by a condition and a body.
 
@@ -574,7 +533,7 @@ func aaron x
 ```
 
 
-# Pigeon lists
+## lists
 
 A ***list*** in Pigeon is a value which itself is made up of any number of other values. The values in a list are known by their numeric indexes. The first element has index 0, the second has index 1, the third has index 2, the fourth has index 3, *etc.*
 
@@ -700,7 +659,7 @@ function main
 
 Like a list, a map is mutable, so if two variables reference the same map, changes *via* either variable affect the same map.
 
-## special `[]` syntax for get and set
+## special `[]` syntax for `get` and `set`
 
 Because getting and setting from lists and maps is particularly common, we have shorthand syntax for `get` and `set`:
 

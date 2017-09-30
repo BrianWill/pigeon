@@ -43,7 +43,7 @@ The second tier ([docs](static-pigeon-tier-2.md)) includes:
 
 # Installation and usage
 
-Because Pigeon compiles to Go, you'll need to install [the Go tools](https://golang.org/doc/install) if you haven't already. Once the Go tool is installed, you can install the Pigeon compiler with one command:
+Because Pigeon compiles to Go, you'll need to install the [Go tool](https://golang.org/doc/install) if you haven't already. Once the Go tool is installed, you can install the Pigeon compiler with one command:
 
 ```
 go get http://github.com/BrianWill/pigeon
