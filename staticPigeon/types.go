@@ -41,6 +41,7 @@ var reservedWords = []string{
 	"import",
 	"method",
 	"foreach",
+	"go",
 	"typeswitch",
 	"case",
 	"default",
@@ -54,6 +55,10 @@ var reservedWords = []string{
 	"return",
 	"as",
 	"locals",
+	"localfunc",
+	"select",
+	"sending",
+	"rcving",
 	"asinc",
 	"asdec",
 	"asadd",
@@ -83,6 +88,8 @@ var operators = []string{
 	"get",
 	"set",
 	"append",
+	"push",
+	"slice",
 	"ref",
 	"dr",
 	"or",
@@ -93,16 +100,27 @@ var operators = []string{
 	"concat",
 	"len",
 	"istype",
+	"send",
+	"rcv",
+	"band", // bitwise and
+	"bor",  // bitwise or
+	"bxor", // bitwise xor
+	"bnot", // bitwise not
 }
 
 var builtinTypes = []string{
-	"N",
+	"I",
+	"F",
+	"Fn",
 	"Str",
 	"Bool",
-	"L",
-	"M",
-	"P",
-	"E",
+	"A",   // array
+	"S",   // slice
+	"Ch",  // channel
+	"L",   // list
+	"M",   // map
+	"P",   // pointer
+	"Err", // error
 	"Type",
 }
 
@@ -140,15 +158,23 @@ type ParsedDataType struct {
 	ReturnTypes []ParsedDataType // non-nil only for functions with return types
 }
 
-// N, Str, Bool, L<>, M<>, P<>
 type BuiltinType struct {
 	Name   string
 	Params []DataType
 }
 
+type ArrayType struct {
+	Size int
+	Type DataType
+}
+
 type FunctionType struct {
 	Params      []DataType
 	ReturnTypes []DataType
+}
+
+type SelectClause interface {
+	SelectClause()
 }
 
 func (t Token) Expression()          {}
@@ -166,6 +192,7 @@ func (t InterfaceDefinition) Definition() {}
 func (t MethodDefinition) Definition()    {}
 
 func (t LocalsStatement) Statement()     {}
+func (t LocalFuncStatement) Statement()  {}
 func (t IfStatement) Statement()         {}
 func (t WhileStatement) Statement()      {}
 func (t ForeachStatement) Statement()    {}
@@ -177,12 +204,18 @@ func (t Operation) Statement()           {}
 func (t TypeswitchStatement) Statement() {}
 func (t BreakStatement) Statement()      {}
 func (t ContinueStatement) Statement()   {}
+func (t GoStatement) Statement()         {}
+func (t SelectStatement) Statement()     {}
 
 func (t InterfaceDefinition) DataType() {}
 func (t StructDefinition) DataType()    {}
 func (t BuiltinType) DataType()         {}
 func (t FunctionType) DataType()        {}
 func (t Struct) DataType()              {}
+func (t ArrayType) DataType()           {}
+
+func (s SelectSendClause) SelectClause() {}
+func (s SelectRcvClause) SelectClause()  {}
 
 func (t LocalsStatement) Line() int {
 	return t.Vars[0].LineNumber
@@ -206,6 +239,15 @@ func (t BreakStatement) Line() int {
 	return t.LineNumber
 }
 func (t ContinueStatement) Line() int {
+	return t.LineNumber
+}
+func (t GoStatement) Line() int {
+	return t.LineNumber
+}
+func (t SelectStatement) Line() int {
+	return t.LineNumber
+}
+func (t LocalFuncStatement) Line() int {
 	return t.LineNumber
 }
 func (t Variable) Line() int {
@@ -368,13 +410,13 @@ type TypeExpression struct {
 	Operands   []Expression
 }
 
-type IfStatement struct {
-	LineNumber int
-	Column     int
-	Condition  Expression
-	Body       []Statement
-	Elifs      []ElseifClause
-	Else       ElseClause
+type LocalFuncStatement struct {
+	LineNumber  int
+	Column      int
+	Name        string
+	Parameters  []Variable
+	ReturnTypes []ParsedDataType
+	Body        []Statement
 }
 
 type TypeswitchStatement struct {
@@ -392,6 +434,15 @@ type TypeswitchCase struct {
 	Body       []Statement
 }
 
+type IfStatement struct {
+	LineNumber int
+	Column     int
+	Condition  Expression
+	Body       []Statement
+	Elifs      []ElseifClause
+	Else       ElseClause
+}
+
 type ElseifClause struct {
 	LineNumber int
 	Column     int
@@ -403,6 +454,41 @@ type ElseClause struct {
 	LineNumber int
 	Column     int
 	Body       []Statement
+}
+
+type SelectStatement struct {
+	LineNumber int
+	Column     int
+	Clauses    []SelectClause
+	Default    SelectDefaultClause
+}
+
+type SelectSendClause struct {
+	LineNumber int
+	Column     int
+	Channel    Expression
+	Value      Expression
+	Body       []Statement
+}
+
+type SelectRcvClause struct {
+	LineNumber int
+	Column     int
+	Target     Variable
+	Channel    Expression
+	Body       []Statement
+}
+
+type SelectDefaultClause struct {
+	LineNumber int
+	Column     int
+	Body       []Statement
+}
+
+type GoStatement struct {
+	LineNumber int
+	Column     int
+	Call       Expression // FunctionCall or MethodCall
 }
 
 type LocalsStatement struct {

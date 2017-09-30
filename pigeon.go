@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
-	"github.com/BrianWill/pigeon/goPigeon"
 	"github.com/BrianWill/pigeon/staticPigeon"
 )
 
@@ -354,29 +353,6 @@ func main() {
 			}
 			if strings.HasSuffix(os.Args[2], ".spigeon") {
 				packages, err := staticPigeon.Compile(os.Args[2], "pigeon_output/")
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				for _, p := range packages {
-					pkgDir := basedir + p.Prefix
-					if _, err := os.Stat(pkgDir); os.IsNotExist(err) {
-						os.Mkdir(pkgDir, os.ModePerm)
-					}
-					outputFilename := pkgDir + "/" + p.Prefix + ".go"
-					err = ioutil.WriteFile(outputFilename, []byte(p.Code), os.ModePerm)
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-					err = exec.Command("go", "fmt", outputFilename).Run()
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-				}
-			} else if strings.HasSuffix(os.Args[2], ".gopigeon") {
-				packages, err := goPigeon.Compile(os.Args[2], "pigeon_output/")
 				if err != nil {
 					fmt.Println(err)
 					return
