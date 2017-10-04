@@ -26,7 +26,7 @@ The first tier ([docs](static-pigeon-tier-1.md)) includes:
 - methods
 - interfaces
 - pointers
-- typeswitchs
+- typeswitches
 - foreach loops
 - break and continue statements
 - imports
@@ -49,7 +49,7 @@ Because Pigeon compiles to Go, you'll need to install the [Go tool](https://gola
 go get http://github.com/BrianWill/pigeon
 ```
 
-This will put the pigeon executable in your Go bin directory. Assuming the Go bin directory is on your shell path, you can then run the compiler from any directory like so:
+This will put the Pigeon executable in your Go bin directory. Assuming the Go bin directory is on your shell path, you can then run the compiler from any directory like so:
 
 ```
 pigeon somefile.dpigeon      # compile and run a DynamicPigeon program

@@ -3,6 +3,7 @@ package staticPigeon
 import (
 	"errors"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -21,6 +22,7 @@ func compile(pkg *Package, packages map[string]*Package, outputDir string, isMai
 	}
 
 	code += `import _fmt "fmt"
+import _std "github.com/BrianWill/pigeon/staticPigeon/stdlib"
 `
 	c, err := compileImports(pkg.ImportDefs, packages, outputDir)
 	if err != nil {
@@ -28,35 +30,7 @@ func compile(pkg *Package, packages map[string]*Package, outputDir string, isMai
 	}
 	code += c
 
-	code += `var _breakpoints = make(map[int]bool)
-
-type _List []interface{}
-
-func _newList(items ...interface{}) *_List {
-	var l _List = _List(items)
-	return &l
-}
-
-func (l *_List) append(item interface{}) {
-	*l = append(*l, item)
-}
-
-func (l *_List) set(idx float64, item interface{}) {
-	(*l)[int64(idx)] = item
-}
-
-func (l *_List) len() float64 {
-	return float64(len(*l))
-}
-
-func _Prompt(args ...interface{}) {
-	if len(args) > 1 {
-		_fmt.Print(args...)
-	}
-	
-}
-
-`
+	code += compileNativeImports(pkg.NativeImports)
 
 	err = processStructs(pkg)
 	if err != nil {
@@ -116,7 +90,6 @@ func _Prompt(args ...interface{}) {
 		code += `
 		
 		func main() {
-			//go _p.PollBreakpoints(&_breakpoints)
 			_main()
 		}
 		`
@@ -159,6 +132,14 @@ func compileImports(imports map[string]ImportDefinition, packages map[string]*Pa
 	return code, nil
 }
 
+func compileNativeImports(imports map[string]string) string {
+	code := ""
+	for prefix, path := range imports {
+		code += "import " + prefix + `"` + path + `"` + "\n"
+	}
+	return code
+}
+
 func compileStruct(st *Struct, types map[string]DataType) (string, error) {
 	code := "type " + st.Name + " struct {\n"
 	for i, n := range st.MemberNames {
@@ -168,6 +149,7 @@ func compileStruct(st *Struct, types map[string]DataType) (string, error) {
 		}
 		code += strings.Title(n) + " " + t + "\n"
 	}
+	code += st.NativeCode
 	return code + "}\n", nil
 }
 
@@ -251,6 +233,7 @@ func processStructs(pkg *Package) error {
 			MemberTypes: make([]DataType, len(st.Members)),
 			Implements:  map[string]bool{},
 			Methods:     map[string]FunctionType{},
+			NativeCode:  st.NativeCode,
 			Pkg:         st.Pkg,
 		}
 		pkg.Structs[s.Name] = s
@@ -269,7 +252,7 @@ func processStructs(pkg *Package) error {
 				return err
 			}
 			if st, ok := dt.(Struct); ok {
-				funcType, err := meth.getFunctionType(pkg)
+				funcType, err := meth.getFunctionType()
 				if err != nil {
 					return err
 				}
@@ -282,7 +265,7 @@ func processStructs(pkg *Package) error {
 	return nil
 }
 
-func (m MethodDefinition) getFunctionType(pkg *Package) (FunctionType, error) {
+func (m MethodDefinition) getFunctionType() (FunctionType, error) {
 	fd := FunctionDefinition{
 		Parameters:  m.Parameters,
 		ReturnTypes: m.ReturnTypes,
@@ -434,7 +417,7 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 			return nil, errors.New("Pointer type has wrong number of type parameters.")
 		}
 		return BuiltinType{"P", params}, nil
-	case "I", "F", "Str", "Bool", "Err", "Any":
+	case "I", "F", "Byte", "Str", "Bool", "Err", "Any":
 		if len(params) != 0 {
 			return nil, errors.New("Type " + parsed.Type + " should not have any type parameters.")
 		}
@@ -442,7 +425,7 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 	default:
 		t, ok := pkg.Types[parsed.Type]
 		if !ok {
-			return nil, errors.New("Unknown type.")
+			return nil, errors.New("Unknown type. " + fmt.Sprint(parsed.Type))
 		}
 		if len(parsed.Params) > 0 || len(parsed.ReturnTypes) > 0 {
 			return nil, errors.New("Type " + parsed.Type + " should not have any type parameters.")
@@ -462,7 +445,7 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 	switch t := dt.(type) {
 	case BuiltinType:
 		switch t.Name {
-		case "I", "F":
+		case "I", "F", "Byte":
 			if len(t.Params) != 0 {
 				return "", nil, errors.New("Invalid type expression. " + t.Name + " cannot have type parameters. Line " + lineStr)
 			}
@@ -480,8 +463,9 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 				return "", nil, errors.New("Invalid type expression. " + t.Name + " must have number operand. Line " + lineStr)
 			}
 			var numberTypes = map[string]string{
-				"I": "int64",
-				"F": "float64",
+				"I":    "int64",
+				"F":    "float64",
+				"Byte": "byte",
 			}
 			code := numberTypes[t.Name] + "(" + expr + ")"
 			return code, []DataType{t}, nil
@@ -520,8 +504,8 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			if len(t.Params) != 1 {
 				return "", nil, errors.New("Invalid type expression. List must have one type parameter. Line " + lineStr)
 			}
-			expr := "(func () *_List {\n"
-			expr += "var _list _List = make([]interface{}, " + strconv.Itoa(len(te.Operands)) + ")\n"
+			expr := "(func () *_std.List {\n"
+			expr += "var _list _std.List = make([]interface{}, " + strconv.Itoa(len(te.Operands)) + ")\n"
 			if err != nil {
 				return "", nil, err
 			}
@@ -797,7 +781,7 @@ func compileType(dt DataType, pkg *Package) (string, error) {
 		case "Any":
 			return "interface{}", nil
 		case "L":
-			return "*_List", nil
+			return "*_std.List", nil
 		case "S":
 			param, err := compileType(t.Params[0], pkg)
 			if err != nil {
@@ -909,10 +893,14 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 		}
 	}
 	header += ") {\n"
+	if fn.NativeCode != "" {
+		return header + fn.NativeCode + "\n}\n", nil
+	}
 	if len(fn.Body) < 1 {
 		return "", errors.New("Function should contain at least one statement.")
 	}
 	bodyStatements := fn.Body
+	// account for locals statement
 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
 		for _, v := range localsStatement.Vars {
 			header += "var "
@@ -933,7 +921,7 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 			if t, ok := dt.(BuiltinType); ok {
 				switch t.Name {
 				case "L":
-					header += " = new(_List)"
+					header += " = new(_std.List)"
 				case "M", "Ch":
 					header += " = make(" + typeCode + ")"
 				}
@@ -942,6 +930,7 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 		}
 		bodyStatements = bodyStatements[1:]
 	}
+	// account for local funcs
 	for {
 		if len(bodyStatements) == 0 {
 			break
@@ -1034,7 +1023,7 @@ func compileMethod(meth MethodDefinition) (string, error) {
 			if t, ok := dt.(BuiltinType); ok {
 				switch t.Name {
 				case "L":
-					header += " = new(_List)"
+					header += " = new(_std.List)"
 				case "M", "Ch":
 					header += " = make(" + typeCode + ")"
 				}
@@ -1136,7 +1125,7 @@ func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[strin
 			if t, ok := dt.(BuiltinType); ok {
 				switch t.Name {
 				case "L":
-					header += " = new(_List)"
+					header += " = new(_std.List)"
 				case "M", "Ch":
 					header += " = make(" + typeCode + ")"
 				}
@@ -1381,7 +1370,7 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 		line := s.Line()
 		lineStr := strconv.Itoa(line)
 		pkg.ValidBreakpoints[lineStr] = true
-		code += fmt.Sprintf("if _breakpoints[%d] {debug(%d)}\n", line, line)
+		code += fmt.Sprintf("if _std.Breakpoints[%d] {debug(%d)}\n", line, line)
 		var c string
 		var err error
 		switch s := s.(type) {
@@ -2266,7 +2255,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 		code += ")"
 	case "prompt":
-		code += "_Prompt("
+		code += "_std.Prompt("
 		for i := range o.Operands {
 			code += operandCode[i] + ", "
 		}
@@ -2322,6 +2311,88 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 		code += operandCode[1] + ".(" + operandCode[0] + "))"
 		return code, []DataType{dt, BuiltinType{"Bool", nil}}, nil
+	case "randInt":
+		if len(o.Operands) > 0 {
+			return "", nil, errors.New("randInt operation takes no operands")
+		}
+		returnType = BuiltinType{"I", nil}
+		code += "_std.RandInt()"
+	case "randIntN":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("randIntN operation takes one integer operand")
+		}
+		returnType = BuiltinType{"I", nil}
+		if !isType(operandTypes[0], returnType, true) {
+			return "", nil, errors.New("randIntN operation has non-integer operand")
+		}
+		code += "_std.RandIntN(" + operandCode[0] + ")"
+	case "randFloat":
+		if len(o.Operands) > 0 {
+			return "", nil, errors.New("randFloat operation takes no operands")
+		}
+		returnType = BuiltinType{"F", nil}
+		code += "_std.RandFloat()"
+	case "parseInt":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("parseInt operation takes one string operand")
+		}
+		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
+			return "", nil, errors.New("parseInt operation has non-string operand")
+		}
+		code += "_std.ParseInt(" + operandCode[0] + ")"
+		return code, []DataType{BuiltinType{"I", nil}, BuiltinType{"Err", nil}}, nil
+	case "parseFloat":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("parseFloat operation takes one string operand")
+		}
+		returnType = BuiltinType{"F", nil}
+		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
+			return "", nil, errors.New("parseFloat operation has non-string operand")
+		}
+		code += "_std.ParseFloat(" + operandCode[0] + ")"
+		return code, []DataType{BuiltinType{"F", nil}, BuiltinType{"Err", nil}}, nil
+	case "formatInt":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("formatInt operation takes one integer operand")
+		}
+		returnType = BuiltinType{"Str", nil}
+		if !isType(operandTypes[0], BuiltinType{"I", nil}, true) {
+			return "", nil, errors.New("formatInt operation has non-integer operand")
+		}
+		code += "_std.FormatInt(" + operandCode[0] + ")"
+	case "formatFloat":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("formatFloat operation takes one float operand")
+		}
+		returnType = BuiltinType{"Str", nil}
+		if !isType(operandTypes[0], BuiltinType{"F", nil}, true) {
+			return "", nil, errors.New("formatFloat operation has non-float operand")
+		}
+		code += "_std.FormatFloat(" + operandCode[0] + ")"
+	case "parseTime":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("parseTime operation takes one string operand")
+		}
+		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
+			return "", nil, errors.New("parseTime operation has non-string operand")
+		}
+		code += "_std.ParseTime(" + operandCode[0] + ")"
+		return code, []DataType{BuiltinType{"I", nil}, BuiltinType{"Err", nil}}, nil
+	case "timeNow":
+		if len(o.Operands) != 0 {
+			return "", nil, errors.New("TimeNow operation takes no operands")
+		}
+		returnType = BuiltinType{"I", nil}
+		code += "_std.TimeNow()"
+	case "formatTime":
+		if len(o.Operands) != 1 {
+			return "", nil, errors.New("formatTime operation takes one integer operand")
+		}
+		returnType = BuiltinType{"Str", nil}
+		if !isType(operandTypes[0], BuiltinType{"I", nil}, true) {
+			return "", nil, errors.New("formatTime operation has non-integer operand")
+		}
+		code += "_std.FormatTime(" + operandCode[0] + ")"
 	}
 
 	code += ")"
@@ -2330,30 +2401,6 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 	}
 	return code, []DataType{returnType}, nil
 }
-
-// func Highlight(code []byte) ([]byte, error) {
-// 	return highlight.AsHTML(code, highlight.OrderedList())
-// }
-
-// func CompileAndRun(filename string) (*exec.Cmd, error) {
-// 	filename, _, err := Compile(filename)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return Run(filename)
-// }
-
-// func Run(filename string) (*exec.Cmd, error) {
-// 	cmd := exec.Command("go", "run", filename)
-// 	cmd.Stdin = os.Stdin
-// 	cmd.Stdout = os.Stdout
-// 	cmd.Stderr = os.Stderr
-// 	err := cmd.Start()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return cmd, nil
-// }
 
 // returns map of valid breakpoints
 func Compile(inputFilename string, outputDir string) (map[string]*Package, error) {
@@ -2370,6 +2417,11 @@ var packagePrefixNum = 0
 // 'packages' = all previously processed packages
 // 'ancestorPaths' = all package full paths up the chain from this one we're processing (needed for detecting recursive dependencies)
 func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths []string, outputDir string) (*Package, error) {
+	// if std lib
+	if filename == "file" || filename == "http" {
+		filename = build.Default.GOPATH + "/src/github.com/BrianWill/pigeon/staticPigeon/stdlib/" +
+			filename + ".spigeon"
+	}
 	path, err := filepath.Abs(filename)
 	if err != nil {
 		return nil, err
@@ -2402,6 +2454,7 @@ func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths
 		Interfaces:       map[string]InterfaceDefinition{},
 		ImportDefs:       map[string]ImportDefinition{},
 		ImportedPackages: map[string]*Package{},
+		NativeImports:    map[string]string{},
 		FullPath:         path,
 		Prefix:           "p" + strconv.Itoa(packagePrefixNum),
 	}
@@ -2455,6 +2508,8 @@ func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths
 				return nil, errors.New("Duplicate method " + d.Name + " defined for type " + d.Receiver.Name)
 			}
 			st[d.Receiver.Name] = d
+		case NativeImportDefinition:
+			pkg.NativeImports[d.Alias] = d.Path
 		case ImportDefinition:
 			pkg.ImportDefs[d.Path] = d
 			var otherPkg *Package

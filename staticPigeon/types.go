@@ -1,15 +1,10 @@
 package staticPigeon
 
-// TODO use bytes.Buffer for more efficent string building
-//import "bytes"
-
 // we use arbitrary number values to designate each type of token. Rather than using straight ints, we
 // create a distinct type to help avoid mistreating these values like ints.
 type TokenType int
 
 const (
-	// every constant is assigned the same expression, but the value of iota is zero in
-	// the first line, then 1 in the second, then 2 in the third, and so forth
 	ReservedWord TokenType = iota
 	OperatorWord
 	IdentifierWord
@@ -19,6 +14,7 @@ const (
 	CloseParen
 	NumberLiteral
 	StringLiteral
+	MultilineStringLiteral
 	BooleanLiteral
 	NilLiteral
 	OpenSquare
@@ -39,6 +35,9 @@ var reservedWords = []string{
 	"struct",
 	"interface",
 	"import",
+	"nativeimport",
+	"nativefunc",
+	"nativestruct",
 	"method",
 	"foreach",
 	"go",
@@ -106,6 +105,15 @@ var operators = []string{
 	"bor",  // bitwise or
 	"bxor", // bitwise xor
 	"bnot", // bitwise not
+	"randInt",
+	"randIntN",
+	"randFloat",
+	"parseInt",
+	"parseFloat",
+	"formatInt",
+	"formatFloat",
+	"timeNow",
+	"formatTime",
 }
 
 var builtinTypes = []string{
@@ -184,12 +192,13 @@ func (t TypeExpression) Expression() {}
 func (t MethodCall) Expression()     {}
 func (t ParsedDataType) Expression() {}
 
-func (t FunctionDefinition) Definition()  {}
-func (t GlobalDefinition) Definition()    {}
-func (t ImportDefinition) Definition()    {}
-func (t StructDefinition) Definition()    {}
-func (t InterfaceDefinition) Definition() {}
-func (t MethodDefinition) Definition()    {}
+func (t FunctionDefinition) Definition()     {}
+func (t GlobalDefinition) Definition()       {}
+func (t ImportDefinition) Definition()       {}
+func (t NativeImportDefinition) Definition() {}
+func (t StructDefinition) Definition()       {}
+func (t InterfaceDefinition) Definition()    {}
+func (t MethodDefinition) Definition()       {}
 
 func (t LocalsStatement) Statement()     {}
 func (t LocalFuncStatement) Statement()  {}
@@ -280,6 +289,10 @@ func (t ImportDefinition) Line() int {
 	return t.LineNumber
 }
 
+func (t NativeImportDefinition) Line() int {
+	return t.LineNumber
+}
+
 func (t GlobalDefinition) Line() int {
 	return t.LineNumber
 }
@@ -307,6 +320,7 @@ type FunctionDefinition struct {
 	Parameters  []Variable
 	ReturnTypes []ParsedDataType
 	Body        []Statement
+	NativeCode  string // a native function has a string of native code and an empty body
 	Pkg         *Package
 }
 
@@ -328,11 +342,20 @@ type ImportDefinition struct {
 	Pkg        *Package
 }
 
+type NativeImportDefinition struct {
+	LineNumber int
+	Column     int
+	Path       string
+	Alias      string
+	Pkg        *Package
+}
+
 type StructDefinition struct {
 	LineNumber int
 	Column     int
 	Name       string
 	Members    []Variable
+	NativeCode string
 	Pkg        *Package
 }
 
@@ -344,6 +367,7 @@ type Struct struct {
 	MemberTypes []DataType
 	Implements  map[string]bool // names of the interfaces this struct implements
 	Methods     map[string]FunctionType
+	NativeCode  string
 	Pkg         *Package
 }
 
@@ -553,6 +577,7 @@ type Package struct {
 	ImportDefs       map[string]ImportDefinition
 	ImportedPackages map[string]*Package
 	Code             string
+	NativeImports    map[string]string
 }
 
 func (p *Package) getExportedDefinition(name string) Definition {

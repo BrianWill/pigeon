@@ -176,6 +176,31 @@ func lex(text string) ([]Token, error) {
 			tokens = append(tokens, Token{NumberLiteral, string(runes[i:endIdx]), line, column})
 			column += (endIdx - i)
 			i = endIdx
+		} else if r == '\'' { // start of a multi-line string
+			if runes[i+1] != '\'' && runes[i+2] != '\'' {
+				return nil, errors.New("Single quotes must come in threes to start multi-line string. Line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+			}
+			column += 3
+			endIdx := i + 3
+			for {
+				if endIdx >= len(runes) {
+					return nil, errors.New("Multi-line string is never closed. Line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+				}
+				if runes[endIdx] == '\'' && runes[endIdx+1] == '\'' && runes[endIdx+2] == '\'' {
+					endIdx += 3
+					column += 3
+					break
+				}
+				if runes[endIdx] == '\n' {
+					line++
+					column = 0
+				} else {
+					column++
+				}
+				endIdx++
+			}
+			tokens = append(tokens, Token{MultilineStringLiteral, string(runes[i:endIdx]), line, column})
+			i = endIdx
 		} else if isAlpha(r) { // start of a word (_ is not a valid identifier character in Pigeon)
 			endIdx := i + 1
 			for {
@@ -257,14 +282,20 @@ func parse(tokens []Token, pkg *Package) ([]Definition, error) {
 			switch t.Content {
 			case "import":
 				definition, numTokens, err = parseImport(tokens[i:], line, pkg)
+			case "nativeimport":
+				definition, numTokens, err = parseNativeImport(tokens[i:], line, pkg)
 			case "struct":
 				definition, numTokens, err = parseStruct(tokens[i:], line, pkg)
+			case "nativestruct":
+				definition, numTokens, err = parseNativeStruct(tokens[i:], line, pkg)
 			case "interface":
 				definition, numTokens, err = parseInterface(tokens[i:], line, pkg)
 			case "method":
 				definition, numTokens, err = parseMethod(tokens[i:], line, pkg)
 			case "func":
 				definition, numTokens, err = parseFunction(tokens[i:], line, pkg)
+			case "nativefunc":
+				definition, numTokens, err = parseNativeFunc(tokens[i:], line, pkg)
 			case "global":
 				definition, numTokens, err = parseGlobal(tokens[i:], line, pkg)
 			default:
@@ -351,6 +382,48 @@ func parseImport(tokens []Token, line int, pkg *Package) (ImportDefinition, int,
 	return ImportDefinition{line, tokens[0].Column, path, importedNames, importedAliases, pkg}, idx, nil
 }
 
+func parseNativeImport(tokens []Token, line int, pkg *Package) (NativeImportDefinition, int, error) {
+	lineStr := strconv.Itoa(line)
+	idx := 1
+	if tokens[idx].Type != Space {
+		return NativeImportDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+	}
+	idx++
+	pathToken := tokens[idx]
+	if pathToken.Type != StringLiteral {
+		return NativeImportDefinition{}, 0, errors.New("Expected string literal on line " + lineStr)
+	}
+	path := strings.Trim(pathToken.Content, "\"")
+	idx++
+	alias := ""
+	if tokens[idx].Type == Space && tokens[idx+1].Type == IdentifierWord {
+		alias = tokens[idx+1].Content
+		idx += 2
+	}
+	if tokens[idx].Type != Newline {
+		return NativeImportDefinition{}, 0, errors.New("Expected newline on line " + lineStr)
+	}
+	idx++
+	return NativeImportDefinition{line, tokens[0].Column, path, alias, pkg}, idx, nil
+}
+
+func parseNativeStruct(tokens []Token, line int, pkg *Package) (StructDefinition, int, error) {
+	st, idx, err := parseStruct(tokens, line, pkg)
+	if err != nil {
+		return StructDefinition{}, 0, err
+	}
+	if tokens[idx].Type != MultilineStringLiteral {
+		return StructDefinition{}, 0, errors.New("Expected multiline string. Line " + strconv.Itoa(line))
+	}
+	native := tokens[idx].Content
+	st.NativeCode = native[3 : len(native)-3]
+	idx++
+	if tokens[idx].Type != Newline {
+		return StructDefinition{}, 0, errors.New("Expecting newline at end of nativestruct. Line " + strconv.Itoa(line))
+	}
+	return st, idx, nil
+}
+
 func parseStruct(tokens []Token, line int, pkg *Package) (StructDefinition, int, error) {
 	lineStr := strconv.Itoa(line)
 	idx := 1
@@ -407,10 +480,7 @@ func parseStruct(tokens []Token, line int, pkg *Package) (StructDefinition, int,
 		}
 		idx++
 	}
-	if len(members) == 0 {
-		return StructDefinition{}, 0, errors.New("Struct definition has no members on line " + lineStr)
-	}
-	return StructDefinition{line, tokens[0].Column, name.Content, members, pkg}, idx, nil
+	return StructDefinition{line, tokens[0].Column, name.Content, members, "", pkg}, idx, nil
 }
 
 func parseMethod(tokens []Token, line int, pkg *Package) (MethodDefinition, int, error) {
@@ -1063,6 +1133,57 @@ func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, 
 		tokens[0].LineNumber, tokens[0].Column,
 		name.Content,
 		params, returnTypes,
+		body,
+		"",
+		pkg,
+	}, idx, nil
+}
+
+func parseNativeFunc(tokens []Token, line int, pkg *Package) (FunctionDefinition, int, error) {
+	lineStr := strconv.Itoa(tokens[0].LineNumber)
+	idx := 1
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	name := tokens[idx]
+	if name.Type != IdentifierWord {
+		return FunctionDefinition{}, 0, errors.New("Native function missing name on line " + strconv.Itoa(name.LineNumber))
+	}
+	idx++
+	var params []Variable
+	var returnTypes []ParsedDataType
+	var err error
+	if tokens[idx].Type == Newline {
+		idx++
+	} else if tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
+		idx += 2
+	} else {
+		if tokens[idx].Type != Space {
+			return FunctionDefinition{}, 0, errors.New("Expecting space on line " + lineStr)
+		}
+		idx++
+		var nTokens int
+		params, returnTypes, nTokens, err = parseParameters(tokens[idx:], line)
+		if err != nil {
+			return FunctionDefinition{}, 0, err
+		}
+		idx += nTokens
+	}
+	if tokens[idx].Type != MultilineStringLiteral {
+		return FunctionDefinition{}, 0, errors.New("Native function expecting multi-line string on line " + strconv.Itoa(name.LineNumber))
+	}
+	body := tokens[idx].Content
+	body = body[3 : len(body)-3]
+	idx++
+	if tokens[idx].Type != Newline {
+		return FunctionDefinition{}, 0, errors.New("Native function expecting newline on line " + strconv.Itoa(name.LineNumber))
+	}
+	idx++
+	return FunctionDefinition{
+		tokens[0].LineNumber, tokens[0].Column,
+		name.Content,
+		params, returnTypes,
+		nil,
 		body,
 		pkg,
 	}, idx, nil
