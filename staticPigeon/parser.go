@@ -1,35 +1,3 @@
-/*
-If the file contains tab characters or any non-ASCII character, the lexer
-returns an error. (Only spaces are allowed for indentation.)
-
-Every line ends with a newline token.
-
-Every line starts with an indentation token representing the spaces at the start of a line.
-An unindented line starts with an indentation token with an empty string for its content. (This will make parsing a bit easier.)
-
-For example, this line of Pigeon:
-
-function david a b c
-
-...is represented as eleven tokens:
-
-	Indentation ("")
-	ReservedWord ("function")
-	Space ("")
-	Identifier ("david")
-	Space ("")
-	Identifier ("a")
-	Space ("")
-	Identifier ("b")
-	Space ("")
-	Identifier ("c")
-	Newline ("\n")
-
-
-The last line of the input file will not necessarily end with a newline, but we add a newline token at the end anyway.
-
-*/
-
 package staticPigeon
 
 import (
@@ -102,6 +70,10 @@ func lex(text string) ([]Token, error) {
 			i++
 		} else if r == '>' {
 			tokens = append(tokens, Token{CloseAngle, ">", line, column})
+			column++
+			i++
+		} else if r == ',' {
+			tokens = append(tokens, Token{Comma, ",", line, column})
 			column++
 			i++
 		} else if r == '.' {
@@ -264,7 +236,38 @@ func lex(text string) ([]Token, error) {
 			i++
 		}
 	}
-	filteredTokens = append(filteredTokens, tokens[len(tokens)-1])
+	tokens = append(filteredTokens, tokens[len(tokens)-1])
+	// remove all spaces followed by newlines
+	filteredTokens = []Token{}
+	for i := 0; i < len(tokens)-1; i++ {
+		if tokens[i].Type == Space && tokens[i+1].Type == Newline {
+			continue
+		}
+		filteredTokens = append(filteredTokens, tokens[i])
+	}
+	// remove all sequences of [newline -> indentation -> comma], replace with space
+	if tokens[0].Type == Comma || tokens[1].Type == Comma {
+		return nil, errors.New("Unexpected comma at start of file.")
+	}
+	if tokens[len(tokens)-2].Type == Comma || tokens[len(tokens)-1].Type == Comma {
+		return nil, errors.New("Unexpected comma at end of file.")
+	}
+	filteredTokens = []Token{}
+	for i := 0; i < len(tokens)-2; {
+		// commas should only be encountered in this pattern
+		if tokens[i].Type == Newline && tokens[i+1].Type == Indentation && tokens[i+2].Type == Comma {
+			tokens[i].Type = Space
+			tokens[i].Content = " "
+			filteredTokens = append(filteredTokens, tokens[i])
+			i += 3
+			continue
+		}
+		if tokens[i].Type == Comma {
+			return nil, errors.New("Unexpected comma. Line " + strconv.Itoa(line) + ", column " + strconv.Itoa(column))
+		}
+		filteredTokens = append(filteredTokens, tokens[i])
+		i++
+	}
 	return filteredTokens, nil
 }
 

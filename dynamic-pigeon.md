@@ -584,8 +584,8 @@ function main
     locals x
     as x (list 6 "hi" 78)
     (append foo 900)
-    (print (get foo 3))           // print 900
-    (print (len foo))                     // print 4
+    (print (get foo 3))                // print 900
+    (print (len foo))                  // print 4
 ```
 
 ## references vs. values

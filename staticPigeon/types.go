@@ -25,6 +25,7 @@ const (
 	OpenAngle
 	CloseAngle
 	Colon
+	Comma
 )
 
 const indentationSpaces = 4
