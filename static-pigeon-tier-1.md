@@ -190,30 +190,6 @@ func alice j Jack
 
 Including a default clause is optional.
 
-## foreach loops
-
-A foreach loop makes it convenient to loop through the elements of a map, list, array, or slice (we'll introduce arrays and slices later). We specify two variables which will exist only in the body of the foreach: the first stores the index/key, the second stores the value:
-
-```
-func main
-    locals x L<I>
-    as x (L<I> 6 2 14)
-    // prints 0 6, then 1 2, then 2 14
-    foreach i I v V x
-        (println i v)    
-```
-
-Because maps have no sense of order, no guarantee is made about the order in which foreach will iterate through the key-value pairs:
-
-```
-func main
-    locals x M<Str I> s Str
-    as x (M<Str I> "hi" 3 "yo" 87)
-    // prints (but not necessarily in this order): "hi" 3, then "yo" 87
-    foreach s Str v V x
-        (println s v)    
-```
-
 ## pointers
 
 A pointer represents a reference, *i.e.* a memory address. There is no single pointer type: rather, there is a pointer tyep for every other type in the language. An int pointer represents a memory address where an int is stored; a string pointer represents a memory address where a string is stored; *etc.* A pointer type is denoted as `P<X>`, where X is the type of pointer, *e.g.* `P<I>` is an int pointer.
@@ -275,57 +251,5 @@ func main
 
 3) Structs and arrays come in all sizes: a few bytes up to thousands or even occasionally millions or billions of bytes. No matter what a pointer points to, a pointer value is always just an address, and all addressses within a single system are the same size. On a 32-bit machine, addresses are 32 bits; on a 64-bit machine, addresses are 64 bits. Therefore, it is often more efficient for functions to have pointer parameters instead of struct or array parameters. A function call argument value is always copied in full to its corresponding parameter: for a large struct or array, that can be a lot of bytes to copy; for a pointer, it’s always just 32 or 64 bits.
 
-
-
 ## break and continue statements
 
-
-
-
-
-## imports
-
-We can split the code of our program into multiple source files, called *packages*. To use the code from one package in another, we import the other package, specifying which elements (functions, structs, interfaces, globals) we want to make accessible in this package:
-
-```
-// import the package at this path, bringing in mike, Bob, and freida
-import "foo/bar/other.spigeon"
-    mike
-    Bob
-    frieda
-```
-
-StaticPigeon files must end with the extension `.spigeon`.
-
-Imports must be written at the top-level of code before any other elements.
-
-If the name of an imported element is the same as that of something already defined or imported into the package, we can resolve the name conflict by giving the imported element an alias:
-
-```
-import "foo/bar/other.spigeon"
-    mike
-    Bob
-    frieda gina        // import frieda with the alias gina
-```
-
-In this package, what is known as *frieda* in *other.spigeon* is known here as *gina*.
-
-## the standard library file package
-
-#### struct File
-
-#### func createFile
-
-#### func openFile
-
-#### func readFile
-
-#### func writeFile
-
-#### func closeFile
-
-#### func seekFile
-
-#### func seekFileStart
-
-#### func seekFileEnd

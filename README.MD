@@ -16,7 +16,7 @@ DynamicPigeon ([docs](dynamic-pigeon.md)) teaches basic programming concepts com
 
 StaticPigeon builds upon DynamicPigeon to teach most of the core concepts of the Go language. Once a student is comfortable with StaticPigeon, learning Go should then mostly be a matter of adjusting to different syntax.
 
-StaticPigeon is logically split into two tiers for easier learning.
+StaticPigeon is logically split into three tiers for easier learning.
 
 The first tier ([docs](static-pigeon-tier-1.md)) includes:
 
@@ -27,19 +27,24 @@ The first tier ([docs](static-pigeon-tier-1.md)) includes:
 - interfaces
 - pointers
 - typeswitches
-- foreach loops
 - break and continue statements
-- imports
-- standard library file and util packages
 
 The second tier ([docs](static-pigeon-tier-2.md)) includes:
 
 - arrays and slices
+- imports
+- standard library file package
+- foreach loops
+- bitwise operations
+
+The third tier ([docs](static-pigeon-tier-3.md)) includes:
+
 - function variables, nested functions, closures
 - goroutines
 - channels, `select` statements
-- bitwise operations
 - standard library networking packages
+
+Once comfortable with StaticPigeon, students should learn Go ([docs](go-lang.md)).
 
 # Installation and usage
 
