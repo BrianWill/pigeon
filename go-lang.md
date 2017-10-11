@@ -75,6 +75,7 @@ x += 3            // x = x + 3
 x /= 3            // x = x / 3
 x -= 3            // x = x - 3
 x *= 3            // x = x * 3
+```
 
 ## basic data types
 
@@ -156,7 +157,7 @@ For concision, we can assign to a variable in its `var` statement:
 
 ```
 var x int = 3          // create int varible x with initial value 3
-``
+```
 
 If we initialize the variable in a `var` this way, we can leave the type to be inferred from the value assigned:
 
