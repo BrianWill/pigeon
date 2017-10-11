@@ -114,7 +114,7 @@ The `mod` (modulus) operator returns the remainder of division:
 
 ### equality and logic operators
 
-The `eq` (equality) operator produces the boolean value if its operands are equal; otherwise, it produces false:
+The `eq` (equality) operator produces the boolean value `true` if its operands are equal; otherwise, it produces `false`:
 
 ```
 (eq 2 2 2)        // all operands are equal, produces true
@@ -219,7 +219,7 @@ The `prompt` operator takes no operands. It prompts the user on screen to type s
 
 A DynamicPigeon program is primarily composed of functions. As discussed, a function is a chunk of statements that is given a name such that we can execute the chunk anywhere else in code by just writing the name.
 
-A function definition in DynamiPigeon starts with the reserved word `func`, then the name you've chosen for the funciton. The body (the statements to execute when the function is called) are written indented on the next lines. For example:
+A function definition in DynamicPigeon starts with the reserved word `func`, then the name you've chosen for the function. The body (the statements to execute when the function is called) are written indented on the next lines. For example:
 
 ```
 // a function named 'david' with a body of two statements
