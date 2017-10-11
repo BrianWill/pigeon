@@ -562,7 +562,7 @@ func main() {
 
 A *defer statement* defers execution of a function or method call. Every `defer` adds another call to a list belonging to the containing function or method call; when the call ends, its list of defered calls are executed in reverse order (*i.e.* the last defered call runs first).
 
-``
+```
 // prints: "1", then "2", then "3", then "4"
 func foo() {
     fmt.Println("1")
