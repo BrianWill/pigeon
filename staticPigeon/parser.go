@@ -1,9 +1,7 @@
 package staticPigeon
 
 import (
-	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -28,7 +26,7 @@ func lex(text string) ([]Token, error) {
 	for i := 0; i < len(runes); {
 		r := runes[i]
 		if r >= 128 {
-			return nil, errors.New("File improperly contains a non-ASCII character at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+			return nil, msg(line, column, "File improperly contains a non-ASCII character.")
 		}
 		if r == '\n' {
 			tokens = append(tokens, Token{Newline, "\n", line, column})
@@ -37,7 +35,7 @@ func lex(text string) ([]Token, error) {
 			i++
 		} else if r == '/' { // start of a comment
 			if runes[i+1] != '/' {
-				return nil, errors.New("Expected second / on line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+				return nil, msg(line, column, "Expected second / (slash).")
 			}
 			for runes[i] != '\n' {
 				i++
@@ -100,7 +98,7 @@ func lex(text string) ([]Token, error) {
 			}
 			tokens = append(tokens, Token{tokenType, string(runes[firstIdx:i]), line, column})
 		} else if r == '\t' {
-			return nil, errors.New("File improperly contains a tab character at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+			return nil, msg(line, column, "File improperly contains a tab character.")
 		} else if r == '"' { // start of a string
 			prev := r
 			endIdx := i + 1
@@ -108,7 +106,7 @@ func lex(text string) ([]Token, error) {
 				current := runes[endIdx]
 				// loop will never run past end of runes because \n appended to end of file
 				if current == '\n' {
-					return nil, errors.New("String literal not closed on its line at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+					return nil, msg(line, column, "String literal not closed.")
 				}
 				if current == '"' && prev != '\\' { // end of the string
 					endIdx++
@@ -132,17 +130,17 @@ func lex(text string) ([]Token, error) {
 					break
 				} else if current == '.' {
 					if decimalPointIdx != -1 {
-						return nil, errors.New("Number literal has more than one decimal point at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+						return nil, msg(line, column, "Number literal has more than one decimal point.")
 					}
 					decimalPointIdx = endIdx
 				} else if !isNumeral(current) {
-					return nil, errors.New("Number literal not properly formed at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+					return nil, msg(line, column, "Number literal not properly formed.")
 				}
 				endIdx++
 			}
 
 			if decimalPointIdx == endIdx {
-				return nil, errors.New("Number literal should not end with decimal point at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+				return nil, msg(line, column, "Number literal should not end with decimal point.")
 			}
 
 			tokens = append(tokens, Token{NumberLiteral, string(runes[i:endIdx]), line, column})
@@ -150,13 +148,13 @@ func lex(text string) ([]Token, error) {
 			i = endIdx
 		} else if r == '\'' { // start of a multi-line string
 			if runes[i+1] != '\'' && runes[i+2] != '\'' {
-				return nil, errors.New("Single quotes must come in threes to start multi-line string. Line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+				return nil, msg(line, column, "Single quotes must come in threes to start multi-line string.")
 			}
 			column += 3
 			endIdx := i + 3
 			for {
 				if endIdx >= len(runes) {
-					return nil, errors.New("Multi-line string is never closed. Line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+					return nil, msg(line, column, "Multi-line string is never closed.")
 				}
 				if runes[endIdx] == '\'' && runes[endIdx+1] == '\'' && runes[endIdx+2] == '\'' {
 					endIdx += 3
@@ -182,7 +180,7 @@ func lex(text string) ([]Token, error) {
 				if strings.Contains(" \n)<>.[", string(current)) {
 					break
 				} else if !(isAlpha(current) || isNumeral(current)) {
-					return nil, errors.New("Word improperly formed at line " + strconv.Itoa(line) + " and column " + strconv.Itoa(column))
+					return nil, msg(line, column, "Word improperly formed.")
 				}
 				endIdx++
 			}
@@ -221,7 +219,7 @@ func lex(text string) ([]Token, error) {
 			column += (endIdx - i)
 			i = endIdx
 		} else {
-			return nil, errors.New("Unexpected character " + string(r) + " at line " + strconv.Itoa(line) + ", column " + strconv.Itoa(column))
+			return nil, msg(line, column, "Unexpected character "+string(r)+".")
 		}
 	}
 	// filter out blank lines
@@ -247,10 +245,10 @@ func lex(text string) ([]Token, error) {
 	}
 	// remove all sequences of [newline -> indentation -> comma], replace with space
 	if tokens[0].Type == Comma || tokens[1].Type == Comma {
-		return nil, errors.New("Unexpected comma at start of file.")
+		return nil, msg(line, column, "Unexpected comma at start of file.")
 	}
 	if tokens[len(tokens)-2].Type == Comma || tokens[len(tokens)-1].Type == Comma {
-		return nil, errors.New("Unexpected comma at end of file.")
+		return nil, msg(line, column, "Unexpected comma at end of file.")
 	}
 	filteredTokens = []Token{}
 	for i := 0; i < len(tokens)-2; {
@@ -263,7 +261,7 @@ func lex(text string) ([]Token, error) {
 			continue
 		}
 		if tokens[i].Type == Comma {
-			return nil, errors.New("Unexpected comma. Line " + strconv.Itoa(line) + ", column " + strconv.Itoa(column))
+			return nil, msg(line, column, "Unexpected comma.")
 		}
 		filteredTokens = append(filteredTokens, tokens[i])
 		i++
@@ -302,7 +300,7 @@ func parse(tokens []Token, pkg *Package) ([]Definition, error) {
 			case "global":
 				definition, numTokens, err = parseGlobal(tokens[i:], line, pkg)
 			default:
-				return nil, errors.New("Improper reserved word at top level of code: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
+				return nil, msg(t.LineNumber, t.Column, "Improper reserved word at top level of code.")
 			}
 			if err != nil {
 				return nil, err
@@ -317,25 +315,25 @@ func parse(tokens []Token, pkg *Package) ([]Definition, error) {
 			// (don't need to check if (i + 1) in bounds because we know token stream always
 			// ends with newline and so this indentation token can't be last)
 			if tokens[i+1].Type != Newline {
-				return nil, errors.New("Improper indentation at top level of code: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
+				return nil, msg(t.LineNumber, t.Column, "Improper indentation at top level of code.")
 			}
 		default:
-			return nil, errors.New("Improper token at top level of code: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
+			return nil, msg(t.LineNumber, t.Column, "Improper token at top level of code.")
 		}
 	}
 	return definitions, nil
 }
 
 func parseImport(tokens []Token, line int, pkg *Package) (ImportDefinition, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return ImportDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+		return ImportDefinition{}, 0, msg(line, column, "Expected space.")
 	}
 	idx++
 	pathToken := tokens[idx]
 	if pathToken.Type != StringLiteral {
-		return ImportDefinition{}, 0, errors.New("Expected string literal on line " + lineStr)
+		return ImportDefinition{}, 0, msg(line, column, "Expected string literal.")
 	}
 	path := strings.Trim(pathToken.Content, "\"")
 	idx++
@@ -343,7 +341,7 @@ func parseImport(tokens []Token, line int, pkg *Package) (ImportDefinition, int,
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return ImportDefinition{}, 0, errors.New("Expected newline on line " + lineStr)
+		return ImportDefinition{}, 0, msg(line, column, "Expected newline.")
 	}
 	idx++
 
@@ -356,7 +354,7 @@ func parseImport(tokens []Token, line int, pkg *Package) (ImportDefinition, int,
 		idx++
 		t := tokens[idx]
 		if t.Type != IdentifierWord {
-			return ImportDefinition{}, 0, errors.New("Expected name to import on line " + lineStr)
+			return ImportDefinition{}, 0, msg(line, column, "Expected name to import.")
 		}
 		idx++
 		importedNames = append(importedNames, t.Content)
@@ -374,27 +372,26 @@ func parseImport(tokens []Token, line int, pkg *Package) (ImportDefinition, int,
 			idx++
 		}
 		if tokens[idx].Type != Newline {
-			return ImportDefinition{}, 0, errors.New("Expected newline on line " + lineStr)
+			return ImportDefinition{}, 0, msg(line, column, "Expected newline.")
 		}
 		idx++
 	}
 	if len(importedNames) == 0 {
-		return ImportDefinition{}, 0, errors.New("Import statement has no imported names on line " + lineStr)
+		return ImportDefinition{}, 0, msg(line, column, "Import statement has no imported names.")
 	}
-
-	return ImportDefinition{line, tokens[0].Column, path, importedNames, importedAliases, pkg}, idx, nil
+	return ImportDefinition{line, column, path, importedNames, importedAliases, pkg}, idx, nil
 }
 
 func parseNativeImport(tokens []Token, line int, pkg *Package) (NativeImportDefinition, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return NativeImportDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+		return NativeImportDefinition{}, 0, msg(line, column, "Expected space.")
 	}
 	idx++
 	pathToken := tokens[idx]
 	if pathToken.Type != StringLiteral {
-		return NativeImportDefinition{}, 0, errors.New("Expected string literal on line " + lineStr)
+		return NativeImportDefinition{}, 0, msg(line, column, "Expected string literal.")
 	}
 	path := strings.Trim(pathToken.Content, "\"")
 	idx++
@@ -404,72 +401,73 @@ func parseNativeImport(tokens []Token, line int, pkg *Package) (NativeImportDefi
 		idx += 2
 	}
 	if tokens[idx].Type != Newline {
-		return NativeImportDefinition{}, 0, errors.New("Expected newline on line " + lineStr)
+		return NativeImportDefinition{}, 0, msg(line, column, "Expected newline.")
 	}
 	idx++
-	return NativeImportDefinition{line, tokens[0].Column, path, alias, pkg}, idx, nil
+	return NativeImportDefinition{line, column, path, alias, pkg}, idx, nil
 }
 
 func parseNativeStruct(tokens []Token, line int, pkg *Package) (StructDefinition, int, error) {
+	column := tokens[0].Column
 	st, idx, err := parseStruct(tokens, line, pkg)
 	if err != nil {
 		return StructDefinition{}, 0, err
 	}
 	if tokens[idx].Type != MultilineStringLiteral {
-		return StructDefinition{}, 0, errors.New("Expected multiline string. Line " + strconv.Itoa(line))
+		return StructDefinition{}, 0, msg(line, column, "Expected multiline string.")
 	}
 	native := tokens[idx].Content
 	st.NativeCode = native[3 : len(native)-3]
 	idx++
 	if tokens[idx].Type != Newline {
-		return StructDefinition{}, 0, errors.New("Expecting newline at end of nativestruct. Line " + strconv.Itoa(line))
+		return StructDefinition{}, 0, msg(line, column, "Expecting newline at end of nativestruct.")
 	}
 	return st, idx, nil
 }
 
 func parseStruct(tokens []Token, line int, pkg *Package) (StructDefinition, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return StructDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+		return StructDefinition{}, 0, msg(line, column, "Expected space.")
 	}
 	idx++
 	name := tokens[idx]
 	if name.Type != TypeName {
-		return StructDefinition{}, 0, errors.New("Expected name for struct on line " + lineStr)
+		return StructDefinition{}, 0, msg(line, column, "Expected name for struct.")
 	}
 	idx++
 	for _, v := range builtinTypes {
 		if name.Content == v {
-			return StructDefinition{}, 0, errors.New("Invalid struct name: cannot redefine builtin type " +
-				name.Content + " on line " + lineStr)
+			return StructDefinition{}, 0, msg(line, column, "Invalid struct name: cannot redefine builtin type "+
+				name.Content+".")
 		}
 	}
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return StructDefinition{}, 0, errors.New("Expected newline on line " + lineStr)
+		return StructDefinition{}, 0, msg(line, tokens[idx].Column, "Expected newline.")
 	}
 	idx++
 
 	members := []Variable{}
 	for {
-		lineStr := strconv.Itoa(tokens[idx].LineNumber)
+		line = tokens[idx].LineNumber
 		if tokens[idx].Type != Indentation {
 			break
 		}
 		idx++
 		memberName := tokens[idx]
 		if memberName.Type != IdentifierWord {
-			return StructDefinition{}, 0, errors.New("Expected struct member name on line " + lineStr)
+			return StructDefinition{}, 0, msg(line, column, "Expected struct member name.")
 		}
 		idx++
 		if tokens[idx].Type != Space {
-			return StructDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+			return StructDefinition{}, 0, msg(line, column, "Expected space.")
 		}
 		idx++
-		memberType, numTypeTokens, err := parseType(tokens[idx:], tokens[idx].LineNumber)
+		memberType, numTypeTokens, err := parseType(tokens[idx:], line)
 		if err != nil {
 			return StructDefinition{}, 0, err
 		}
@@ -479,21 +477,21 @@ func parseStruct(tokens []Token, line int, pkg *Package) (StructDefinition, int,
 			idx++
 		}
 		if tokens[idx].Type != Newline {
-			return StructDefinition{}, 0, errors.New("Expected newline on line " + lineStr)
+			return StructDefinition{}, 0, msg(line, column, "Expected newline.")
 		}
 		idx++
 	}
-	return StructDefinition{line, tokens[0].Column, name.Content, members, "", pkg}, idx, nil
+	return StructDefinition{line, column, name.Content, members, "", pkg}, idx, nil
 }
 
 func parseMethod(tokens []Token, line int, pkg *Package) (MethodDefinition, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	funcDef, numTokens, err := parseFunction(tokens, line, pkg)
 	if err != nil {
 		return MethodDefinition{}, 0, err
 	}
 	if len(funcDef.Parameters) == 0 {
-		return MethodDefinition{}, 0, errors.New("Method must have a receiver parameter on line " + lineStr)
+		return MethodDefinition{}, 0, msg(line, column, "Method must have a receiver parameter.")
 	}
 	return MethodDefinition{
 		funcDef.LineNumber,
@@ -510,7 +508,7 @@ func parseMethod(tokens []Token, line int, pkg *Package) (MethodDefinition, int,
 // used by parseFunction
 // consumes all tokens through end of line
 func parseParameters(tokens []Token, line int) ([]Variable, []ParsedDataType, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	params := []Variable{}
 	idx := 0
 	expectingSpace := false
@@ -524,7 +522,7 @@ Loop:
 		case IdentifierWord:
 			idx++
 			if tokens[idx].Type != Space {
-				return nil, nil, 0, errors.New("Expecting space on line " + lineStr)
+				return nil, nil, 0, msg(line, column, "Expecting space.")
 			}
 			idx++
 			dataType, n, err := parseType(tokens[idx:], line)
@@ -533,10 +531,10 @@ Loop:
 			}
 			idx += n
 			expectingSpace = true
-			params = append(params, Variable{t.LineNumber, t.Column, t.Content, dataType})
+			params = append(params, Variable{line, t.Column, t.Content, dataType})
 		case Colon:
 			if expectingSpace {
-				return nil, nil, 0, errors.New("Expecting space on line " + lineStr)
+				return nil, nil, 0, msg(line, t.Column, "Expecting space.")
 			}
 			// don't inc idx
 			break Loop
@@ -544,7 +542,7 @@ Loop:
 			// don't inc idx
 			break Loop
 		default:
-			return nil, nil, 0, errors.New("Unexpected token on line " + lineStr)
+			return nil, nil, 0, msg(t.LineNumber, t.Column, "Unexpected token.")
 		}
 	}
 
@@ -553,7 +551,7 @@ Loop:
 	if tokens[idx].Type == Colon {
 		idx++
 		if tokens[idx].Type != Space {
-			return nil, nil, 0, errors.New("Expecting space on line " + lineStr)
+			return nil, nil, 0, msg(line, tokens[idx].Column, "Expecting space.")
 		}
 		idx++
 		t, n, err := parseType(tokens[idx:], line)
@@ -567,7 +565,7 @@ Loop:
 				break
 			}
 			if tokens[idx].Type != Space {
-				return nil, nil, 0, errors.New("Expecting space on line " + lineStr)
+				return nil, nil, 0, msg(tokens[idx].LineNumber, tokens[idx].Column, "Expecting space.")
 			}
 			idx++
 			t, n, err := parseType(tokens[idx:], line)
@@ -578,29 +576,27 @@ Loop:
 			returnTypes = append(returnTypes, t)
 		}
 	}
-
 	// newline
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return nil, nil, 0, errors.New("Expecting newline on line " + lineStr)
+		return nil, nil, 0, msg(tokens[idx].LineNumber, tokens[idx].Column, "Expecting newline.")
 	}
 	idx++
-
 	return params, returnTypes, idx, nil
 }
 
 // used by parseInterface, not parseFunction
 // consumes all tokens through end of line
 func parseSignature(tokens []Token, line int) (Signature, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	paramTypes := []ParsedDataType{}
 	returnTypes := []ParsedDataType{}
 	idx := 0
 	methodName := tokens[idx]
 	if methodName.Type != IdentifierWord {
-		return Signature{}, 0, errors.New("Expecting method name on line " + lineStr)
+		return Signature{}, 0, msg(line, column, "Expecting method name.")
 	}
 	idx++
 	if tokens[idx].Type == Space && tokens[idx+1].Type != Newline {
@@ -622,21 +618,21 @@ func parseSignature(tokens []Token, line int) (Signature, int, error) {
 				expectingSpace = true
 			case Colon:
 				if expectingSpace {
-					return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
+					return Signature{}, 0, msg(line, column, "Expecting space.")
 				}
 				// don't inc idx
 				break Loop
 			case Newline:
 				break Loop
 			default:
-				return Signature{}, 0, errors.New("Unexpected token on line " + lineStr)
+				return Signature{}, 0, msg(line, column, "Unexpected token.")
 			}
 		}
 		// optional colon and return types
 		if tokens[idx].Type == Colon {
 			idx++
 			if tokens[idx].Type != Space {
-				return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
+				return Signature{}, 0, msg(line, column, "Expecting space.")
 			}
 			idx++
 			t, n, err := parseType(tokens[idx:], line)
@@ -650,7 +646,7 @@ func parseSignature(tokens []Token, line int) (Signature, int, error) {
 					break
 				}
 				if tokens[idx].Type != Space {
-					return Signature{}, 0, errors.New("Expecting space on line " + lineStr)
+					return Signature{}, 0, msg(line, column, "Expecting space.")
 				}
 				idx++
 				t, n, err := parseType(tokens[idx:], line)
@@ -667,29 +663,29 @@ func parseSignature(tokens []Token, line int) (Signature, int, error) {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return Signature{}, 0, errors.New("Expecting newline on line " + lineStr)
+		return Signature{}, 0, msg(line, column, "Expecting newline.")
 	}
 	idx++
-	return Signature{line, tokens[0].Column, methodName.Content, paramTypes, returnTypes}, idx, nil
+	return Signature{line, column, methodName.Content, paramTypes, returnTypes}, idx, nil
 }
 
 func parseInterface(tokens []Token, line int, pkg *Package) (InterfaceDefinition, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return InterfaceDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+		return InterfaceDefinition{}, 0, msg(line, column, "Expected space.")
 	}
 	idx++
 	name := tokens[idx]
 	if name.Type != TypeName {
-		return InterfaceDefinition{}, 0, errors.New("Expected name for interface on line " + lineStr)
+		return InterfaceDefinition{}, 0, msg(line, column, "Expected name for interface.")
 	}
 	idx++
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return InterfaceDefinition{}, 0, errors.New("Expected newline on line " + lineStr)
+		return InterfaceDefinition{}, 0, msg(line, column, "Expected newline.")
 	}
 	idx++
 
@@ -699,7 +695,7 @@ func parseInterface(tokens []Token, line int, pkg *Package) (InterfaceDefinition
 			break
 		}
 		idx++
-		signature, numTokens, err := parseSignature(tokens[idx:], tokens[idx].LineNumber)
+		signature, numTokens, err := parseSignature(tokens[idx:], line)
 		if err != nil {
 			return InterfaceDefinition{}, 0, err
 		}
@@ -707,18 +703,17 @@ func parseInterface(tokens []Token, line int, pkg *Package) (InterfaceDefinition
 		idx += numTokens
 	}
 	if len(methods) == 0 {
-		return InterfaceDefinition{}, 0, errors.New("Interface definition has no method signatures on line " + lineStr)
+		return InterfaceDefinition{}, 0, msg(line, column, "Interface definition has no method signatures.")
 	}
-	return InterfaceDefinition{line, tokens[0].Column, name.Content, methods, pkg}, idx, nil
-
+	return InterfaceDefinition{line, column, name.Content, methods, pkg}, idx, nil
 }
 
 func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 0
 	primary := tokens[idx]
 	if primary.Type != TypeName {
-		return ParsedDataType{}, 0, errors.New("Expecting type name on line " + lineStr)
+		return ParsedDataType{}, 0, msg(line, column, "Expecting type name.")
 	}
 	idx++
 	paramTypes := []ParsedDataType{}
@@ -772,7 +767,7 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 			}
 		}
 		if tokens[idx].Type != CloseAngle {
-			return ParsedDataType{}, 0, errors.New("Expecting closing angle bracket on line " + lineStr)
+			return ParsedDataType{}, 0, msg(line, column, "Expecting closing angle bracket.")
 		}
 		idx++
 	}
@@ -781,10 +776,10 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 
 // expects to end with newline or >, but does not consume the newline or >
 func parseReturnTypes(tokens []Token, line int) ([]ParsedDataType, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return nil, 0, errors.New("Expecting space on line " + lineStr)
+		return nil, 0, msg(line, column, "Expecting space.")
 	}
 	returnTypes := []ParsedDataType{}
 	dataType, n, err := parseType(tokens[idx:], line)
@@ -802,7 +797,7 @@ func parseReturnTypes(tokens []Token, line int) ([]ParsedDataType, int, error) {
 			break
 		}
 		if tokens[idx].Type != Space {
-			return nil, 0, errors.New("Expecting space on line " + lineStr)
+			return nil, 0, msg(line, column, "Expecting space.")
 		}
 		idx++
 		dataType, n, err := parseType(tokens[idx:], line)
@@ -816,19 +811,19 @@ func parseReturnTypes(tokens []Token, line int) ([]ParsedDataType, int, error) {
 }
 
 func parseGlobal(tokens []Token, line int, pkg *Package) (GlobalDefinition, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return GlobalDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+		return GlobalDefinition{}, 0, msg(line, column, "Expected space.")
 	}
 	idx++
 	target := tokens[idx]
 	if target.Type != IdentifierWord {
-		return GlobalDefinition{}, 0, errors.New("Improper name for a global on line " + lineStr)
+		return GlobalDefinition{}, 0, msg(line, column, "Improper name for a global.")
 	}
 	idx++
 	if tokens[idx].Type != Space {
-		return GlobalDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+		return GlobalDefinition{}, 0, msg(line, column, "Expected space.")
 	}
 	idx++
 	globalType, numTypeTokens, err := parseType(tokens[idx:], line)
@@ -837,7 +832,7 @@ func parseGlobal(tokens []Token, line int, pkg *Package) (GlobalDefinition, int,
 	}
 	idx += numTypeTokens
 	if tokens[idx].Type != Space {
-		return GlobalDefinition{}, 0, errors.New("Expected space on line " + lineStr)
+		return GlobalDefinition{}, 0, msg(line, column, "Expected space.")
 	}
 	idx++
 	value, numValueTokens, err := parseExpression(tokens[idx:], line)
@@ -846,18 +841,18 @@ func parseGlobal(tokens []Token, line int, pkg *Package) (GlobalDefinition, int,
 	}
 	idx += numValueTokens
 	if tokens[idx].Type != Newline {
-		return GlobalDefinition{}, 0, errors.New("Global not terminated with newline on line " + lineStr)
+		return GlobalDefinition{}, 0, msg(line, column, "Global not terminated with newline.")
 	}
 	idx++
-	return GlobalDefinition{line, tokens[0].Column, target.Content, value, globalType, pkg}, idx, nil
+	return GlobalDefinition{line, column, target.Content, value, globalType, pkg}, idx, nil
 }
 
 func parseGoStatement(tokens []Token) (GoStatement, int, error) {
 	line := tokens[0].LineNumber
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return GoStatement{}, 0, errors.New("Expecting space in go statement. Line " + lineStr)
+		return GoStatement{}, 0, msg(line, column, "Expecting space in go statement.")
 	}
 	idx++
 	expr, n, err := parseExpression(tokens[idx:], line)
@@ -868,19 +863,19 @@ func parseGoStatement(tokens []Token) (GoStatement, int, error) {
 	switch expr.(type) {
 	case FunctionCall, MethodCall:
 	default:
-		return GoStatement{}, 0, errors.New("Expecting function call or method call in go statement. Line " + lineStr)
+		return GoStatement{}, 0, msg(line, column, "Expecting function call or method call in go statement.")
 	}
 	if tokens[idx].Type != Newline {
-		return GoStatement{}, 0, errors.New("Expecting newline after go statement. Line " + lineStr)
+		return GoStatement{}, 0, msg(line, column, "Expecting newline after go statement.")
 	}
 	idx++
-	return GoStatement{line, tokens[0].Column, expr}, idx, nil
+	return GoStatement{line, column, expr}, idx, nil
 }
 
 func parseExpression(tokens []Token, line int) (Expression, int, error) {
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	if len(tokens) < 1 {
-		return nil, 0, errors.New("Missing expression on line " + lineStr)
+		return nil, 0, msg(line, column, "Missing expression.")
 	}
 	idx := 0
 	token := tokens[idx]
@@ -906,8 +901,7 @@ func parseExpression(tokens []Token, line int) (Expression, int, error) {
 			return nil, 0, err
 		}
 	default:
-		return nil, 0, errors.New("Improper expression on line " + lineStr +
-			": " + fmt.Sprintf("%#v", token))
+		return nil, 0, msg(line, column, "Improper expression: "+fmt.Sprintf("%#v", token))
 	}
 
 Loop:
@@ -932,13 +926,14 @@ Loop:
 
 // assumes first token is dot
 func parseDot(tokens []Token, expr Expression, line int) (Expression, int, error) {
+	column := tokens[0].Column
 	if tokens[1].Type != IdentifierWord {
-		return nil, 0, errors.New("Identifier expected after dot line " + strconv.Itoa(line))
+		return nil, 0, msg(line, column, "Identifier expected after dot.")
 	}
 	strLiteral := Token{StringLiteral, "\"" + tokens[1].Content + "\"", line, -1}
 	getOp := Operation{
 		line,
-		tokens[0].Column,
+		column,
 		"get",
 		[]Expression{expr, strLiteral},
 	}
@@ -947,6 +942,7 @@ func parseDot(tokens []Token, expr Expression, line int) (Expression, int, error
 
 // assumes first token is open square
 func parseOpenSquare(tokens []Token, expr Expression, line int) (Expression, int, error) {
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
@@ -960,12 +956,12 @@ func parseOpenSquare(tokens []Token, expr Expression, line int) (Expression, int
 		idx++
 	}
 	if len(tokens) < idx || tokens[idx].Type != CloseSquare {
-		return nil, 0, errors.New("Improperly formed square brackets on line " + strconv.Itoa(line))
+		return nil, 0, msg(line, column, "Improperly formed square brackets.")
 	}
 	idx++ // account for ']'
 	getOp := Operation{
 		line,
-		tokens[0].Column,
+		column,
 		"get",
 		[]Expression{expr, indexExpr},
 	}
@@ -976,12 +972,11 @@ func parseOpenSquare(tokens []Token, expr Expression, line int) (Expression, int
 // Returns a FunctionCall or Operation and the number of tokens that make up the Expression.
 func parseOpenParen(tokens []Token) (Expression, int, error) {
 	line := tokens[0].LineNumber
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
-
 	functionCall := true
 	typeExpression := false
 	methodCall := false
@@ -1000,7 +995,7 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 	case Dot:
 		idx++
 		if tokens[idx].Type != IdentifierWord {
-			return nil, 0, errors.New("Method call expects a method name after the dot on line " + lineStr)
+			return nil, 0, msg(line, column, "Method call expects a method name after the dot.")
 		}
 		op = tokens[idx]
 		methodCall = true
@@ -1023,7 +1018,7 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 		}
 		idx += n
 	default:
-		return nil, 0, errors.New("Improper function call or operation on line " + lineStr)
+		return nil, 0, msg(line, column, "Improper function call or operation.")
 	}
 
 	var arguments []Expression
@@ -1037,7 +1032,7 @@ Loop:
 			idx++
 			break Loop
 		}
-		expr, numTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+		expr, numTokens, err := parseExpression(tokens[idx:], line)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -1048,19 +1043,19 @@ Loop:
 	var expr Expression
 	if methodCall {
 		if len(arguments) < 1 {
-			return nil, 0, errors.New("Method call must have a receiver on line " + lineStr)
+			return nil, 0, msg(line, column, "Method call must have a receiver.")
 		}
-		expr = MethodCall{tokens[0].LineNumber, tokens[0].Column, op.Content, arguments[0], arguments[1:]}
+		expr = MethodCall{line, column, op.Content, arguments[0], arguments[1:]}
 	} else if typeExpression {
-		expr = TypeExpression{tokens[0].LineNumber, tokens[0].Column, dt, arguments}
+		expr = TypeExpression{line, column, dt, arguments}
 	} else if functionCall {
 		if leadingCall == nil {
-			expr = FunctionCall{tokens[0].LineNumber, tokens[0].Column, op, arguments}
+			expr = FunctionCall{line, column, op, arguments}
 		} else {
-			expr = FunctionCall{tokens[0].LineNumber, tokens[0].Column, leadingCall, arguments}
+			expr = FunctionCall{line, column, leadingCall, arguments}
 		}
 	} else {
-		expr = Operation{tokens[0].LineNumber, tokens[0].Column, op.Content, arguments}
+		expr = Operation{line, column, op.Content, arguments}
 	}
 
 Outer:
@@ -1089,20 +1084,15 @@ Outer:
 	return expr, idx, nil
 }
 
-func debug(args ...interface{}) {
-	fmt.Print("DEBUG: ")
-	fmt.Println(args...)
-}
-
 func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, int, error) {
-	lineStr := strconv.Itoa(tokens[0].LineNumber)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	name := tokens[idx]
 	if name.Type != IdentifierWord {
-		return FunctionDefinition{}, 0, errors.New("Function missing name on line " + strconv.Itoa(name.LineNumber))
+		return FunctionDefinition{}, 0, msg(line, column, "Function missing name.")
 	}
 	if name.Content == "main" {
 		name.Content = "_main"
@@ -1117,7 +1107,7 @@ func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, 
 		idx += 2
 	} else {
 		if tokens[idx].Type != Space {
-			return FunctionDefinition{}, 0, errors.New("Expecting space on line " + lineStr)
+			return FunctionDefinition{}, 0, msg(line, column, "Expecting space.")
 		}
 		idx++
 		var nTokens int
@@ -1133,7 +1123,7 @@ func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, 
 	}
 	idx += nTokens
 	return FunctionDefinition{
-		tokens[0].LineNumber, tokens[0].Column,
+		line, column,
 		name.Content,
 		params, returnTypes,
 		body,
@@ -1143,14 +1133,14 @@ func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, 
 }
 
 func parseNativeFunc(tokens []Token, line int, pkg *Package) (FunctionDefinition, int, error) {
-	lineStr := strconv.Itoa(tokens[0].LineNumber)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	name := tokens[idx]
 	if name.Type != IdentifierWord {
-		return FunctionDefinition{}, 0, errors.New("Native function missing name on line " + strconv.Itoa(name.LineNumber))
+		return FunctionDefinition{}, 0, msg(line, column, "Native function missing name.")
 	}
 	idx++
 	var params []Variable
@@ -1162,7 +1152,7 @@ func parseNativeFunc(tokens []Token, line int, pkg *Package) (FunctionDefinition
 		idx += 2
 	} else {
 		if tokens[idx].Type != Space {
-			return FunctionDefinition{}, 0, errors.New("Expecting space on line " + lineStr)
+			return FunctionDefinition{}, 0, msg(line, column, "Missing space.")
 		}
 		idx++
 		var nTokens int
@@ -1173,17 +1163,17 @@ func parseNativeFunc(tokens []Token, line int, pkg *Package) (FunctionDefinition
 		idx += nTokens
 	}
 	if tokens[idx].Type != MultilineStringLiteral {
-		return FunctionDefinition{}, 0, errors.New("Native function expecting multi-line string on line " + strconv.Itoa(name.LineNumber))
+		return FunctionDefinition{}, 0, msg(line, column, "Native function expecting multi-line string.")
 	}
 	body := tokens[idx].Content
 	body = body[3 : len(body)-3]
 	idx++
 	if tokens[idx].Type != Newline {
-		return FunctionDefinition{}, 0, errors.New("Native function expecting newline on line " + strconv.Itoa(name.LineNumber))
+		return FunctionDefinition{}, 0, msg(line, column, "Native function expecting newline.")
 	}
 	idx++
 	return FunctionDefinition{
-		tokens[0].LineNumber, tokens[0].Column,
+		line, column,
 		name.Content,
 		params, returnTypes,
 		nil,
@@ -1193,13 +1183,14 @@ func parseNativeFunc(tokens []Token, line int, pkg *Package) (FunctionDefinition
 }
 
 func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return TypeswitchStatement{}, 0, errors.New("Missing space on line " + line)
+		return TypeswitchStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	value, nTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
 		return TypeswitchStatement{}, 0, err
 	}
@@ -1208,12 +1199,14 @@ func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int,
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return TypeswitchStatement{}, 0, errors.New("Typeswitch expected newline on line " + line)
+		return TypeswitchStatement{}, 0, msg(line, column, "Typeswitch expected newline.")
 	}
 	idx++
 	var cases []TypeswitchCase
 	for idx+1 < len(tokens) {
-		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "case" {
+		if tokens[idx].Type == Indentation &&
+			len(tokens[idx].Content) == indentation &&
+			tokens[idx+1].Content == "case" {
 			idx++
 			c, nTokens, err := parseTypeswitchCase(tokens[idx:], indentation)
 			if err != nil {
@@ -1227,7 +1220,9 @@ func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int,
 	}
 	var defaultBody []Statement
 	if idx+1 < len(tokens) {
-		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "default" {
+		if tokens[idx].Type == Indentation &&
+			len(tokens[idx].Content) == indentation &&
+			tokens[idx+1].Content == "default" {
 			idx++
 			var nTokens int
 			var err error
@@ -1238,27 +1233,27 @@ func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int,
 			idx += nTokens
 		}
 	}
-	return TypeswitchStatement{tokens[0].LineNumber, tokens[0].Column, value, cases, defaultBody}, idx, nil
+	return TypeswitchStatement{line, column, value, cases, defaultBody}, idx, nil
 }
 
 func parseTypeswitchCase(tokens []Token, indentation int) (TypeswitchCase, int, error) {
 	line := tokens[0].LineNumber
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return TypeswitchCase{}, 0, errors.New("Missing space on line " + lineStr)
+		return TypeswitchCase{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	if tokens[idx].Type != IdentifierWord {
-		return TypeswitchCase{}, 0, errors.New("Expecting identifier on line " + lineStr)
+		return TypeswitchCase{}, 0, msg(line, column, "Expecting identifier.")
 	}
 	name := tokens[idx].Content
 	idx++
 	if tokens[idx].Type != Space {
-		return TypeswitchCase{}, 0, errors.New("Missing space on line " + lineStr)
+		return TypeswitchCase{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	dt, nTokens, err := parseType(tokens[idx:], tokens[0].LineNumber)
+	dt, nTokens, err := parseType(tokens[idx:], line)
 	if err != nil {
 		return TypeswitchCase{}, 0, err
 	}
@@ -1267,7 +1262,7 @@ func parseTypeswitchCase(tokens []Token, indentation int) (TypeswitchCase, int, 
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return TypeswitchCase{}, 0, errors.New("typeswitch case type not followed by newline on line " + lineStr)
+		return TypeswitchCase{}, 0, msg(line, column, "typeswitch case type not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1275,18 +1270,19 @@ func parseTypeswitchCase(tokens []Token, indentation int) (TypeswitchCase, int, 
 		return TypeswitchCase{}, 0, err
 	}
 	idx += numTokens
-	v := Variable{tokens[0].LineNumber, tokens[0].Column, name, dt}
-	return TypeswitchCase{tokens[0].LineNumber, tokens[0].Column, v, body}, idx, nil
+	v := Variable{line, column, name, dt}
+	return TypeswitchCase{line, column, v, body}, idx, nil
 }
 
 func parseDefaultCase(tokens []Token, indentation int) ([]Statement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return nil, 0, errors.New("Default case not followed by newline on line " + line)
+		return nil, 0, msg(line, column, "Default case not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1298,13 +1294,14 @@ func parseDefaultCase(tokens []Token, indentation int) ([]Statement, int, error)
 }
 
 func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return IfStatement{}, 0, errors.New("Missing space on line " + line)
+		return IfStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	condition, numConditionTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	condition, numConditionTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
 		return IfStatement{}, 0, err
 	}
@@ -1313,7 +1310,7 @@ func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return IfStatement{}, 0, errors.New("If statement condition not followed by newline on line " + line)
+		return IfStatement{}, 0, msg(line, column, "If statement condition not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1326,7 +1323,8 @@ func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
 	var elseClause ElseClause
 
 	for idx+1 < len(tokens) {
-		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation && tokens[idx+1].Content == "elseif" {
+		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation &&
+			tokens[idx+1].Content == "elseif" {
 			elseifClause, numTokens, err := parseElif(tokens[idx+1:], indentation)
 			if err != nil {
 				return IfStatement{}, 0, err
@@ -1349,26 +1347,27 @@ func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
 			idx += numTokens + 1 // +1 for the indentation before this else
 		}
 	}
-	return IfStatement{tokens[0].LineNumber, tokens[0].Column, condition, body, elseifClauses, elseClause}, idx, nil
+	return IfStatement{line, column, condition, body, elseifClauses, elseClause}, idx, nil
 }
 
 func parseElif(tokens []Token, indentation int) (ElseifClause, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return ElseifClause{}, 0, errors.New("Missing space on line " + line)
+		return ElseifClause{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	condition, numConditionTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	condition, numConditionTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
-		return ElseifClause{}, 0, errors.New("Improper condition in if statement on line " + line)
+		return ElseifClause{}, 0, msg(line, column, "Improper condition in if statement.")
 	}
 	idx += numConditionTokens
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return ElseifClause{}, 0, errors.New("Elseif clause condition not followed by newline on line " + line)
+		return ElseifClause{}, 0, msg(line, column, "Elseif clause condition not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1376,31 +1375,33 @@ func parseElif(tokens []Token, indentation int) (ElseifClause, int, error) {
 		return ElseifClause{}, 0, err
 	}
 	idx += numTokens
-	return ElseifClause{tokens[0].LineNumber, tokens[0].Column, condition, body}, idx, nil
+	return ElseifClause{line, column, condition, body}, idx, nil
 }
 
 func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return ElseClause{}, 0, errors.New("Else clause not followed by newline on line " + line)
+		return ElseClause{}, 0, msg(line, column, "Else clause not followed by newline.")
 	}
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
 	if err != nil {
 		return ElseClause{}, 0, err
 	}
 	idx += numTokens
-	return ElseClause{tokens[0].LineNumber, tokens[0].Column, body}, idx, nil
+	return ElseClause{line, column, body}, idx, nil
 }
 
 func parseSelect(tokens []Token, indentation int) (SelectStatement, int, error) {
-	lineStr := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Newline {
-		return SelectStatement{}, 0, errors.New("Expecting newline. Line " + lineStr)
+		return SelectStatement{}, 0, msg(line, column, "Expecting newline.")
 	}
 	idx++
 	var clauses []SelectClause
@@ -1410,7 +1411,7 @@ loop:
 		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation {
 			idx++
 			if tokens[idx].Type != ReservedWord {
-				return SelectStatement{}, 0, errors.New("Expecting 'send' or 'rcv', or 'default'. Line " + lineStr)
+				return SelectStatement{}, 0, msg(line, column, "Expecting 'send' or 'rcv', or 'default'.")
 			}
 			switch tokens[idx].Content {
 			case "sending":
@@ -1441,33 +1442,33 @@ loop:
 			break
 		}
 	}
-	return SelectStatement{tokens[0].LineNumber, tokens[0].Column, clauses, defaultClause}, idx, nil
+	return SelectStatement{line, column, clauses, defaultClause}, idx, nil
 }
 
 func parseSendClause(tokens []Token, indentation int) (SelectSendClause, int, error) {
 	line := tokens[0].LineNumber
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return SelectSendClause{}, 0, errors.New("Missing space on line " + lineStr)
+		return SelectSendClause{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	channelExpr, numConditionTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
-		return SelectSendClause{}, 0, errors.New("Improper channel expression in select send clause. Line " + lineStr)
+		return SelectSendClause{}, 0, msg(line, column, "Improper channel expression in select send clause.")
 	}
 	idx += numConditionTokens
 	if tokens[idx].Type != Space {
-		return SelectSendClause{}, 0, errors.New("Missing space on line " + lineStr)
+		return SelectSendClause{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	valExpr, numConditionTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
-		return SelectSendClause{}, 0, errors.New("Improper value expression in select send clause. Line " + lineStr)
+		return SelectSendClause{}, 0, msg(line, column, "Improper value expression in select send clause.")
 	}
 	idx += numConditionTokens
 	if tokens[idx].Type != Newline {
-		return SelectSendClause{}, 0, errors.New("Expecting newline in select send clause. Line " + lineStr)
+		return SelectSendClause{}, 0, msg(line, column, "Expecting newline in select send clause.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1475,24 +1476,24 @@ func parseSendClause(tokens []Token, indentation int) (SelectSendClause, int, er
 		return SelectSendClause{}, 0, err
 	}
 	idx += numTokens
-	return SelectSendClause{tokens[0].LineNumber, tokens[0].Column, channelExpr, valExpr, body}, idx, nil
+	return SelectSendClause{line, column, channelExpr, valExpr, body}, idx, nil
 }
 
 func parseRcvClause(tokens []Token, indentation int) (SelectRcvClause, int, error) {
 	line := tokens[0].LineNumber
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return SelectRcvClause{}, 0, errors.New("Missing space on line " + lineStr)
+		return SelectRcvClause{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	if tokens[idx].Type != IdentifierWord {
-		return SelectRcvClause{}, 0, errors.New("Expecting variable name for target of select rcv clause. Line " + lineStr)
+		return SelectRcvClause{}, 0, msg(line, column, "Expecting variable name for target of select rcv clause.")
 	}
 	targetName := tokens[idx].Content
 	idx++
 	if tokens[idx].Type != Space {
-		return SelectRcvClause{}, 0, errors.New("Missing space on line " + lineStr)
+		return SelectRcvClause{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	dt, n, err := parseType(tokens[idx:], line)
@@ -1501,7 +1502,7 @@ func parseRcvClause(tokens []Token, indentation int) (SelectRcvClause, int, erro
 	}
 	idx += n
 	if tokens[idx].Type != Space {
-		return SelectRcvClause{}, 0, errors.New("Missing space on line " + lineStr)
+		return SelectRcvClause{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	expr, n, err := parseExpression(tokens[idx:], line)
@@ -1510,7 +1511,7 @@ func parseRcvClause(tokens []Token, indentation int) (SelectRcvClause, int, erro
 	}
 	idx += n
 	if tokens[idx].Type != Newline {
-		return SelectRcvClause{}, 0, errors.New("Expecting newline in select rcv clause. Line " + lineStr)
+		return SelectRcvClause{}, 0, msg(line, column, "Expecting newline in select rcv clause.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1518,20 +1519,20 @@ func parseRcvClause(tokens []Token, indentation int) (SelectRcvClause, int, erro
 		return SelectRcvClause{}, 0, err
 	}
 	idx += numTokens
-
 	return SelectRcvClause{
-		tokens[0].LineNumber, tokens[0].Column,
-		Variable{tokens[0].LineNumber, tokens[0].Column, targetName, dt},
+		line, column,
+		Variable{line, column, targetName, dt},
 		expr,
 		body,
 	}, idx, nil
 }
 
 func parseSelectDefault(tokens []Token, indentation int) (SelectDefaultClause, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Newline {
-		return SelectDefaultClause{}, 0, errors.New("Elseif clause condition not followed by newline on line " + line)
+		return SelectDefaultClause{}, 0, msg(line, column, "Elseif clause condition not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1539,59 +1540,61 @@ func parseSelectDefault(tokens []Token, indentation int) (SelectDefaultClause, i
 		return SelectDefaultClause{}, 0, err
 	}
 	idx += numTokens
-	return SelectDefaultClause{tokens[0].LineNumber, tokens[0].Column, body}, idx, nil
+	return SelectDefaultClause{line, column, body}, idx, nil
 }
 
 func parseForeach(tokens []Token, indentation int) (ForeachStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+		return ForeachStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	if tokens[idx].Type != IdentifierWord {
-		return ForeachStatement{}, 0, errors.New("Expecting identifier for the indexes in foreach on line " + line)
+		return ForeachStatement{}, 0, msg(line, column, "Expecting identifier for the indexes in foreach.")
 	}
 	indexName := tokens[idx].Content
 	idx++
 	if tokens[idx].Type != Space {
-		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+		return ForeachStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	indexType, nTokens, err := parseType(tokens[idx:], tokens[0].LineNumber)
+	indexType, nTokens, err := parseType(tokens[idx:], line)
 	if err != nil {
 		return ForeachStatement{}, 0, err
 	}
 	idx += nTokens
 	if tokens[idx].Type != Space {
-		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+		return ForeachStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	if tokens[idx].Type != IdentifierWord {
-		return ForeachStatement{}, 0, errors.New("Expecting identifier for the values in foreach on line " + line)
+		return ForeachStatement{}, 0, msg(line, column, "Expecting identifier for the values in foreach.")
 	}
 	valName := tokens[idx].Content
 	idx++
 	if tokens[idx].Type != Space {
-		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+		return ForeachStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	valType, nTokens, err := parseType(tokens[idx:], tokens[0].LineNumber)
+	valType, nTokens, err := parseType(tokens[idx:], line)
 	if err != nil {
 		return ForeachStatement{}, 0, err
 	}
 	idx += nTokens
 	if tokens[idx].Type != Space {
-		return ForeachStatement{}, 0, errors.New("Missing space on line " + line)
+		return ForeachStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	collection, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	collection, nTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
 		return ForeachStatement{}, 0, err
 	}
 	idx += nTokens
 	if tokens[idx].Type != Newline {
-		return ForeachStatement{}, 0, errors.New("Foreach statement collection expression not followed by newline on line " + line)
+		return ForeachStatement{}, 0, msg(line, column,
+			"Foreach statement collection expression not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1600,26 +1603,27 @@ func parseForeach(tokens []Token, indentation int) (ForeachStatement, int, error
 	}
 	idx += numTokens
 	return ForeachStatement{
-		tokens[0].LineNumber, tokens[0].Column,
+		line, column,
 		indexName, indexType,
 		valName, valType,
 		collection, body}, idx, nil
 }
 
 func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return WhileStatement{}, 0, errors.New("Missing space on line " + line)
+		return WhileStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	condition, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	condition, nTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
 		return WhileStatement{}, 0, err
 	}
 	idx += nTokens
 	if tokens[idx].Type != Newline {
-		return WhileStatement{}, 0, errors.New("While statement condition not followed by newline on line " + line)
+		return WhileStatement{}, 0, msg(line, column, "While statement condition not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
@@ -1627,17 +1631,18 @@ func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
 		return WhileStatement{}, 0, err
 	}
 	idx += numTokens
-	return WhileStatement{tokens[0].LineNumber, tokens[0].Column, condition, body}, idx, nil
+	return WhileStatement{line, column, condition, body}, idx, nil
 }
 
 func parseReturn(tokens []Token) (ReturnStatement, int, error) {
-	lineStr := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return ReturnStatement{}, 0, errors.New("Missing space on line " + lineStr)
+		return ReturnStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+	value, nTokens, err := parseExpression(tokens[idx:], line)
 	if err != nil {
 		return ReturnStatement{}, 0, err
 	}
@@ -1653,55 +1658,58 @@ func parseReturn(tokens []Token) (ReturnStatement, int, error) {
 			break
 		}
 		if tokens[idx].Type != Space {
-			return ReturnStatement{}, 0, errors.New("Missing space on line " + lineStr)
+			return ReturnStatement{}, 0, msg(line, column, "Missing space.")
 		}
 		idx++
-		value, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+		value, nTokens, err := parseExpression(tokens[idx:], line)
 		if err != nil {
 			return ReturnStatement{}, 0, err
 		}
 		idx += nTokens
 		values = append(values, value)
 	}
-	return ReturnStatement{tokens[0].LineNumber, tokens[0].Column, values}, idx, nil
+	return ReturnStatement{line, column, values}, idx, nil
 }
 
 func parseBreak(tokens []Token) (BreakStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return BreakStatement{}, 0, errors.New("Break statement not terminated with newline on line " + line)
+		return BreakStatement{}, 0, msg(line, column, "Break statement not terminated with newline.")
 	}
-	return BreakStatement{tokens[0].LineNumber, tokens[0].Column}, idx, nil
+	return BreakStatement{line, column}, idx, nil
 }
 
 func parseContinue(tokens []Token) (ContinueStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return ContinueStatement{}, 0, errors.New("Continue statement not terminated with newline on line " + line)
+		return ContinueStatement{}, 0, msg(line, column, "Continue statement not terminated with newline.")
 	}
-	return ContinueStatement{tokens[0].LineNumber, tokens[0].Column}, idx, nil
+	return ContinueStatement{line, column}, idx, nil
 }
 
 // assume first token is reserved word "as"
 // returns number of tokens (including the newline at the end)
 func parseAssignment(tokens []Token) (AssignmentStatement, int, error) {
-	line := strconv.Itoa(tokens[0].LineNumber)
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
+		return AssignmentStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
 	exprs := []Expression{}
 	for {
-		expr, nTokens, err := parseExpression(tokens[idx:], tokens[0].LineNumber)
+		expr, nTokens, err := parseExpression(tokens[idx:], line)
 		if err != nil {
 			return AssignmentStatement{}, 0, err
 		}
@@ -1716,12 +1724,12 @@ func parseAssignment(tokens []Token) (AssignmentStatement, int, error) {
 			break
 		}
 		if tokens[idx].Type != Space {
-			return AssignmentStatement{}, 0, errors.New("Missing space on line " + line)
+			return AssignmentStatement{}, 0, msg(line, column, "Missing space.")
 		}
 		idx++
 	}
 	if len(exprs) < 2 {
-		return AssignmentStatement{}, 0, errors.New("Invalid assignment statement on line " + line)
+		return AssignmentStatement{}, 0, msg(line, column, "Invalid assignment statement.")
 	}
 	return AssignmentStatement{
 		tokens[0].LineNumber,
@@ -1732,10 +1740,10 @@ func parseAssignment(tokens []Token) (AssignmentStatement, int, error) {
 
 func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 	line := tokens[0].LineNumber
-	lineStr := strconv.Itoa(tokens[0].LineNumber)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type != Space {
-		return LocalsStatement{}, 0, errors.New("Expecting space on line " + lineStr)
+		return LocalsStatement{}, 0, msg(line, column, "Expecting space.")
 	}
 	idx++
 	var locals []Variable
@@ -1744,7 +1752,7 @@ func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 		if token.Type == IdentifierWord {
 			idx++
 			if tokens[idx].Type != Space {
-				return LocalsStatement{}, 0, errors.New("Expecting space on line " + lineStr)
+				return LocalsStatement{}, 0, msg(line, column, "Expecting space.")
 			}
 			idx++
 			dataType, n, err := parseType(tokens[idx:], line)
@@ -1763,7 +1771,7 @@ func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return LocalsStatement{}, 0, errors.New("Expecting newline in locals statement on line " + lineStr)
+		return LocalsStatement{}, 0, msg(line, column, "Expecting newline in locals statement.")
 	}
 	idx++
 	return LocalsStatement{tokens[0].LineNumber, tokens[0].Column, locals}, idx, nil
@@ -1772,14 +1780,14 @@ func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 // exactly like parseFunction but with more indentation
 func parseLocalFunc(tokens []Token, indentation int) (LocalFuncStatement, int, error) {
 	line := tokens[0].LineNumber
-	lineStr := strconv.Itoa(line)
+	column := tokens[0].Column
 	idx := 1
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	name := tokens[idx]
 	if name.Type != IdentifierWord {
-		return LocalFuncStatement{}, 0, errors.New("Local function missing name. Line " + lineStr)
+		return LocalFuncStatement{}, 0, msg(line, column, "Local function missing name.")
 	}
 	idx++
 	var params []Variable
@@ -1791,7 +1799,7 @@ func parseLocalFunc(tokens []Token, indentation int) (LocalFuncStatement, int, e
 		idx += 2
 	} else {
 		if tokens[idx].Type != Space {
-			return LocalFuncStatement{}, 0, errors.New("Expecting space on line " + lineStr)
+			return LocalFuncStatement{}, 0, msg(line, column, "Expecting space.")
 		}
 		idx++
 		var nTokens int
@@ -1838,7 +1846,7 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 				case ReservedWord:
 					switch t.Content {
 					case "func":
-						return nil, 0, errors.New("Functions cannot be nested: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
+						return nil, 0, msg(t.LineNumber, t.Column, "Functions cannot be nested.")
 					case "as":
 						statement, numTokens, err = parseAssignment(tokens[i:])
 					case "if":
@@ -1864,7 +1872,7 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 					case "go":
 						statement, numTokens, err = parseGoStatement(tokens[i:])
 					default:
-						return nil, 0, errors.New("Improper reserved word '" + t.Content + "' in body: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
+						return nil, 0, msg(t.LineNumber, t.Column, "Improper reserved word '"+t.Content+"' in body.")
 					}
 					if err != nil {
 						return nil, 0, err
@@ -1877,16 +1885,16 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 					}
 					statement = expression.(Statement)
 					if tokens[i+numTokens].Type != Newline {
-						return nil, 0, errors.New("Statement not terminated with newline on line " + strconv.Itoa(t.LineNumber))
+						return nil, 0, msg(t.LineNumber, t.Column, "Statement not terminated with newline.")
 					}
 					numTokens++ // add in the newline
 				default:
-					return nil, 0, errors.New("Improper token. Expected start of statement: line " + strconv.Itoa(t.LineNumber) + " column: " + strconv.Itoa(t.Column))
+					return nil, 0, msg(t.LineNumber, t.Column, "Improper token. Expected start of statement.")
 				}
 				statements = append(statements, statement)
 				i += numTokens
 			} else {
-				return nil, 0, errors.New("Improper indentation: line " + strconv.Itoa(t.LineNumber))
+				return nil, 0, msg(t.LineNumber, t.Column, "Improper indentation.")
 			}
 		}
 	}

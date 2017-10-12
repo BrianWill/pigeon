@@ -1,5 +1,11 @@
 package staticPigeon
 
+import (
+	"errors"
+	"fmt"
+	"strconv"
+)
+
 // we use arbitrary number values to designate each type of token. Rather than using straight ints, we
 // create a distinct type to help avoid mistreating these values like ints.
 type TokenType int
@@ -599,4 +605,14 @@ func (p *Package) getExportedDefinition(name string) Definition {
 		return inter
 	}
 	return nil
+}
+
+func msg(line int, column int, s string) error {
+	return errors.New("Line " + strconv.Itoa(line) + ", column " +
+		strconv.Itoa(column) + " . " + s)
+}
+
+func debug(args ...interface{}) {
+	fmt.Print("DEBUG: ")
+	fmt.Println(args...)
 }

@@ -213,7 +213,7 @@ func processStructs(pkg *Package) error {
 			case Struct:
 				for _, cst := range containingStructs {
 					if t.Name == cst.Name {
-						return fmt.Errorf("Struct cannot recursively contain itself on line %d", st.LineNumber)
+						return msg(st.LineNumber, st.Column, "Struct cannot recursively contain itself.")
 					}
 				}
 				err := processStruct(t, pkg, append(containingStructs, t))
@@ -258,7 +258,7 @@ func processStructs(pkg *Package) error {
 				}
 				st.Methods[meth.Name] = funcType
 			} else {
-				return errors.New("Method has non-struct receiver. Line " + strconv.Itoa(meth.LineNumber))
+				return msg(meth.LineNumber, meth.Column, "Method has non-struct receiver.")
 			}
 		}
 	}
@@ -437,7 +437,8 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 // not the same as a 'type assertion'
 // 'type expression' is parens starting with a type to create a value of that type
 func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
-	lineStr := strconv.Itoa(te.LineNumber)
+	line := te.LineNumber
+	column := te.Column
 	dt, err := getDataType(te.Type, pkg)
 	if err != nil {
 		return "", nil, err
@@ -447,20 +448,20 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 		switch t.Name {
 		case "I", "F", "Byte":
 			if len(t.Params) != 0 {
-				return "", nil, errors.New("Invalid type expression. " + t.Name + " cannot have type parameters. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" cannot have type parameters.")
 			}
 			if len(te.Operands) != 1 {
-				return "", nil, errors.New("Invalid type expression. " + t.Name + " must have one (and just one) operand. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" must have one (and just one) operand.")
 			}
 			expr, returnedTypes, err := compileExpression(te.Operands[0], pkg, locals)
 			if err != nil {
 				return "", nil, err
 			}
 			if len(returnedTypes) != 1 {
-				return "", nil, errors.New("Invalid type expression. " + t.Name + " must have one (and just one) operand. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" must have one (and just one) operand.")
 			}
 			if !isNumber(returnedTypes[0]) {
-				return "", nil, errors.New("Invalid type expression. " + t.Name + " must have number operand. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" must have number operand.")
 			}
 			var numberTypes = map[string]string{
 				"I":    "int64",
@@ -471,7 +472,7 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			return code, []DataType{t}, nil
 		case "M":
 			if len(t.Params) != 2 {
-				return "", nil, errors.New("Invalid type expression. Map must have two type parameters. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. Map must have two type parameters.")
 			}
 			mapType, err := compileType(t, pkg)
 			if err != nil {
@@ -479,7 +480,7 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			}
 			mapType += "{"
 			if len(te.Operands)%2 != 0 {
-				return "", nil, errors.New("Invalid type expression. Map must have even number of operands. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. Map must have even number of operands.")
 			}
 			for i := 0; i < len(te.Operands); i += 2 {
 				key, returnedTypes, err := compileExpression(te.Operands[i], pkg, locals)
@@ -487,14 +488,14 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 					return "", nil, err
 				}
 				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[0], false) {
-					return "", nil, errors.New("Invalid type expression. Map key of wrong type. Line " + lineStr)
+					return "", nil, msg(line, column, "Invalid type expression. Map key of wrong type.")
 				}
 				val, returnedTypes, err := compileExpression(te.Operands[i+1], pkg, locals)
 				if err != nil {
 					return "", nil, err
 				}
 				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[1], false) {
-					return "", nil, errors.New("Invalid type expression. Map val of wrong type. Line " + lineStr)
+					return "", nil, msg(line, column, "Invalid type expression. Map val of wrong type.")
 				}
 				mapType += key + ": " + val + ", "
 			}
@@ -502,7 +503,7 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			return mapType, []DataType{t}, nil
 		case "L":
 			if len(t.Params) != 1 {
-				return "", nil, errors.New("Invalid type expression. List must have one type parameter. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. List must have one type parameter.")
 			}
 			expr := "(func () *_std.List {\n"
 			expr += "var _list _std.List = make([]interface{}, " + strconv.Itoa(len(te.Operands)) + ")\n"
@@ -515,7 +516,7 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 					return "", nil, err
 				}
 				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[0], false) {
-					return "", nil, errors.New("Invalid type expression. List val of wrong type. Line " + lineStr)
+					return "", nil, msg(line, column, "Invalid type expression. List val of wrong type.")
 				}
 				expr += "_list[" + strconv.Itoa(i) + "] = " + val + "\n"
 			}
@@ -524,20 +525,20 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			return expr, []DataType{t}, nil
 		case "Ch":
 			if len(t.Params) != 1 {
-				return "", nil, errors.New("Invalid type expression. Channel must have one type parameter. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. Channel must have one type parameter.")
 			}
 			if len(te.Operands) != 1 {
-				return "", nil, errors.New("Invalid type expression. Must specify size for channel. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. Must specify size for channel.")
 			}
 			size, returnedTypes, err := compileExpression(te.Operands[0], pkg, locals)
 			if err != nil {
 				return "", nil, err
 			}
 			if len(returnedTypes) != 1 {
-				return "", nil, errors.New("Invalid type expression. Channel must have one (and just one) operand. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. Channel must have one (and just one) operand.")
 			}
 			if !isInteger(returnedTypes[0]) {
-				return "", nil, errors.New("Invalid type expression. Channel must have an integer operand. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. Channel must have an integer operand.")
 			}
 			channelType, err := compileType(t.Params[0], pkg)
 			if err != nil {
@@ -546,11 +547,11 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			code := "make(chan " + channelType + ", " + size + ")"
 			return code, []DataType{t}, nil
 		default:
-			return "", nil, errors.New("Invalid type expression. Cannot create type " + t.Name + ". Line " + lineStr)
+			return "", nil, msg(line, column, "Invalid type expression. Cannot create type "+t.Name+".")
 		}
 	case ArrayType:
 		if len(te.Operands) != t.Size {
-			return "", nil, errors.New("Array expression must have number of operands that matches the length. Line " + lineStr)
+			return "", nil, msg(line, column, "Array expression must have number of operands that matches the length.")
 		}
 		param, err := compileType(t.Type, pkg)
 		if err != nil {
@@ -563,17 +564,17 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 				return "", nil, err
 			}
 			if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Type, false) {
-				return "", nil, errors.New("Invalid type expression. List val of wrong type. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. List val of wrong type.")
 			}
 			code += val + ", "
 		}
 		code += "}"
 		return code, nil, nil
 	case FunctionType:
-		return "", nil, errors.New("Invalid type expression. Cannot create a function with a type expression. Line " + lineStr)
+		return "", nil, msg(line, column, "Invalid type expression. Cannot create a function with a type expression.")
 	case Struct:
 		if len(t.MemberNames) != len(te.Operands) {
-			return "", nil, errors.New("Invalid type expression. Wrong number of args for creating struct. Line " + lineStr)
+			return "", nil, msg(line, column, "Invalid type expression. Wrong number of args for creating struct.")
 		}
 		code := t.Name + "{"
 		for i, argType := range t.MemberTypes {
@@ -582,17 +583,17 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 				return "", nil, err
 			}
 			if len(returnTypes) != 1 || !isType(returnTypes[0], argType, false) {
-				return "", nil, errors.New("Invalid type expression. Wrong type of arg for creating struct. Line " + lineStr)
+				return "", nil, msg(line, column, "Invalid type expression. Wrong type of arg for creating struct.")
 			}
 			code += expr + ", "
 		}
 		code += "}"
 		return code, []DataType{t}, nil
 	case InterfaceDefinition:
-		return "", nil, errors.New("Invalid type expression. Cannot create interface value. Line " + lineStr)
+		return "", nil, msg(line, column, "Invalid type expression. Cannot create interface value.")
 	}
 	// should be unreachable
-	return "", nil, errors.New("Invalid type expression. Line " + lineStr)
+	return "", nil, msg(line, column, "Invalid type expression.")
 }
 
 func compileExpression(e Expression, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
@@ -666,7 +667,7 @@ func compileExpression(e Expression, pkg *Package, locals map[string]Variable) (
 				}
 				returnedTypes = []DataType{rt}
 			} else {
-				return "", nil, fmt.Errorf("Name %s on line %d is undefined.", name, e.LineNumber)
+				return "", nil, msg(e.LineNumber, e.Column, "Name is undefined.")
 			}
 		case NumberLiteral:
 			if strings.Index(e.Content, ".") == -1 {
@@ -710,10 +711,10 @@ func compileGlobals(pkg *Package) (string, error) {
 			return "", err
 		}
 		if len(returnedTypes) != 1 {
-			return "", errors.New("Initial value of global does not match the declared type.")
+			return "", msg(g.LineNumber, g.Column, "Initial value of global does not match the declared type.")
 		}
 		if !isType(returnedTypes[0], t, false) {
-			return "", errors.New("Initial value of global does not match the declared type.")
+			return "", msg(g.LineNumber, g.Column, "Initial value of global does not match the declared type.")
 		}
 		code += c + "\n"
 		pkg.ValidBreakpoints[strconv.Itoa(g.LineNumber)] = true
@@ -897,7 +898,7 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 		return header + fn.NativeCode + "\n}\n", nil
 	}
 	if len(fn.Body) < 1 {
-		return "", errors.New("Function should contain at least one statement.")
+		return "", msg(fn.LineNumber, fn.Column, "Function should contain at least one statement.")
 	}
 	bodyStatements := fn.Body
 	// account for locals statement
@@ -905,8 +906,7 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 		for _, v := range localsStatement.Vars {
 			header += "var "
 			if _, ok := locals[v.Name]; ok {
-				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
-					v.Name, v.LineNumber)
+				return "", msg(v.LineNumber, v.Column, "Local variable "+v.Name+" is already defined as a parameter.")
 			}
 			locals[v.Name] = v
 			dt, err := getDataType(v.Type, fn.Pkg)
@@ -1000,15 +1000,14 @@ func compileMethod(meth MethodDefinition) (string, error) {
 	}
 	header += ") {\n"
 	if len(meth.Body) < 1 {
-		return "", errors.New("Function should contain at least one statement.")
+		return "", msg(meth.LineNumber, meth.Column, "FMethod should contain at least one statement.")
 	}
 	bodyStatements := meth.Body
 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
 		for _, v := range localsStatement.Vars {
 			header += "var "
 			if _, ok := locals[v.Name]; ok {
-				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
-					v.Name, v.LineNumber)
+				return "", msg(v.LineNumber, v.Column, "Local variable "+v.Name+" is already defined as a parameter.")
 			}
 			locals[v.Name] = v
 			dt, err := getDataType(v.Type, meth.Pkg)
@@ -1057,7 +1056,7 @@ func compileMethod(meth MethodDefinition) (string, error) {
 
 func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[string]Variable) (string, error) {
 	if _, ok := outerLocals[fn.Name]; ok {
-		return "", errors.New("Local func cannot have same name as another local. Line " + strconv.Itoa(fn.LineNumber))
+		return "", msg(fn.LineNumber, fn.Column, "Local func cannot have same name as another local.")
 	}
 	paramTypes := make([]ParsedDataType, len(fn.Parameters))
 	for i, v := range fn.Parameters {
@@ -1102,15 +1101,14 @@ func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[strin
 	}
 	header += ") {\n"
 	if len(fn.Body) < 1 {
-		return "", errors.New("Function should contain at least one statement.")
+		return "", msg(fn.LineNumber, fn.Column, "Function should contain at least one statement.")
 	}
 	bodyStatements := fn.Body
 	if localsStatement, ok := bodyStatements[0].(LocalsStatement); ok {
 		for _, v := range localsStatement.Vars {
 			header += "var "
 			if _, ok := locals[v.Name]; ok {
-				return "", fmt.Errorf("Local variable %s on line %d is already defined as a parameter.",
-					v.Name, v.LineNumber)
+				return "", msg(v.LineNumber, v.Column, "Local variable "+v.Name+"is already defined as a parameter.")
 			}
 			locals[v.Name] = v
 			dt, err := getDataType(v.Type, pkg)
@@ -1186,7 +1184,7 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, pkg *Pack
 		return "", err
 	}
 	if len(returnedTypes) != 1 || !isType(returnedTypes[0], BuiltinType{"Bool", nil}, true) {
-		return "", fmt.Errorf("if condition does not return one value or returns non-bool on line %d", s.LineNumber)
+		return "", msg(s.LineNumber, s.Column, "if condition does not return one value or returns non-bool.")
 	}
 	code := "if " + c
 	c, err = compileBody(s.Body, expectedReturnTypes, pkg, locals)
@@ -1200,7 +1198,7 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, pkg *Pack
 			return "", err
 		}
 		if !isType(returnedTypes[0], BuiltinType{"Bool", nil}, true) {
-			return "", errors.New("Elif condition expression does not return a boolean on line " + strconv.Itoa(elif.LineNumber))
+			return "", msg(elif.LineNumber, elif.Column, "Elif condition expression does not return a boolean.")
 		}
 		code += " else if " + c + ".(bool) {\n"
 		c, err = compileBody(elif.Body, expectedReturnTypes, pkg, locals)
@@ -1226,11 +1224,11 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 		return "", err
 	}
 	if len(rts) != 1 {
-		return "", fmt.Errorf("typeswitch expression does not return one value on line %d", s.LineNumber)
+		return "", msg(s.LineNumber, s.Column, "typeswitch expression does not return one value.")
 	}
 	inter, ok := rts[0].(InterfaceDefinition)
 	if !ok {
-		return "", fmt.Errorf("typeswitch expression does not an interface value on line %d", s.LineNumber)
+		return "", msg(s.LineNumber, s.Column, "typeswitch expression does not an interface value.")
 	}
 	code := "{\n _inter := " + expr + "\n"
 	for i, c := range s.Cases {
@@ -1239,7 +1237,7 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 			return "", err
 		}
 		if !isType(caseType, inter, false) {
-			return "", fmt.Errorf("typeswitch case type is not an implementor of the interface. Line %d", s.LineNumber)
+			return "", msg(s.LineNumber, s.Column, "typeswitch case type is not an implementor of the interface.")
 		}
 		t, err := compileType(caseType, pkg)
 		if err != nil {
@@ -1278,10 +1276,10 @@ func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, pkg
 		return "", err
 	}
 	if len(returnedTypes) != 1 {
-		return "", errors.New("while condition expression must one value (a boolean) on line " + strconv.Itoa(s.LineNumber))
+		return "", msg(s.LineNumber, s.Column, "while condition expression must one value (a boolean).")
 	}
 	if !isType(returnedTypes[0], BuiltinType{"Bool", nil}, true) {
-		return "", errors.New("while condition expression does not return a boolean on line " + strconv.Itoa(s.LineNumber))
+		return "", msg(s.LineNumber, s.Column, "while condition expression does not return a boolean.")
 	}
 	code := "for " + c + " {\n"
 	c, err = compileBody(s.Body, expectedReturnTypes, pkg, locals)
@@ -1292,12 +1290,11 @@ func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, pkg
 }
 
 func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
-	lineStr := strconv.Itoa(s.LineNumber)
 	if _, ok := locals[s.IndexName]; ok {
-		return "", errors.New("foreach index name conflicts with an existing local variable on line " + lineStr)
+		return "", msg(s.LineNumber, s.Column, "foreach index name conflicts with an existing local variable.")
 	}
 	if _, ok := locals[s.ValName]; ok {
-		return "", errors.New("foreach val name conflicts with an existing local variable on line " + lineStr)
+		return "", msg(s.LineNumber, s.Column, "foreach val name conflicts with an existing local variable.")
 	}
 	newLocals := map[string]Variable{}
 	for k, v := range locals {
@@ -1310,7 +1307,7 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 		return "", err
 	}
 	if len(returnedTypes) != 1 {
-		return "", errors.New("foreach collection expression improperly returns more than one value on line " + lineStr)
+		return "", msg(s.LineNumber, s.Column, "foreach collection expression improperly returns more than one value.")
 	}
 	indexType, err := getDataType(s.IndexType, pkg)
 	if err != nil {
@@ -1324,33 +1321,33 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 	switch t := returnedTypes[0].(type) {
 	case BuiltinType:
 		if t.Name != "L" && t.Name != "M" && t.Name != "S" {
-			return "", errors.New("foreach collection type must be a list or map on line " + lineStr)
+			return "", msg(s.LineNumber, s.Column, "foreach collection type must be a list or map.")
 		}
 		if t.Name == "L" {
 			if !isNumber(indexType) {
-				return "", errors.New("Expected foreach index variable to be a number on line " + lineStr)
+				return "", msg(s.LineNumber, s.Column, "Expected foreach index variable to be a number.")
 			}
 			if !isType(t.Params[0], valType, false) {
-				return "", errors.New("Improper foreach val type for list on line " + lineStr)
+				return "", msg(s.LineNumber, s.Column, "Improper foreach val type for list.")
 			}
 			code += "*"
 		} else if t.Name == "M" {
 			if !isType(t.Params[0], indexType, false) {
-				return "", errors.New("Improper foreach index type for map on line " + lineStr)
+				return "", msg(s.LineNumber, s.Column, "Improper foreach index type for map.")
 			}
 			if !isType(t.Params[1], valType, false) {
-				return "", errors.New("Improper foreach val type for map on line " + lineStr)
+				return "", msg(s.LineNumber, s.Column, "Improper foreach val type for map.")
 			}
 		}
 	case ArrayType:
 		if !isNumber(indexType) {
-			return "", errors.New("Expected foreach index variable to be a number on line " + lineStr)
+			return "", msg(s.LineNumber, s.Column, "Expected foreach index variable to be a number.")
 		}
 		if !isType(t.Type, valType, false) {
-			return "", errors.New("Improper foreach val type for array on line " + lineStr)
+			return "", msg(s.LineNumber, s.Column, "Improper foreach val type for array.")
 		}
 	default:
-		return "", errors.New("foreach collection type must be a list, map, slice, or array. Line " + lineStr)
+		return "", msg(s.LineNumber, s.Column, "foreach collection type must be a list, map, slice, or array.")
 	}
 	code += collExpr + " { \n"
 	code += s.IndexName + " := _i \n"
@@ -1399,8 +1396,8 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 		case Operation:
 			if s.Operator != "set" && s.Operator != "print" && s.Operator != "println" &&
 				s.Operator != "prompt" && s.Operator != "push" {
-				return "", errors.New("Improper operation as statement. Only set, push, print, println, " +
-					"and prompt can be standalone statements. Line " + lineStr)
+				return "", msg(s.LineNumber, s.Column, "Improper operation as statement. Only set, push, print, println, "+
+					"and prompt can be standalone statements.")
 			}
 			c, _, err = compileOperation(s, pkg, locals)
 			c += "\n"
@@ -1423,21 +1420,21 @@ func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, p
 				return "", err
 			}
 			if len(channelTypes) != 1 {
-				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+				return "", msg(clause.LineNumber, clause.Column, "Select send clause expecting channel expression.")
 			}
 			ok, param := isChannel(channelTypes[0])
 			if !ok {
-				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+				return "", msg(clause.LineNumber, clause.Column, "Select send clause expecting channel expression.")
 			}
 			val, valTypes, err := compileExpression(clause.Value, pkg, locals)
 			if err != nil {
 				return "", err
 			}
 			if len(valTypes) != 1 {
-				return "", errors.New("Select send clause expecting expression returning one value. Line " + strconv.Itoa(clause.LineNumber))
+				return "", msg(clause.LineNumber, clause.Column, "Select send clause expecting expression returning one value.")
 			}
 			if !isType(valTypes[0], param, false) {
-				return "", errors.New("Select send clause expecting expression with type matching its channel. Line " + strconv.Itoa(clause.LineNumber))
+				return "", msg(clause.LineNumber, clause.Column, "Select send clause expecting expression with type matching its channel.")
 			}
 			code += "case " + ch + " <- " + val + ":\n"
 			c, err := compileBody(clause.Body, expectedReturnTypes, pkg, locals)
@@ -1451,11 +1448,11 @@ func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, p
 				return "", err
 			}
 			if len(channelTypes) != 1 {
-				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+				return "", msg(clause.LineNumber, clause.Column, "Select send clause expecting channel expression.")
 			}
 			ok, param := isChannel(channelTypes[0])
 			if !ok {
-				return "", errors.New("Select send clause expecting channel expression. Line " + strconv.Itoa(clause.LineNumber))
+				return "", msg(clause.LineNumber, clause.Column, "Select send clause expecting channel expression.")
 			}
 			dt, err := getDataType(clause.Target.Type, pkg)
 			if err != nil {
@@ -1463,7 +1460,7 @@ func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, p
 			}
 			// because we must use := syntax, must be exact match
 			if !isType(param, dt, true) {
-				return "", errors.New("Select rcv clause has improper type target variable. Line " + strconv.Itoa(clause.LineNumber))
+				return "", msg(clause.LineNumber, clause.Column, "Select rcv clause has improper type target variable.")
 			}
 			code += "case " + clause.Target.Name + " := <- " + ch + ":\n"
 			newLocals := map[string]Variable{}
@@ -1491,31 +1488,30 @@ func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, p
 }
 
 func compileAssignmentStatement(s AssignmentStatement, pkg *Package, locals map[string]Variable) (string, error) {
-	lineStr := strconv.Itoa(s.LineNumber)
 	valCode, valueTypes, err := compileExpression(s.Value, pkg, locals)
 	if err != nil {
 		return "", err
 	}
 	if len(valueTypes) != len(s.Targets) {
-		return "", errors.New("Wrong number of targets in assignment on line " + lineStr)
+		return "", msg(s.LineNumber, s.Column, "Wrong number of targets in assignment.")
 	}
 	code := ""
 	for i, target := range s.Targets {
 		switch t := target.(type) {
 		case Token:
 			if t.Type != IdentifierWord {
-				return "", errors.New("Assignment to non-identifier on line " + lineStr)
+				return "", msg(s.LineNumber, s.Column, "Assignment to non-identifier.")
 			}
 		case Operation:
 			if t.Operator != "dr" && t.Operator != "get" && t.Operator != "ref" {
-				return "", errors.New("Improper target of assignment on line " + lineStr)
+				return "", msg(s.LineNumber, s.Column, "Improper target of assignment.")
 			}
 			if t.Operator == "get" {
 				t.Operator = "asget"
 				target = t
 			}
 		default:
-			return "", errors.New("Improper target of assignment on line " + lineStr)
+			return "", msg(s.LineNumber, s.Column, "Improper target of assignment.")
 		}
 		expr, rts, err := compileExpression(target, pkg, locals)
 		if err != nil {
@@ -1526,7 +1522,7 @@ func compileAssignmentStatement(s AssignmentStatement, pkg *Package, locals map[
 			return "", errors.New("Improper target of assignment on line")
 		}
 		if !isType(valueTypes[i], rts[0], false) {
-			return "", errors.New("Value in assignment does not match expected type on line " + lineStr)
+			return "", msg(s.LineNumber, s.Column, "Value in assignment does not match expected type.")
 		}
 		code += expr
 		if i < len(s.Targets)-1 {
@@ -1537,9 +1533,8 @@ func compileAssignmentStatement(s AssignmentStatement, pkg *Package, locals map[
 }
 
 func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
-	lineStr := strconv.Itoa(s.LineNumber)
 	if len(s.Values) != len(expectedReturnTypes) {
-		return "", errors.New("Return statement has wrong number of values on line " + lineStr)
+		return "", msg(s.LineNumber, s.Column, "Return statement has wrong number of values.")
 	}
 	code := "return "
 	for i, v := range s.Values {
@@ -1548,10 +1543,10 @@ func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, p
 			return "", err
 		}
 		if len(returnedTypes) != 1 {
-			return "", errors.New("Expression in return statement returns more than one value on line " + lineStr)
+			return "", msg(s.LineNumber, s.Column, "Expression in return statement returns more than one value.")
 		}
 		if !isType(returnedTypes[0], expectedReturnTypes[i], false) {
-			return "", errors.New("Wrong type in return statement on line " + lineStr)
+			return "", msg(s.LineNumber, s.Column, "Wrong type in return statement.")
 		}
 		code += c
 		if i < len(s.Values)-1 {
@@ -1562,16 +1557,15 @@ func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, p
 }
 
 func compileMethodCall(s MethodCall, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
-	lineStr := strconv.Itoa(s.LineNumber)
 	if len(s.Arguments) < 1 {
-		return "", nil, errors.New("Method call has not receiver on line " + lineStr)
+		return "", nil, msg(s.LineNumber, s.Column, "Method call has no receiver.")
 	}
 	receiver, receiverTypes, err := compileExpression(s.Receiver, pkg, locals)
 	if err != nil {
 		return "", nil, err
 	}
 	if len(receiverTypes) != 1 {
-		return "", nil, errors.New("Method call receiver expression does not return one value on line " + lineStr)
+		return "", nil, msg(s.LineNumber, s.Column, "Method call receiver expression does not return one value.")
 	}
 	var ft FunctionType
 Outer:
@@ -1580,7 +1574,7 @@ Outer:
 		var ok bool
 		ft, ok = receiverType.Methods[s.MethodName]
 		if !ok {
-			return "", nil, errors.New("Method call struct receiver does not have such a method on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "Method call struct receiver does not have such a method.")
 		}
 	case InterfaceDefinition:
 		for _, sig := range receiverType.Methods {
@@ -1593,9 +1587,9 @@ Outer:
 				break Outer
 			}
 		}
-		return "", nil, errors.New("Method call receiver does not have a method of that name on " + lineStr)
+		return "", nil, msg(s.LineNumber, s.Column, "Method call receiver does not have a method of that name.")
 	default:
-		return "", nil, errors.New("Method call receiver must be a struct or interface value on line " + lineStr)
+		return "", nil, msg(s.LineNumber, s.Column, "Method call receiver must be a struct or interface value.")
 	}
 
 	code := receiver + "." + s.MethodName + "("
@@ -1605,10 +1599,10 @@ Outer:
 			return "", nil, err
 		}
 		if len(returnedTypes) != 1 {
-			return "", nil, errors.New("Method call argument does not return one value on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "Method call argument does not return one value.")
 		}
 		if !isType(returnedTypes[0], ft.Params[i], false) {
-			return "", nil, errors.New("Method call argument is wrong type on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "Method call argument is wrong type.")
 		}
 		code += c + ", " // Go is OK with comma after last arg, so don't need special case for last arg
 	}
@@ -1616,7 +1610,6 @@ Outer:
 }
 
 func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
-	lineStr := strconv.Itoa(s.LineNumber)
 	code := ""
 	var ft FunctionType
 	var ok bool
@@ -1627,11 +1620,11 @@ func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]Variabl
 			return "", nil, err
 		}
 		if len(returnedTypes) != 1 {
-			return "", nil, errors.New("operation at start of parens must return a function to call on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "operation at start of parens must return a function to call.")
 		}
 		ft, ok = returnedTypes[0].(FunctionType)
 		if !ok {
-			return "", nil, errors.New("operation at start of parens returned something other than a function on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "operation at start of parens returned something other than a function.")
 		}
 		code += c
 	case FunctionCall:
@@ -1640,11 +1633,11 @@ func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]Variabl
 			return "", nil, err
 		}
 		if len(returnedTypes) != 1 {
-			return "", nil, errors.New("function call at start of parens must return a function to call on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "function call at start of parens must return a function to call.")
 		}
 		ft, ok = returnedTypes[0].(FunctionType)
 		if !ok {
-			return "", nil, errors.New("function call at start of parens returned something other than a function on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "function call at start of parens returned something other than a function.")
 		}
 		code += c
 	case Token: // will always be an identifier
@@ -1657,13 +1650,13 @@ func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]Variabl
 			}
 			ft, ok = dt.(FunctionType)
 			if !ok {
-				return "", nil, errors.New("calling non-function on line " + lineStr)
+				return "", nil, msg(s.LineNumber, s.Column, "calling non-function.")
 			}
 			code += s.Content
 		} else {
 			fnDef, ok := pkg.Funcs[s.Content] // previous check means we don't have to check for zero val
 			if !ok {
-				return "", nil, errors.New("calling non-existent function on line " + lineStr)
+				return "", nil, msg(s.LineNumber, s.Column, "calling non-existent function.")
 			}
 			var err error
 			ft, err = getFunctionType(fnDef)
@@ -1684,10 +1677,10 @@ func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]Variabl
 			return "", nil, err
 		}
 		if len(returnedTypes) != 1 {
-			return "", nil, errors.New("argument expression in function call doesn't return one value on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "argument expression in function call doesn't return one value.")
 		}
 		if !isType(returnedTypes[0], ft.Params[i], false) {
-			return "", nil, errors.New("argument of wrong type in function call on line " + lineStr)
+			return "", nil, msg(s.LineNumber, s.Column, "argument of wrong type in function call.")
 		}
 		code += c + ", " // Go is OK with comma after last arg, so don't need special case for last arg
 	}
@@ -1707,7 +1700,6 @@ func (s Struct) getMemberType(name string) (DataType, error) {
 }
 
 func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
-	lineStr := strconv.Itoa(o.LineNumber)
 	operandCode := make([]string, len(o.Operands))
 	operandTypes := make([]DataType, len(o.Operands))
 	for i, expr := range o.Operands {
@@ -1732,7 +1724,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			return "", nil, err
 		}
 		if len(returnTypes) != 1 {
-			return "", nil, errors.New("operand expression returns more than one value on line " + strconv.Itoa(o.LineNumber))
+			return "", nil, msg(o.LineNumber, o.Column, "operand expression returns more than one value.")
 		}
 		operandCode[i] = c
 		operandTypes[i] = returnTypes[0]
@@ -1742,15 +1734,15 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 	switch o.Operator {
 	case "add":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("add operations requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "add operations requires at least two operands.")
 		}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("add operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "add operation has non-number operand")
 		}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], t, true) {
-				return "", nil, errors.New("add operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "add operation has non-number operand")
 			}
 			code += operandCode[i]
 			if i < len(o.Operands)-1 {
@@ -1760,15 +1752,15 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		returnType = t
 	case "sub":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("sub operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "sub operation requires at least two operands")
 		}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("sub operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "sub operation has non-number operand")
 		}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], t, true) {
-				return "", nil, errors.New("sub operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "sub operation has non-number operand")
 			}
 			code += operandCode[i]
 			if i < len(o.Operands)-1 {
@@ -1778,15 +1770,15 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		returnType = t
 	case "mul":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("mul operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "mul operation requires at least two operands")
 		}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("mul operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "mul operation has non-number operand")
 		}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], t, true) {
-				return "", nil, errors.New("mul operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "mul operation has non-number operand")
 			}
 			code += operandCode[i]
 			if i < len(o.Operands)-1 {
@@ -1796,15 +1788,15 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		returnType = t
 	case "div":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("div operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "div operation requires at least two operands")
 		}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("div operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "div operation has non-number operand")
 		}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], t, true) {
-				return "", nil, errors.New("div operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "div operation has non-number operand")
 			}
 			code += operandCode[i]
 			if i < len(o.Operands)-1 {
@@ -1814,15 +1806,15 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		returnType = t
 	case "mod":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("mod operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "mod operation requires two operands")
 		}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("mod operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "mod operation has non-number operand")
 		}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], t, true) {
-				return "", nil, errors.New("mod operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "mod operation has non-number operand")
 			}
 			code += "int64(" + operandCode[i] + ")"
 			if i < len(o.Operands)-1 {
@@ -1832,13 +1824,13 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		returnType = t
 	case "eq":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("eq operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "eq operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		for i := 0; i < len(o.Operands)-1; i++ {
 			if !isType(operandTypes[i], operandTypes[0], true) ||
 				!isType(operandTypes[i+1], operandTypes[0], true) {
-				return "", nil, errors.New("eq operation has mismatched operand types")
+				return "", nil, msg(o.LineNumber, o.Column, "eq operation has mismatched operand types")
 			}
 			if i > 0 {
 				code += " && "
@@ -1847,13 +1839,13 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "neq":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("neq operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "neq operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		for i := 0; i < len(o.Operands)-1; i++ {
 			if !isType(operandTypes[i], operandTypes[0], true) ||
 				!isType(operandTypes[i+1], operandTypes[0], true) {
-				return "", nil, errors.New("neq operation has mismatched operand types")
+				return "", nil, msg(o.LineNumber, o.Column, "neq operation has mismatched operand types")
 			}
 			if i > 0 {
 				code += " && "
@@ -1862,26 +1854,26 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "not":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("not operation requires one operand")
+			return "", nil, msg(o.LineNumber, o.Column, "not operation requires one operand")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		if !isType(operandTypes[0], returnType, true) {
-			return "", nil, errors.New("not operation has a non-bool operand")
+			return "", nil, msg(o.LineNumber, o.Column, "not operation has a non-bool operand")
 		}
 		code += "!" + operandCode[0]
 	case "lt":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("lt operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "lt operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("lt operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "lt operation has non-number operand")
 		}
 		for i := 0; i < len(o.Operands)-1; i++ {
 			if !isType(operandTypes[i], t, true) ||
 				!isType(operandTypes[i+1], t, true) {
-				return "", nil, errors.New("lt operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "lt operation has non-number operand")
 			}
 			if i > 0 {
 				code += " && "
@@ -1890,17 +1882,17 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "gt":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("gt operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "gt operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("lt operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "lt operation has non-number operand")
 		}
 		for i := 0; i < len(o.Operands)-1; i++ {
 			if !isType(operandTypes[i], t, true) ||
 				!isType(operandTypes[i+1], t, true) {
-				return "", nil, errors.New("gt operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "gt operation has non-number operand")
 			}
 			if i > 0 {
 				code += " && "
@@ -1909,17 +1901,17 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "lte":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("lte operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "lte operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("lt operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "lt operation has non-number operand")
 		}
 		for i := 0; i < len(o.Operands)-1; i++ {
 			if !isType(operandTypes[i], t, true) ||
 				!isType(operandTypes[i+1], t, true) {
-				return "", nil, errors.New("lte operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "lte operation has non-number operand")
 			}
 			if i > 0 {
 				code += " && "
@@ -1929,17 +1921,17 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "gte":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("gte operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "gte operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		t := operandTypes[0]
 		if !isNumber(t) {
-			return "", nil, errors.New("lt operation has non-number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "lt operation has non-number operand")
 		}
 		for i := 0; i < len(o.Operands)-1; i++ {
 			if !isType(operandTypes[i], t, true) ||
 				!isType(operandTypes[i+1], t, true) {
-				return "", nil, errors.New("gte operation has non-number operand")
+				return "", nil, msg(o.LineNumber, o.Column, "gte operation has non-number operand")
 			}
 			if i > 0 {
 				code += " && "
@@ -1948,30 +1940,30 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "send":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("send operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "send operation requires two operands")
 		}
 		ok, param := isChannel(operandTypes[0])
 		if !ok {
-			return "", nil, errors.New("send operation's first operand must be a channel")
+			return "", nil, msg(o.LineNumber, o.Column, "send operation's first operand must be a channel")
 		}
 		if !isType(operandTypes[0], param, false) {
-			return "", nil, errors.New("send operation's second operand is wrong type for the channel")
+			return "", nil, msg(o.LineNumber, o.Column, "send operation's second operand is wrong type for the channel")
 		}
 		code += operandCode[0] + " <- " + operandCode[1]
 		returnType = nil
 	case "rcv":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("rcv operation requires one operand")
+			return "", nil, msg(o.LineNumber, o.Column, "rcv operation requires one operand")
 		}
 		ok, param := isChannel(operandTypes[0])
 		if !ok {
-			return "", nil, errors.New("rcv operation's first operand must be a channel")
+			return "", nil, msg(o.LineNumber, o.Column, "rcv operation's first operand must be a channel")
 		}
 		code += " <- " + operandCode[0]
 		returnType = param
 	case "get", "asget":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("get operation has too few operands")
+			return "", nil, msg(o.LineNumber, o.Column, "get operation has too few operands")
 		}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
@@ -1979,7 +1971,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			case "M":
 				returnType = t.Params[1]
 				if !isType(operandTypes[1], t.Params[0], true) {
-					return "", nil, errors.New("get operation on map has wrong type as second operand")
+					return "", nil, msg(o.LineNumber, o.Column, "get operation on map has wrong type as second operand")
 				}
 				code += operandCode[0] + "[" + operandCode[1] + "]"
 			case "L", "S":
@@ -1989,7 +1981,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 					return "", nil, err
 				}
 				if !isNumber(operandTypes[1]) {
-					return "", nil, errors.New("get operation on list or slice requires a number as second operand")
+					return "", nil, msg(o.LineNumber, o.Column, "get operation on list or slice requires a number as second operand")
 				}
 				if t.Name == "L" {
 					code += "(*"
@@ -2001,7 +1993,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 					code += ".(" + dt + ")"
 				}
 			default:
-				return "", nil, errors.New("get operation requires a list or map as first operand. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "get operation requires a list or map as first operand.")
 			}
 		case ArrayType:
 			returnType = t.Type
@@ -2010,84 +2002,84 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			}
 			code += operandCode[0] + "[int64(" + operandCode[1] + ")]"
 		default:
-			return "", nil, errors.New("get operation requires a list or map as first operand. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "get operation requires a list or map as first operand.")
 		}
 	case "set":
 		if len(o.Operands) != 3 {
-			return "", nil, errors.New("set operation requires three operands")
+			return "", nil, msg(o.LineNumber, o.Column, "set operation requires three operands")
 		}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
 			switch t.Name {
 			case "M":
 				if !isType(operandTypes[1], t.Params[0], true) {
-					return "", nil, errors.New("set operation on map has wrong type as second operand")
+					return "", nil, msg(o.LineNumber, o.Column, "set operation on map has wrong type as second operand")
 				}
 				if !isType(operandTypes[2], t.Params[1], false) {
-					return "", nil, errors.New("set operation on map has wrong type as third operand")
+					return "", nil, msg(o.LineNumber, o.Column, "set operation on map has wrong type as third operand")
 				}
 				code += "func () {" + operandCode[0] + "[" + operandCode[1] + "] = " + operandCode[2] + "}()"
 			case "L":
 				if !isNumber(operandTypes[1]) {
-					return "", nil, errors.New("set operation requires a number as second operand")
+					return "", nil, msg(o.LineNumber, o.Column, "set operation requires a number as second operand")
 				}
 				if !isType(operandTypes[2], t.Params[0], false) {
-					return "", nil, errors.New("set operation on list has wrong type as third operand")
+					return "", nil, msg(o.LineNumber, o.Column, "set operation on list has wrong type as third operand")
 				}
 				code += "func () {(*" + operandCode[0] + ")[" + operandCode[1] + "] = " + operandCode[2] + "}()"
 			case "S":
 				if !isNumber(operandTypes[1]) {
-					return "", nil, errors.New("set operation requires a number as second operand")
+					return "", nil, msg(o.LineNumber, o.Column, "set operation requires a number as second operand")
 				}
 				if !isType(operandTypes[2], t.Params[0], false) {
-					return "", nil, errors.New("set operation on list has wrong type as third operand")
+					return "", nil, msg(o.LineNumber, o.Column, "set operation on list has wrong type as third operand")
 				}
 				code += "func () {" + operandCode[0] + "[" + operandCode[1] + "] = " + operandCode[2] + "}()"
 			}
 		case ArrayType:
 			if !isNumber(operandTypes[1]) {
-				return "", nil, errors.New("set operation requires a number as second operand")
+				return "", nil, msg(o.LineNumber, o.Column, "set operation requires a number as second operand")
 			}
 			if !isType(operandTypes[2], t.Type, false) {
-				return "", nil, errors.New("set operation on list has wrong type as third operand")
+				return "", nil, msg(o.LineNumber, o.Column, "set operation on list has wrong type as third operand")
 			}
 			code += "func () {" + operandCode[0] + "[" + operandCode[1] + "] = " + operandCode[2] + "}()"
 		default:
-			return "", nil, errors.New("set operation requires a list, map, slice, or array as first operand")
+			return "", nil, msg(o.LineNumber, o.Column, "set operation requires a list, map, slice, or array as first operand")
 		}
 		returnType = nil
 	case "push":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("push operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "push operation requires two operands")
 		}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
 			if t.Name != "L" {
-				return "", nil, errors.New("push operation's first operand must be a list. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "push operation's first operand must be a list.")
 			}
 			if !isType(operandTypes[1], t.Params[0], false) {
-				return "", nil, errors.New("push operation's second operand is not valid for the list. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "push operation's second operand is not valid for the list.")
 			}
 			code += operandCode[0] + ".append(" + operandCode[1] + ")"
 		default:
-			return "", nil, errors.New("push operation requires first operand to be a list. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "push operation requires first operand to be a list.")
 		}
 		returnType = nil
 	case "append":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("append operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "append operation requires two operands")
 		}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
 			if t.Name != "S" {
-				return "", nil, errors.New("append operation's first operand must be a slice. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "append operation's first operand must be a slice.")
 			}
 			if !isType(operandTypes[1], t.Params[0], false) {
-				return "", nil, errors.New("append operation's second operand is not valid for the slice. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "append operation's second operand is not valid for the slice.")
 			}
 			code += "append(" + operandCode[0] + ", " + operandCode[1] + ")"
 		default:
-			return "", nil, errors.New("append operation requires first operand to be a slice. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "append operation requires first operand to be a slice.")
 		}
 		returnType = operandTypes[0]
 	case "slice":
@@ -2095,28 +2087,28 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			return "", nil, errors.New("slice operation requires three operands")
 		}
 		if !isNumber(operandTypes[1]) || !isNumber(operandTypes[2]) {
-			return "", nil, errors.New("slice operation's second and third operands must be numbers. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "slice operation's second and third operands must be numbers.")
 		}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
 			if t.Name != "S" {
-				return "", nil, errors.New("append operation's first operand must be a slice. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "append operation's first operand must be a slice.")
 			}
 			returnType = operandTypes[0]
 		case ArrayType:
 			returnType = BuiltinType{"S", []DataType{t.Type}}
 		default:
-			return "", nil, errors.New("append operation requires first operand to be a slice. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "append operation requires first operand to be a slice.")
 		}
 		code += operandCode[0] + "[int64(" + operandCode[1] + "):int64(" + operandCode[2] + ")]"
 	case "or":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("or operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "or operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], returnType, true) {
-				return "", nil, errors.New("or operation has non-boolean operand")
+				return "", nil, msg(o.LineNumber, o.Column, "or operation has non-boolean operand")
 			}
 			code += operandCode[i]
 			if i < len(o.Operands)-1 {
@@ -2125,12 +2117,12 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "and":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("and operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "and operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Bool", nil}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], returnType, true) {
-				return "", nil, errors.New("and operation has non-boolean operand")
+				return "", nil, msg(o.LineNumber, o.Column, "and operation has non-boolean operand")
 			}
 			code += operandCode[i]
 			if i < len(o.Operands)-1 {
@@ -2139,7 +2131,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "ref":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("ref operation requires a single operand. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "ref operation requires a single operand.")
 		}
 		switch e := o.Operands[0].(type) {
 		case Token:
@@ -2161,84 +2153,84 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 					}
 					returnType = BuiltinType{"P", []DataType{rt}}
 				} else {
-					return "", nil, fmt.Errorf("Name %s on line %d is undefined.", name, e.LineNumber)
+					return "", nil, msg(e.LineNumber, e.Column, "Name is undefined.")
 				}
 			default:
-				return "", nil, errors.New("ref operation has improper operand. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "ref operation has improper operand.")
 			}
 		case Operation:
 			if e.Operator != "get" {
-				return "", nil, errors.New("ref operation has improper operand. Line " + lineStr)
+				return "", nil, msg(o.LineNumber, o.Column, "ref operation has improper operand.")
 			}
 			if len(o.Operands) != 2 {
-				return "", nil, errors.New("get operation requires two operands")
+				return "", nil, msg(o.LineNumber, o.Column, "get operation requires two operands")
 			}
 			t, ok := operandTypes[0].(BuiltinType)
 			if !ok || (t.Name != "L" && t.Name != "M") {
-				return "", nil, errors.New("get operation requires a list or map as first operand")
+				return "", nil, msg(o.LineNumber, o.Column, "get operation requires a list or map as first operand")
 			}
 			switch t.Name {
 			case "M":
 				returnType = t.Params[1]
 				if !isType(operandTypes[1], t.Params[0], true) {
-					return "", nil, errors.New("get operation on map has wrong type as second operand")
+					return "", nil, msg(o.LineNumber, o.Column, "get operation on map has wrong type as second operand")
 				}
 				code += "&" + operandCode[0] + "[" + operandCode[1] + "]"
 			case "L":
 				returnType = t.Params[0]
 				if !isNumber(operandTypes[1]) {
-					return "", nil, errors.New("get operation requires a number as second operand")
+					return "", nil, msg(o.LineNumber, o.Column, "get operation requires a number as second operand")
 				}
 				code += "&(*" + operandCode[0] + ")[int64(" + operandCode[1] + ")]"
 			}
 		default:
-			return "", nil, errors.New("ref operation requires a single operand. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "ref operation requires a single operand.")
 		}
 	case "dr":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("dr operation requires a single operand. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "dr operation requires a single operand.")
 		}
 		dt, ok := operandTypes[0].(BuiltinType)
 		if !ok && dt.Name != "P" {
-			return "", nil, errors.New("dr operation requires a pointer operand. Line " + lineStr)
+			return "", nil, msg(o.LineNumber, o.Column, "dr operation requires a pointer operand.")
 		}
 		returnType = dt.Params[0]
 		code += "*" + operandCode[0]
 	case "band":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("'band' operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "'band' operation requires two operands")
 		}
 		if !isNumber(operandTypes[0]) || !isNumber(operandTypes[1]) {
-			return "", nil, errors.New("'band' operation requires two number operands")
+			return "", nil, msg(o.LineNumber, o.Column, "'band' operation requires two number operands")
 		}
 		code += operandCode[0] + " & " + operandCode[1]
 	case "bor":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("'bor' operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "'bor' operation requires two operands")
 		}
 		if !isNumber(operandTypes[0]) || !isNumber(operandTypes[1]) {
-			return "", nil, errors.New("'bor' operation requires two number operands")
+			return "", nil, msg(o.LineNumber, o.Column, "'bor' operation requires two number operands")
 		}
 		code += operandCode[0] + " | " + operandCode[1]
 	case "bxor":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("'bxor' operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "'bxor' operation requires two operands")
 		}
 		if !isNumber(operandTypes[0]) || !isNumber(operandTypes[1]) {
-			return "", nil, errors.New("'bxor' operation requires two number operands")
+			return "", nil, msg(o.LineNumber, o.Column, "'bxor' operation requires two number operands")
 		}
 		code += operandCode[0] + " ^ " + operandCode[1]
 	case "bnot":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("'bnot' operation requires one operand")
+			return "", nil, msg(o.LineNumber, o.Column, "'bnot' operation requires one operand")
 		}
 		if !isNumber(operandTypes[0]) {
-			return "", nil, errors.New("'bnot' operation requires one number operand")
+			return "", nil, msg(o.LineNumber, o.Column, "'bnot' operation requires one number operand")
 		}
 		code += "^" + operandCode[1]
 	case "print":
 		if len(o.Operands) < 1 {
-			return "", nil, errors.New("'print' operation requires at least one operand")
+			return "", nil, msg(o.LineNumber, o.Column, "'print' operation requires at least one operand")
 		}
 		code += "_fmt.Print("
 		for i := range o.Operands {
@@ -2247,7 +2239,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		code += ")"
 	case "println":
 		if len(o.Operands) < 1 {
-			return "", nil, errors.New("'println' operation requires at least one operand")
+			return "", nil, msg(o.LineNumber, o.Column, "'println' operation requires at least one operand")
 		}
 		code += "_fmt.Println("
 		for i := range o.Operands {
@@ -2262,12 +2254,12 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		code += ")"
 	case "concat":
 		if len(o.Operands) < 2 {
-			return "", nil, errors.New("concat operation requires at least two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "concat operation requires at least two operands")
 		}
 		returnType = BuiltinType{"Str", nil}
 		for i := range o.Operands {
 			if !isType(operandTypes[i], returnType, true) {
-				return "", nil, errors.New("concat operation has non-string operand")
+				return "", nil, msg(o.LineNumber, o.Column, "concat operation has non-string operand")
 			}
 			code += operandCode[i]
 			if i < len(o.Operands)-1 {
@@ -2276,7 +2268,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 	case "len":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("len operation requires one operand")
+			return "", nil, msg(o.LineNumber, o.Column, "len operation requires one operand")
 		}
 		returnType = BuiltinType{"I", nil}
 		switch t := operandTypes[0].(type) {
@@ -2287,110 +2279,111 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			case "M", "S":
 				code += "len(" + operandCode[0] + ")"
 			default:
-				return "", nil, errors.New("len operand must be a list or map")
+				return "", nil, msg(o.LineNumber, o.Column, "len operand must be a list or map")
 			}
 		case ArrayType:
 			code += "len(" + operandCode[0] + ")"
 		default:
-			return "", nil, errors.New("len operation requires a list, map, array, or slice as operand")
+			return "", nil, msg(o.LineNumber, o.Column, "len operation requires a list, map, array, or slice as operand")
 		}
 	case "istype":
 		if len(o.Operands) != 2 {
-			return "", nil, errors.New("istype operation requires two operands")
+			return "", nil, msg(o.LineNumber, o.Column, "istype operation requires two operands")
 		}
 		parsedType, ok := o.Operands[0].(ParsedDataType)
 		if !ok {
-			return "", nil, errors.New("istype first operand must be a data type")
+			return "", nil, msg(o.LineNumber, o.Column, "istype first operand must be a data type")
 		}
 		dt, err := getDataType(parsedType, pkg)
 		if err != nil {
 			return "", nil, err
 		}
 		if !isType(dt, operandTypes[1], false) {
-			return "", nil, errors.New("istype first operand must be a type implementing interface type of the second operand")
+			return "", nil, msg(o.LineNumber, o.Column, "istype first operand must be a type implementing "+
+				"interface type of the second operand")
 		}
 		code += operandCode[1] + ".(" + operandCode[0] + "))"
 		return code, []DataType{dt, BuiltinType{"Bool", nil}}, nil
 	case "randInt":
 		if len(o.Operands) > 0 {
-			return "", nil, errors.New("randInt operation takes no operands")
+			return "", nil, msg(o.LineNumber, o.Column, "randInt operation takes no operands")
 		}
 		returnType = BuiltinType{"I", nil}
 		code += "_std.RandInt()"
 	case "randIntN":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("randIntN operation takes one integer operand")
+			return "", nil, msg(o.LineNumber, o.Column, "randIntN operation takes one integer operand")
 		}
 		returnType = BuiltinType{"I", nil}
 		if !isType(operandTypes[0], returnType, true) {
-			return "", nil, errors.New("randIntN operation has non-integer operand")
+			return "", nil, msg(o.LineNumber, o.Column, "randIntN operation has non-integer operand")
 		}
 		code += "_std.RandIntN(" + operandCode[0] + ")"
 	case "randFloat":
 		if len(o.Operands) > 0 {
-			return "", nil, errors.New("randFloat operation takes no operands")
+			return "", nil, msg(o.LineNumber, o.Column, "randFloat operation takes no operands")
 		}
 		returnType = BuiltinType{"F", nil}
 		code += "_std.RandFloat()"
 	case "parseInt":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("parseInt operation takes one string operand")
+			return "", nil, msg(o.LineNumber, o.Column, "parseInt operation takes one string operand")
 		}
 		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
-			return "", nil, errors.New("parseInt operation has non-string operand")
+			return "", nil, msg(o.LineNumber, o.Column, "parseInt operation has non-string operand")
 		}
 		code += "_std.ParseInt(" + operandCode[0] + ")"
 		return code, []DataType{BuiltinType{"I", nil}, BuiltinType{"Err", nil}}, nil
 	case "parseFloat":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("parseFloat operation takes one string operand")
+			return "", nil, msg(o.LineNumber, o.Column, "parseFloat operation takes one string operand")
 		}
 		returnType = BuiltinType{"F", nil}
 		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
-			return "", nil, errors.New("parseFloat operation has non-string operand")
+			return "", nil, msg(o.LineNumber, o.Column, "parseFloat operation has non-string operand")
 		}
 		code += "_std.ParseFloat(" + operandCode[0] + ")"
 		return code, []DataType{BuiltinType{"F", nil}, BuiltinType{"Err", nil}}, nil
 	case "formatInt":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("formatInt operation takes one integer operand")
+			return "", nil, msg(o.LineNumber, o.Column, "formatInt operation takes one integer operand")
 		}
 		returnType = BuiltinType{"Str", nil}
 		if !isType(operandTypes[0], BuiltinType{"I", nil}, true) {
-			return "", nil, errors.New("formatInt operation has non-integer operand")
+			return "", nil, msg(o.LineNumber, o.Column, "formatInt operation has non-integer operand")
 		}
 		code += "_std.FormatInt(" + operandCode[0] + ")"
 	case "formatFloat":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("formatFloat operation takes one float operand")
+			return "", nil, msg(o.LineNumber, o.Column, "formatFloat operation takes one float operand")
 		}
 		returnType = BuiltinType{"Str", nil}
 		if !isType(operandTypes[0], BuiltinType{"F", nil}, true) {
-			return "", nil, errors.New("formatFloat operation has non-float operand")
+			return "", nil, msg(o.LineNumber, o.Column, "formatFloat operation has non-float operand")
 		}
 		code += "_std.FormatFloat(" + operandCode[0] + ")"
 	case "parseTime":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("parseTime operation takes one string operand")
+			return "", nil, msg(o.LineNumber, o.Column, "parseTime operation takes one string operand")
 		}
 		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
-			return "", nil, errors.New("parseTime operation has non-string operand")
+			return "", nil, msg(o.LineNumber, o.Column, "parseTime operation has non-string operand")
 		}
 		code += "_std.ParseTime(" + operandCode[0] + ")"
 		return code, []DataType{BuiltinType{"I", nil}, BuiltinType{"Err", nil}}, nil
 	case "timeNow":
 		if len(o.Operands) != 0 {
-			return "", nil, errors.New("TimeNow operation takes no operands")
+			return "", nil, msg(o.LineNumber, o.Column, "TimeNow operation takes no operands")
 		}
 		returnType = BuiltinType{"I", nil}
 		code += "_std.TimeNow()"
 	case "formatTime":
 		if len(o.Operands) != 1 {
-			return "", nil, errors.New("formatTime operation takes one integer operand")
+			return "", nil, msg(o.LineNumber, o.Column, "formatTime operation takes one integer operand")
 		}
 		returnType = BuiltinType{"Str", nil}
 		if !isType(operandTypes[0], BuiltinType{"I", nil}, true) {
-			return "", nil, errors.New("formatTime operation has non-integer operand")
+			return "", nil, msg(o.LineNumber, o.Column, "formatTime operation has non-integer operand")
 		}
 		code += "_std.FormatTime(" + operandCode[0] + ")"
 	}

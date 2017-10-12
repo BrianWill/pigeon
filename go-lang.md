@@ -123,9 +123,19 @@ func main() {
 }
 ```
 
-## if and while syntax
+## increment and decrement statements
 
-The bodies of `if`'s, `while`'s, and other such constructs are surrounded in curly braces:
+Because adding `1` or subtracting `1` from an integer variable is so common, Go allows shorthand statements with `++` (increment) and `--` (decrement):
+
+```
+i := 4
+i++       // i = i + 1
+i--       // i = i - 1
+```
+
+## `if` and loop syntax
+
+The bodies of `if`'s, `for`'s (Go's equivalent of `while`), and other such constructs are surrounded in curly braces:
 
 ```
 if x < 3 {
@@ -134,12 +144,62 @@ if x < 3 {
     // body
 }
 
-while i > 0 {
+for i > 0 {
     // body
 }
 ```
 
 Also note that we write `else if` instaed of `elif`.
+
+As a convenience, `for` loops can be written in this form:
+
+```
+for precondition; condition; postcondition {
+    body
+}
+```
+
+The pre-condition is a declaration and assignment using the `:=` syntax. It is executed once, at the start of the loop before the condition is first tested.
+
+The post-condition is an assignment or increment/decrement operation. It is executed every time after the body is executed but before the condition is tested again. (If the condition is false the first time, the post-condition is skipped over entirely like the rest of the body.)
+
+This variant of for is handy for looping through a range of integers:
+
+```
+// this loop calls 'foo' with the values: 0 1 2 3 4
+for i := 0; i < 5; i++ {
+    foo(i)
+}
+```
+
+With a normal for, the same thing would be written:
+
+```
+i := 0
+for i < 5 {
+    foo(i)
+    i++   
+}
+foo(i)        // calls 'foo' with argument 5
+```
+
+The above code is exactly the same except for one subtle difference: when the variable is declared in the pre-condition, it belongs to the scope of the for body:
+
+```
+for i := 0; i < 5; i++ {
+    foo(i)
+}
+foo(i)        // compile error: 'i' does not exist in this scope
+```
+
+The equivalent of Pigeon's `foreach` is written with `:= range`:
+
+```
+foo := []int{8, 4, 7}
+for i, v := range foo {
+    // ... i is the index, v is the value
+}
+```
 
 ## variable declarations
 
@@ -498,12 +558,110 @@ type cat struct {
 As a convenience, the dot operator used on a pointer to a struct implicitly dereferences the struct:
 
 ```
-
-
-
+c := &cat{"Mittens", 10, 12.0}     // c is a pointer to a cat
+s := c.name                        // (*c).name
 ```
 
-Embedding
+When declaring a struct type, if we omit the name of a struct field, the field is *embedded*, and the field’s name is implicitly the same as its type:
+
+```
+type Foo struct {
+    A int
+    B string
+    C float32
+}
+
+type Bar struct {
+    A float32
+    Foo                      // embed 'Foo' inside 'Bar'
+    X string
+}
+
+func main() {
+    var b Bar = Bar{}
+    var f Foo = b.Foo        // assign 'Foo' field to variable 'f'
+    b.Foo.A = 3              // assign to field 'A' of the 'Foo' field
+}
+```
+
+As a convenience, the fields of an embedded struct can be accessed as if they are directly part of the embedding struct (even though they really aren’t!). However, if the embedding struct has a field of the same name, the embedded struct’s field can only be accessed via the embedded struct:
+
+```
+func main() {
+    var b Bar = Bar{}
+    b.C = "hi"               // b.Foo.C = "hi"
+    b.A = 35.2               // assign to the float32 field of 'Bar'
+    b.Foo.A = 12             // assign to the int field of 'Foo'
+}
+```
+
+If an embedded type has methods, we can call them as if they are directly methods of the embedding struct, but the embedded struct is passed as the receiver:
+
+```
+func (f Foo) roger() int {
+    return f.A
+}
+
+func main() {
+    var b Bar = Bar{}
+    b.Foo.A = 9
+    x := b.roger()           // 9  (b.Foo passed as receiver)
+    y := b.Foo.roger()       // 9
+}
+```
+
+Methods of embedded structs count towards the embedding struct implementing interfaces:
+
+```
+type Alice interface {
+    bob()
+    carol()
+}
+
+type Foo struct {
+    // ...
+}
+
+type Bar struct {
+    // ...
+    Foo                      // embed 'Foo' inside 'Bar'
+}
+
+func (f Foo) bob() {
+    // ...
+}
+
+func (b Bar) carol() {
+    // ...
+}
+
+func main() {
+    var a Alice = Bar{}      // ok: 'Bar' implements 'Alice'
+}
+```
+
+A struct can embed pointers to structs:
+
+```
+type Foo struct {
+    A int
+    B string
+    C float32
+}
+
+type Bar struct {
+    A float32
+    *Foo                     // embed pointer to 'Foo' inside 'Bar'
+    X string
+}
+
+func main() {
+    var b Bar = Bar{}
+    b.Foo = &Foo{}           // the 'Foo' pointer needs an actual Foo to point to
+    b.Foo.A = 3              // (*b.Foo).A = 3
+    var f *Foo = b.Foo       // assign 'Foo' field to variable 'f'
+}
+```
 
 ## interfaces
 
@@ -515,7 +673,24 @@ type sleeper interface {
     sleep(float64)
 ```
 
-interface embedding
+## the empty interface
+
+The special empty interface type, written interface{}, is an interface with no methods, and so every type is considered to implement it, even unnamed types. Effectively, any value of any type can be cast to an empty interface value:
+
+```
+var x interface{}          // an empty interface variable
+x = 5                      // ok
+x = "hi"                   // ok
+x = jack(8)                // ok
+```
+
+To get the value referenced in an empty interface value, we must use type assertions (just as we must with any other interface values).
+
+## reflection
+
+With type assertions, we can test if an interface value references a value of a specific type, but what if we want to know if the type is something more general, like an array, or a slice, or a number type? The special package “reflect” gives us the means to query the types of values referenced in interface values at run time, *a.k.a.* to do reflection. With reflection, we can write functions that take in interface values but then branch to handle different types of input differently. The fmt.Println function, for example, is a variadic function taking a slice of empty interface values, and it uses reflection to discover the types of these inputs and then create an appropriate text representation for any kind of input.
+
+Reflection is not a commonly used feature, so we won’t cover it here, but it’s worth mentioning because some parts of the standard library rely upon it.
 
 ## method values
 
@@ -736,7 +911,7 @@ var receive <-chan int = bi                // cast is implicit
 
 So why use unidirectional references? Very commonly, we intend for a particular goroutine to only send to a particular channel or only receive from that channel. Unidirectional references help us enforce that intention. When we spawn a new goroutine, we can pass it only a unidirectional reference, thereby ensuring the goroutine will only read or write the channel, not do both.
 
-##closing channels
+## closing channels
 
 The built-in function `close` closes a channel. We can still receive from a closed channel, but sending to a closed channel triggers a panic. Once a closed channel has no more values to receive, any subsequent receive operations will return the zero value of the type without ever blocking:
 

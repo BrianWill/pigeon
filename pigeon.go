@@ -318,14 +318,6 @@ func open(url string) error {
 	return exec.Command(cmd, args...).Start()
 }
 
-// func CompileAndRun(filename string) (*exec.Cmd, error) {
-// 	filename, _, err := Compile(filename)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return Run(filename)
-// }
-
 func Run(filename string) (*exec.Cmd, error) {
 	cmd := exec.Command("go", "run", filename)
 	cmd.Stdin = os.Stdin
