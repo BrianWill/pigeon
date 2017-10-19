@@ -121,6 +121,12 @@ var operators = []string{
 	"formatFloat",
 	"timeNow",
 	"formatTime",
+	"getchar",
+	"getrune",
+	"charlist",
+	"runelist",
+	"charlist",
+	"charslice",
 }
 
 var builtinTypes = []string{

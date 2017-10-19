@@ -458,7 +458,7 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 				return "", nil, err
 			}
 			if len(returnedTypes) != 1 {
-				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" must have one (and just one) operand.")
+				return "", nil, msg(line, column, "Invalid type expression: Operand expression must return one (and just one) value.")
 			}
 			if !isNumber(returnedTypes[0]) {
 				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" must have number operand.")
@@ -470,6 +470,31 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 			}
 			code := numberTypes[t.Name] + "(" + expr + ")"
 			return code, []DataType{t}, nil
+		case "Str":
+			if len(t.Params) != 0 {
+				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" cannot have type parameters.")
+			}
+			if len(te.Operands) != 1 {
+				return "", nil, msg(line, column, "Invalid type expression: "+t.Name+" must have one (and just one) operand.")
+			}
+			expr, returnedTypes, err := compileExpression(te.Operands[0], pkg, locals)
+			if err != nil {
+				return "", nil, err
+			}
+			if len(returnedTypes) != 1 {
+				return "", nil, msg(line, column, "Invalid type expression: Operand expression must return one (and just one) value.")
+			}
+			if isType(returnedTypes[0], BuiltinType{"L", []DataType{BuiltinType{"I", nil}}}, true) {
+				return "_std.Runelist2string(" + expr + ")", []DataType{t}, nil
+			} else if isType(returnedTypes[0], BuiltinType{"L", []DataType{BuiltinType{"Str", nil}}}, true) {
+				return "_std.Charlist2string(" + expr + ")", []DataType{t}, nil
+			} else if isType(returnedTypes[0], BuiltinType{"S", []DataType{BuiltinType{"I", nil}}}, true) {
+				return "_std.Runeslice2string(" + expr + ")", []DataType{t}, nil
+			} else if isType(returnedTypes[0], BuiltinType{"S", []DataType{BuiltinType{"Str", nil}}}, true) {
+				return "_std.Charslice2string(" + expr + ")", []DataType{t}, nil
+			} else {
+				return "", nil, msg(line, column, "Invalid type expression: Str operand must be a list or slice of strings or runes")
+			}
 		case "M":
 			if len(t.Params) != 2 {
 				return "", nil, msg(line, column, "Invalid type expression. Map must have two type parameters.")
@@ -2026,7 +2051,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 				if !isType(operandTypes[2], t.Params[0], false) {
 					return "", nil, msg(o.LineNumber, o.Column, "set operation on list has wrong type as third operand")
 				}
-				code += "func () {(*" + operandCode[0] + ")[" + operandCode[1] + "] = " + operandCode[2] + "}()"
+				code += operandCode[0] + ".Set(int64(" + operandCode[1] + "), " + operandCode[2] + ")"
 			case "S":
 				if !isNumber(operandTypes[1]) {
 					return "", nil, msg(o.LineNumber, o.Column, "set operation requires a number as second operand")
@@ -2060,7 +2085,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 			if !isType(operandTypes[1], t.Params[0], false) {
 				return "", nil, msg(o.LineNumber, o.Column, "push operation's second operand is not valid for the list.")
 			}
-			code += operandCode[0] + ".append(" + operandCode[1] + ")"
+			code += operandCode[0] + ".Append(" + operandCode[1] + ")"
 		default:
 			return "", nil, msg(o.LineNumber, o.Column, "push operation requires first operand to be a list.")
 		}
@@ -2266,6 +2291,66 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 				code += " + "
 			}
 		}
+	case "getchar":
+		if len(o.Operands) != 2 {
+			return "", nil, msg(o.LineNumber, o.Column, "getchar operation requires two operands")
+		}
+		returnType = BuiltinType{"Str", nil}
+		if !isType(operandTypes[0], returnType, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "getchar's first operand must be a string")
+		}
+		if !isInteger(operandTypes[1]) {
+			return "", nil, msg(o.LineNumber, o.Column, "getchar's second operand must be an integer or byte")
+		}
+		code += "string(" + operandCode[0] + "[" + operandCode[1] + "])"
+	case "getrune":
+		if len(o.Operands) != 2 {
+			return "", nil, msg(o.LineNumber, o.Column, "getchar operation requires two operands")
+		}
+		returnType = BuiltinType{"I", nil}
+		if !isType(operandTypes[0], returnType, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "getchar's first operand must be a string")
+		}
+		if !isInteger(operandTypes[1]) {
+			return "", nil, msg(o.LineNumber, o.Column, "getchar's second operand must be an integer or byte")
+		}
+		code += operandCode[0] + "[" + operandCode[1] + "]"
+	case "charlist":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "charlist operation requires one operand")
+		}
+		returnType = BuiltinType{"L", []DataType{BuiltinType{"Str", nil}}}
+		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "charlist operand must be a string")
+		}
+		code += "_std.Charlist(" + operandCode[0] + ")"
+	case "runelist":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "runelist operation requires one operand")
+		}
+		returnType = BuiltinType{"L", []DataType{BuiltinType{"I", nil}}}
+		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "runelist operand must be a string")
+		}
+		code += "_std.Runelist(" + operandCode[0] + ")"
+	case "charslice":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "charslice operation requires one operand")
+		}
+		returnType = BuiltinType{"S", []DataType{BuiltinType{"Str", nil}}}
+		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "charslice operand must be a string")
+		}
+		code += "_std.Charslice(" + operandCode[0] + ")"
+	case "runeslice":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "runeslice operation requires one operand")
+		}
+		returnType = BuiltinType{"S", []DataType{BuiltinType{"I", nil}}}
+		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "runeslice operand must be a string")
+		}
+		code += "_std.Runeslice(" + operandCode[0] + ")"
 	case "len":
 		if len(o.Operands) != 1 {
 			return "", nil, msg(o.LineNumber, o.Column, "len operation requires one operand")

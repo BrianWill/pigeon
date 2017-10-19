@@ -1,0 +1,21 @@
+// (charAt 0 "foo")     // "f"
+// (runeAt 0 "foo")     // returns Integer codepoint of Unicode "f"
+// (allrunes "foo")     // return slice of integers, where each integer is a character of the string
+// (allchars "foo")     //
+// (Str )               // create string from list, array, or slice of strings, or from list, array, or slice of Bytes or Integers
+
+// func prefix s Str pre Str : Bool
+
+
+func foo a L<I>
+    (push a 400)
+
+func main
+    locals a L<I> b L<I>
+    (push a 5)
+    as b a
+    (push b -99)
+    (set b 0 -7)
+    (foo a)
+    (println a b)
+    (println "fun with strings")

@@ -237,12 +237,13 @@ func lex(text string) ([]Token, error) {
 	tokens = append(filteredTokens, tokens[len(tokens)-1])
 	// remove all spaces followed by newlines
 	filteredTokens = []Token{}
-	for i := 0; i < len(tokens)-1; i++ {
+	for i := 0; i < len(tokens); i++ {
 		if tokens[i].Type == Space && tokens[i+1].Type == Newline {
 			continue
 		}
 		filteredTokens = append(filteredTokens, tokens[i])
 	}
+	tokens = filteredTokens
 	// remove all sequences of [newline -> indentation -> comma], replace with space
 	if tokens[0].Type == Comma || tokens[1].Type == Comma {
 		return nil, msg(line, column, "Unexpected comma at start of file.")
@@ -265,6 +266,9 @@ func lex(text string) ([]Token, error) {
 		}
 		filteredTokens = append(filteredTokens, tokens[i])
 		i++
+	}
+	if len(tokens) > 2 {
+		filteredTokens = append(filteredTokens, tokens[len(tokens)-2:]...)
 	}
 	return filteredTokens, nil
 }
