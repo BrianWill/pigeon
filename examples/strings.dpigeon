@@ -1,0 +1,91 @@
+
+// (Str )               // create string from list, array, or slice of strings, or from list, array, or slice of Bytes or Integers
+
+// func prefix s Str pre Str : Bool
+
+
+//getchar
+//getrune
+//charlist
+//runelist
+
+// s = string, start and end = integers, return string
+func substr s start end
+    locals s2
+    forinc i start end
+        if (gte i (len s))
+            break
+        as s2 (concat s2 (getchar s i))
+    return s2
+
+// strings = list of strings, separator = string, returns string
+func join strings separator
+    locals s
+    foreach i v strings
+        as s (concat s v)
+    return s
+
+// s = string, cutset = list of strings, returns string
+func trim s cutset
+    locals start end startFound
+    foreach i ch (charlist s)
+        if (containsAny ch cutset)
+            if startFound
+                break
+            as start (inc start)
+            as end (inc end)
+        else
+            as end (inc end)
+            as startFound true
+    return (substr s start end)
+
+// s = string, ss (substring) = string, returns boolean
+func contains s ss
+    locals match       // boolean
+    forinc i 0 (inc (sub (len s) (len ss)))
+        as match true
+        forinc j I 0 (len ss)
+            if (neq (getchar s j) (getchar ss j))
+                as match false
+                break
+        if match
+            return true
+    return false
+
+// s = string, ss (substring) = string, returns integer
+func index s ss
+    locals match      // boolean
+    forinc i I 0 (inc (sub (len s) (len ss)))
+        as match true
+        forinc j I 0 (len ss)
+            if (neq (getchar s j) (getchar ss j))
+                as match false
+                break
+        if match
+            return i
+    return -1
+
+// s = string, chars = list of strings, returns boolean
+func containsAny s chars
+    forinc i 0 (inc (sub (len s) (len chars)))
+        forinc j 0 (len chars)
+            if (eq (getchar s j) (get chars j))
+                return true
+    return false
+
+// check that len on strings returns rune count rather than byte count
+
+func foo a
+    (push a 400)
+
+func main
+    locals a b
+    (push a 5)
+    as b a
+    (push b -99)
+    (set b 0 -7)
+    (foo a)
+    (println a b)
+    (println "fun with strings")
+
+

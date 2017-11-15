@@ -28,21 +28,21 @@ The operators in Go are symbols rather than words:
 Most of these are binary infix operators, meaning they are always written in between their two operands. A few, like ! and ^, are unary operators written before their single operand:
 
 
-```
+```go
 (((-x) + y) * z)             // (mul (add (neg x) y) z)
 ((!true) && false)           // (and (not true) false)
 ```
 
 The operators have an *order of precedence*, such that parentheses are only needed when we wish to subvert the order of precedence. For example, `*` has higher precedence than `+`, so these are equivalent:
 
-```
+```go
 ((x * y) + z)                // (add (mul x y) z)
 x * y + z                    // (add (mul x y) z)
 ```
 
-...but the parentheses cause the addition to be done first:
+...but here the parentheses cause the addition to be done first:
 
-```
+```go
 x * (y + z)                  // (mul x (add y z))
 ```
 
@@ -104,9 +104,9 @@ Whether `int` and `uint` are 32- or 64-bit depends upon the platform we compile 
 
 ## function definitions
 
-Functions are written with the parameters and returns types in parens, separated by commas, followed by the body inside curly braces:
+Functions are written with the parameters and return types in parens, separated by commas, followed by the body inside curly braces:
 
-```
+```go
 // foo takes an int and a string and returns a byte and a float32
 func foo(a int, b string) (byte, float32) {
     // ... body goes here
@@ -117,30 +117,32 @@ If a function has just one return type, we can omit the parens around the return
 
 The `main` function has no parameters or return type:
 
-```
+```go
 func main() {
     // ...
 }
 ```
 
+Note the parens for the parameters are never omited, even for a function with no parameters.
+
 ## increment and decrement statements
 
 Because adding `1` or subtracting `1` from an integer variable is so common, Go allows shorthand statements with `++` (increment) and `--` (decrement):
 
-```
+```go
 i := 4
 i++       // i = i + 1
 i--       // i = i - 1
 ```
 
-## `if` and loop syntax
+## `if` and `for` syntax
 
 The bodies of `if`'s, `for`'s (Go's equivalent of `while`), and other such constructs are surrounded in curly braces:
 
-```
+```go
 if x < 3 {
     // body
-} else if y == 2 {
+} else if y == 2 {            // note that we write 'else if' instead of 'elif'
     // body
 }
 
@@ -149,7 +151,7 @@ for i > 0 {
 }
 ```
 
-Also note that we write `else if` instaed of `elif`.
+Line indentation is not siginificant in Go, but standard style is to indent code as we do in Pigeon.
 
 As a convenience, `for` loops can be written in this form:
 
@@ -163,18 +165,18 @@ The pre-condition is a declaration and assignment using the `:=` syntax. It is e
 
 The post-condition is an assignment or increment/decrement operation. It is executed every time after the body is executed but before the condition is tested again. (If the condition is false the first time, the post-condition is skipped over entirely like the rest of the body.)
 
-This variant of for is handy for looping through a range of integers:
+This variant of `for` is especially handy for looping through a range of integers:
 
-```
+```go
 // this loop calls 'foo' with the values: 0 1 2 3 4
 for i := 0; i < 5; i++ {
     foo(i)
 }
 ```
 
-With a normal for, the same thing would be written:
+With a normal `for`, the same thing would be written:
 
-```
+```go
 i := 0
 for i < 5 {
     foo(i)
@@ -205,7 +207,7 @@ for i, v := range foo {
 
 A `var` statement creates a local variable. They can be put anywhere in a function, not just at the top, but a variable is only considered to exist in the lines below the `var` statement that creates it.
 
-```
+```go
 foo()
 var x int              // int variable x exists starting here
 x = 3
@@ -215,13 +217,13 @@ A declared variable starts out with the 'zero value' (default value) for its typ
 
 For concision, we can assign to a variable in its `var` statement:
 
-```
+```go
 var x int = 3          // create int varible x with initial value 3
 ```
 
 If we initialize the variable in a `var` this way, we can leave the type to be inferred from the value assigned:
 
-```
+```go
 var foo = "hi"         // var foo string = "hi"
 var bar = true         // var bar bool = true
 var ack = foo()        // ack will have the type of whatever foo returns
@@ -233,7 +235,7 @@ var y = 5.2            // var x float64 = 5.2
 
 If a `var` statement is inside the body of some construct like an `if` or loop, the variable it creates only exists within that body:
 
-```
+```go
 if x < 3 {
     var y int   // this y variable only exists within the if
     // ...
@@ -254,7 +256,7 @@ inferred typing, :=, subscoping
 
 Number literals in Go are called *constants* and have no particular type, meaning, say, `52` is neither a `uint8`, an `int64`, or any other kind of integer value. When assigning a number constant to a variable, the compiler simply requires that the value be valid for the variable's type:
 
-```
+```go
 var x float32 = 53.8       // OK
 var y int = 53.8           // compile error: 53.8 is not a valid int value  
 var z byte = 9000          // compile error: 9000 is not a valid byte value (the max byte value is 255)
@@ -262,7 +264,7 @@ var z byte = 9000          // compile error: 9000 is not a valid byte value (the
 
 A `const` statement creates a named constant. These are not variables: they are just constant values represented by a name. The value 'assigned' in `const` must be a compile-time expression:
 
-```
+```go
 const x = 3.5                 // x is now a name for the constant 3.5
 x = 7                         // compile error: cannot assign to a constant
 const y = 9 * 10              // OK
@@ -273,7 +275,7 @@ A `const` statement at the top-level of code is global. A `const` statement in a
 
 If we specify a type for a constant, the compiler considers it to be a value of that type and only that type:
 
-```
+```go
 const x uint16 = 500
 var y int = x                // compile error: cannot assign a uint16 value to an int variable
 ```
@@ -282,7 +284,7 @@ var y int = x                // compile error: cannot assign a uint16 value to a
 
 In the parentheses form of `const`, we can use the reserved word `iota` as the value for the first constant and leave the value of the other constants implied. The first constant will be 0, the second will be 1, the third 2, *etc.*:
 
-```
+```go
 const (
     foo = iota           // 0
     bar                  // 1
@@ -292,7 +294,7 @@ const (
 
 If we specify a type for the first constant, all other constants will have the same type:
 
-```
+```go
 const (
     foo int64 = iota     // int64(0)
     bar                  // int64(1)
@@ -302,7 +304,7 @@ const (
 
 The word `iota` can be used in an expression. The same expression is used to generate all the constant values, with `iota` as 0 for the first constant and incrementing by 1 for each additional constant:
 
-```
+```go
 const (
     a = 3 * iota         // 0     (3 * 0)
     b                    // 3     (3 * 1)
@@ -317,7 +319,7 @@ const (
 
 Several kinds of statements, including `var`, assignments, and function call statements require semi-colons at the end:
 
-```
+```go
 var x int;
 x = 3;
 foo(x);
@@ -342,14 +344,14 @@ In practice, we rarely write semi-colons in our Go code.
 
 A pointer type is denoted by prefixing *:
 
-```
+```go
 var x *int                    // P<I>
 var y **string                // P<P<Str>>
 ```
 
 The equivalent of Pigeon's `ref` and `dr` are `&` and `*`. To assign to the location referenced by a pointer, we don't have a distinct operator but instead assign to a dereference of the pointer:
 
-```
+```go
 var x *int
 var y int
 x = &y
@@ -367,7 +369,7 @@ Be clear that `*` has three meanings:
 
 An array type is denoted by prefixing the size of the array in `[]`, and a slice type is denoted by prefixing empty `[]`:
 
-```
+```go
 var x [4]int          // x is an array of 4 ints
 var y []int           // y is a slice of ints
 ```
@@ -547,7 +549,7 @@ Above, the compiler catches when we mistakenly try passing a seconds value to a 
 
 To define a struct:
 
-```
+```go
 type cat struct {
     name string
     age int
@@ -557,14 +559,14 @@ type cat struct {
 
 As a convenience, the dot operator used on a pointer to a struct implicitly dereferences the struct:
 
-```
+```go
 c := &cat{"Mittens", 10, 12.0}     // c is a pointer to a cat
 s := c.name                        // (*c).name
 ```
 
 When declaring a struct type, if we omit the name of a struct field, the field is *embedded*, and the field’s name is implicitly the same as its type:
 
-```
+```go
 type Foo struct {
     A int
     B string
@@ -586,7 +588,7 @@ func main() {
 
 As a convenience, the fields of an embedded struct can be accessed as if they are directly part of the embedding struct (even though they really aren’t!). However, if the embedding struct has a field of the same name, the embedded struct’s field can only be accessed via the embedded struct:
 
-```
+```go
 func main() {
     var b Bar = Bar{}
     b.C = "hi"               // b.Foo.C = "hi"
@@ -597,7 +599,7 @@ func main() {
 
 If an embedded type has methods, we can call them as if they are directly methods of the embedding struct, but the embedded struct is passed as the receiver:
 
-```
+```go
 func (f Foo) roger() int {
     return f.A
 }
@@ -612,7 +614,7 @@ func main() {
 
 Methods of embedded structs count towards the embedding struct implementing interfaces:
 
-```
+```go
 type Alice interface {
     bob()
     carol()

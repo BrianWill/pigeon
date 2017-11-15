@@ -54,6 +54,7 @@ func main
     localfunc evan a I : I
         return (add a 3)
     (println (evan 8))          // 11
+```
 
 Aside from not being accessible outside its enclosing function, the special thing about a local function is that it can access the variables of the call to the enclosing function:
 

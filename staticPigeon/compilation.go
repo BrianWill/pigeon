@@ -90,6 +90,7 @@ import _std "github.com/BrianWill/pigeon/staticPigeon/stdlib"
 		code += `
 		
 		func main() {
+			_fmt.Println()
 			_main()
 		}
 		`
@@ -972,7 +973,7 @@ func compileFunc(fn FunctionDefinition) (string, error) {
 		bodyStatements = bodyStatements[1:]
 	}
 	header += genDebugFn(locals, fn.Pkg.Globals, fn.Pkg)
-	body, err := compileBody(bodyStatements, returnTypes, fn.Pkg, locals)
+	body, err := compileBody(bodyStatements, returnTypes, fn.Pkg, locals, false)
 	if err != nil {
 		return "", err
 	}
@@ -1072,7 +1073,7 @@ func compileMethod(meth MethodDefinition) (string, error) {
 		bodyStatements = bodyStatements[1:]
 	}
 	header += genDebugFn(locals, meth.Pkg.Globals, meth.Pkg)
-	body, err := compileBody(bodyStatements, returnTypes, meth.Pkg, locals)
+	body, err := compileBody(bodyStatements, returnTypes, meth.Pkg, locals, false)
 	if err != nil {
 		return "", err
 	}
@@ -1163,7 +1164,7 @@ func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[strin
 			locals[name] = v
 		}
 	}
-	body, err := compileBody(bodyStatements, returnTypes, pkg, locals)
+	body, err := compileBody(bodyStatements, returnTypes, pkg, locals, false)
 	if err != nil {
 		return "", err
 	}
@@ -1203,7 +1204,8 @@ func compileGoStatement(s GoStatement, pkg *Package, locals map[string]Variable)
 	return "go " + expr + "\n", nil
 }
 
-func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
+func compileIfStatement(s IfStatement, expectedReturnTypes []DataType,
+	pkg *Package, locals map[string]Variable, insideLoop bool) (string, error) {
 	c, returnedTypes, err := compileExpression(s.Condition, pkg, locals)
 	if err != nil {
 		return "", err
@@ -1212,7 +1214,7 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, pkg *Pack
 		return "", msg(s.LineNumber, s.Column, "if condition does not return one value or returns non-bool.")
 	}
 	code := "if " + c
-	c, err = compileBody(s.Body, expectedReturnTypes, pkg, locals)
+	c, err = compileBody(s.Body, expectedReturnTypes, pkg, locals, insideLoop)
 	if err != nil {
 		return "", nil
 	}
@@ -1226,14 +1228,14 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, pkg *Pack
 			return "", msg(elif.LineNumber, elif.Column, "Elif condition expression does not return a boolean.")
 		}
 		code += " else if " + c + ".(bool) {\n"
-		c, err = compileBody(elif.Body, expectedReturnTypes, pkg, locals)
+		c, err = compileBody(elif.Body, expectedReturnTypes, pkg, locals, insideLoop)
 		if err != nil {
 			return "", err
 		}
 		code += c + "}"
 	}
 	if len(s.Else.Body) > 0 {
-		c, err := compileBody(s.Else.Body, expectedReturnTypes, pkg, locals)
+		c, err := compileBody(s.Else.Body, expectedReturnTypes, pkg, locals, insideLoop)
 		if err != nil {
 			return "", err
 		}
@@ -1242,8 +1244,8 @@ func compileIfStatement(s IfStatement, expectedReturnTypes []DataType, pkg *Pack
 	return code + "\n", nil
 }
 
-func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []DataType, pkg *Package,
-	locals map[string]Variable) (string, error) {
+func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []DataType,
+	pkg *Package, locals map[string]Variable, insideLoop bool) (string, error) {
 	expr, rts, err := compileExpression(s.Value, pkg, locals)
 	if err != nil {
 		return "", err
@@ -1274,7 +1276,7 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 			newLocals[k] = v
 		}
 		newLocals[name] = c.Variable
-		body, err := compileBody(c.Body, expectedReturnTypes, pkg, newLocals)
+		body, err := compileBody(c.Body, expectedReturnTypes, pkg, newLocals, insideLoop)
 		if err != nil {
 			return "", nil
 		}
@@ -1286,7 +1288,7 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 		code += body + "}"
 	}
 	if s.Default != nil {
-		body, err := compileBody(s.Default, expectedReturnTypes, pkg, locals)
+		body, err := compileBody(s.Default, expectedReturnTypes, pkg, locals, insideLoop)
 		if err != nil {
 			return "", nil
 		}
@@ -1295,7 +1297,8 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 	return code + "\n}\n", nil
 }
 
-func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
+func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType,
+	pkg *Package, locals map[string]Variable) (string, error) {
 	c, returnedTypes, err := compileExpression(s.Condition, pkg, locals)
 	if err != nil {
 		return "", err
@@ -1307,14 +1310,71 @@ func compileWhileStatement(s WhileStatement, expectedReturnTypes []DataType, pkg
 		return "", msg(s.LineNumber, s.Column, "while condition expression does not return a boolean.")
 	}
 	code := "for " + c + " {\n"
-	c, err = compileBody(s.Body, expectedReturnTypes, pkg, locals)
+	c, err = compileBody(s.Body, expectedReturnTypes, pkg, locals, true)
 	if err != nil {
 		return "", err
 	}
 	return code + c + "}\n", nil
 }
 
-func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
+func compileForincStatement(s ForincStatement, expectedReturnTypes []DataType,
+	pkg *Package, locals map[string]Variable) (string, error) {
+	if _, ok := locals[s.IndexName]; ok {
+		return "", msg(s.LineNumber, s.Column, "forinc index name conflicts with an existing local variable.")
+	}
+	newLocals := map[string]Variable{}
+	for k, v := range locals {
+		newLocals[k] = v
+	}
+	newLocals[s.IndexName] = Variable{s.LineNumber, s.Column, s.IndexName, s.IndexType}
+	if s.IndexType.Type != "I" {
+		return "", msg(s.LineNumber, s.Column, "forinc index must start value expression must return a non-integer.")
+	}
+	startExpr, returnedTypes, err := compileExpression(s.StartVal, pkg, newLocals)
+	if err != nil {
+		return "", err
+	}
+	if len(returnedTypes) != 1 {
+		return "", msg(s.LineNumber, s.Column, "forinc start value expression improperly returns more than one value.")
+	}
+	if !isInteger(returnedTypes[0]) {
+		return "", msg(s.LineNumber, s.Column, "forinc start value expression must return a non-integer.")
+	}
+	endExpr, returnedTypes, err := compileExpression(s.EndVal, pkg, newLocals)
+	if err != nil {
+		return "", err
+	}
+	if len(returnedTypes) != 1 {
+		return "", msg(s.LineNumber, s.Column, "forinc end value expression improperly returns more than one value.")
+	}
+	if !isInteger(returnedTypes[0]) {
+		return "", msg(s.LineNumber, s.Column, "forinc end value expression must return a non-integer.")
+	}
+	code := "for _i := " + startExpr + "; _i "
+	if s.Dec {
+		code += "> "
+	} else {
+		code += "< "
+	}
+	code += endExpr + " ; _i"
+	if s.Dec {
+		code += "--"
+	} else {
+		code += "++"
+	}
+	code += " { \n"
+	code += s.IndexName + " := _i \n"
+	code += genDebugFn(newLocals, pkg.Globals, pkg)
+	body, err := compileBody(s.Body, expectedReturnTypes, pkg, newLocals, true)
+	if err != nil {
+		return "", err
+	}
+	code += body + "}\n"
+	return code, nil
+}
+
+func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
+	pkg *Package, locals map[string]Variable) (string, error) {
 	if _, ok := locals[s.IndexName]; ok {
 		return "", msg(s.LineNumber, s.Column, "foreach index name conflicts with an existing local variable.")
 	}
@@ -1343,6 +1403,7 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 		return "", err
 	}
 	code := "for _i, _v := range "
+	isList := false
 	switch t := returnedTypes[0].(type) {
 	case BuiltinType:
 		if t.Name != "L" && t.Name != "M" && t.Name != "S" {
@@ -1356,6 +1417,7 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 				return "", msg(s.LineNumber, s.Column, "Improper foreach val type for list.")
 			}
 			code += "*"
+			isList = true
 		} else if t.Name == "M" {
 			if !isType(t.Params[0], indexType, false) {
 				return "", msg(s.LineNumber, s.Column, "Improper foreach index type for map.")
@@ -1376,9 +1438,21 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 	}
 	code += collExpr + " { \n"
 	code += s.IndexName + " := _i \n"
-	code += s.ValName + " := _v \n"
+	if isList {
+		dt, err := getDataType(s.ValType, pkg)
+		if err != nil {
+			return "", err
+		}
+		typeCode, err := compileType(dt, pkg)
+		if err != nil {
+			return "", err
+		}
+		code += s.ValName + " := _v.(" + typeCode + ") \n"
+	} else {
+		code += s.ValName + " := _v \n"
+	}
 	code += genDebugFn(newLocals, pkg.Globals, pkg)
-	body, err := compileBody(s.Body, expectedReturnTypes, pkg, newLocals)
+	body, err := compileBody(s.Body, expectedReturnTypes, pkg, newLocals, true)
 	if err != nil {
 		return "", err
 	}
@@ -1386,7 +1460,8 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 	return code, nil
 }
 
-func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
+func compileBody(statements []Statement, expectedReturnTypes []DataType,
+	pkg *Package, locals map[string]Variable, insideLoop bool) (string, error) {
 	var code string
 	for _, s := range statements {
 		line := s.Line()
@@ -1397,7 +1472,7 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 		var err error
 		switch s := s.(type) {
 		case IfStatement:
-			c, err = compileIfStatement(s, expectedReturnTypes, pkg, locals)
+			c, err = compileIfStatement(s, expectedReturnTypes, pkg, locals, insideLoop)
 		case WhileStatement:
 			c, err = compileWhileStatement(s, expectedReturnTypes, pkg, locals)
 		case ForeachStatement:
@@ -1407,11 +1482,23 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 		case AssignmentStatement:
 			c, err = compileAssignmentStatement(s, pkg, locals)
 		case SelectStatement:
-			c, err = compileSelectStatement(s, expectedReturnTypes, pkg, locals)
+			c, err = compileSelectStatement(s, expectedReturnTypes, pkg, locals, insideLoop)
 		case TypeswitchStatement:
-			c, err = compileTypeswitchStatement(s, expectedReturnTypes, pkg, locals)
+			c, err = compileTypeswitchStatement(s, expectedReturnTypes, pkg, locals, insideLoop)
 		case ReturnStatement:
 			c, err = compileReturnStatement(s, expectedReturnTypes, pkg, locals)
+		case BreakStatement:
+			if insideLoop {
+				c += "break \n"
+			} else {
+				err = msg(s.LineNumber, s.Column, "cannot have break statement outside a loop.")
+			}
+		case ContinueStatement:
+			if insideLoop {
+				c += "continue \n"
+			} else {
+				err = msg(s.LineNumber, s.Column, "cannot have continue statement outside a loop.")
+			}
 		case FunctionCall:
 			c, _, err = compileFunctionCall(s, pkg, locals)
 			c += "\n"
@@ -1435,7 +1522,8 @@ func compileBody(statements []Statement, expectedReturnTypes []DataType, pkg *Pa
 	return code, nil
 }
 
-func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, pkg *Package, locals map[string]Variable) (string, error) {
+func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType,
+	pkg *Package, locals map[string]Variable, insideLoop bool) (string, error) {
 	code := "select {\n"
 	for _, clause := range s.Clauses {
 		switch clause := clause.(type) {
@@ -1462,7 +1550,7 @@ func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, p
 				return "", msg(clause.LineNumber, clause.Column, "Select send clause expecting expression with type matching its channel.")
 			}
 			code += "case " + ch + " <- " + val + ":\n"
-			c, err := compileBody(clause.Body, expectedReturnTypes, pkg, locals)
+			c, err := compileBody(clause.Body, expectedReturnTypes, pkg, locals, insideLoop)
 			if err != nil {
 				return "", err
 			}
@@ -1494,7 +1582,7 @@ func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, p
 			}
 			newLocals[clause.Target.Name] = clause.Target
 			code += genDebugFn(newLocals, pkg.Globals, pkg)
-			c, err := compileBody(clause.Body, expectedReturnTypes, pkg, newLocals)
+			c, err := compileBody(clause.Body, expectedReturnTypes, pkg, newLocals, insideLoop)
 			if err != nil {
 				return "", err
 			}
@@ -1502,7 +1590,7 @@ func compileSelectStatement(s SelectStatement, expectedReturnTypes []DataType, p
 		}
 	}
 	if s.Default.Body != nil {
-		c, err := compileBody(s.Default.Body, expectedReturnTypes, pkg, locals)
+		c, err := compileBody(s.Default.Body, expectedReturnTypes, pkg, locals, insideLoop)
 		if err != nil {
 			return "", err
 		}
@@ -1828,6 +1916,26 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 				code += " / "
 			}
 		}
+		returnType = t
+	case "inc":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "inc operation requires one operand.")
+		}
+		t := operandTypes[0]
+		if !isNumber(t) {
+			return "", nil, msg(o.LineNumber, o.Column, "inc operation has non-number operand")
+		}
+		code += operandCode[0] + " + 1"
+		returnType = t
+	case "dec":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "dec operation requires one operand.")
+		}
+		t := operandTypes[0]
+		if !isNumber(t) {
+			return "", nil, msg(o.LineNumber, o.Column, "dec operation has non-number operand")
+		}
+		code += operandCode[0] + " - 1"
 		returnType = t
 	case "mod":
 		if len(o.Operands) != 2 {

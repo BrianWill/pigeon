@@ -1,6 +1,6 @@
 # Pigeon, an educational programming language
 
-More accurately, *two* educational programming languages:
+More accurately, Pigeon is *two* educational programming languages:
 
 - DynamicPigeon
 - StaticPigeon
@@ -14,7 +14,7 @@ DynamicPigeon ([docs](dynamic-pigeon.md)) teaches basic programming concepts com
 - functions
 - lists and hashmaps
 
-StaticPigeon builds upon DynamicPigeon to teach most of the core concepts of the Go language. Once a student is comfortable with StaticPigeon, learning Go should then mostly be a matter of adjusting to different syntax.
+StaticPigeon builds upon DynamicPigeon to teach most of the core concepts of the Go language. Once a student is comfortable with StaticPigeon, learning Go should then be mostly a matter of adjusting to different syntax.
 
 The StaticPigeon documentation is split into three parts:
 

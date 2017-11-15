@@ -1392,6 +1392,7 @@ func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
 	if tokens[idx].Type != Newline {
 		return ElseClause{}, 0, msg(line, column, "Else clause not followed by newline.")
 	}
+	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
 	if err != nil {
 		return ElseClause{}, 0, err
@@ -1613,6 +1614,63 @@ func parseForeach(tokens []Token, indentation int) (ForeachStatement, int, error
 		collection, body}, idx, nil
 }
 
+func parseForinc(tokens []Token, indentation int, isDec bool) (ForincStatement, int, error) {
+	line := tokens[0].LineNumber
+	column := tokens[0].Column
+	idx := 1
+	if tokens[idx].Type != Space {
+		return ForincStatement{}, 0, msg(line, column, "Missing space.")
+	}
+	idx++
+	if tokens[idx].Type != IdentifierWord {
+		return ForincStatement{}, 0, msg(line, column, "Expecting identifier for the index in forinc.")
+	}
+	indexName := tokens[idx].Content
+	idx++
+	if tokens[idx].Type != Space {
+		return ForincStatement{}, 0, msg(line, column, "Missing space.")
+	}
+	idx++
+	indexType, nTokens, err := parseType(tokens[idx:], line)
+	if err != nil {
+		return ForincStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Space {
+		return ForincStatement{}, 0, msg(line, column, "Missing space.")
+	}
+	idx++
+	startExpr, nTokens, err := parseExpression(tokens[idx:], line)
+	if err != nil {
+		return ForincStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Space {
+		return ForincStatement{}, 0, msg(line, column, "Missing space.")
+	}
+	idx++
+	endExpr, nTokens, err := parseExpression(tokens[idx:], line)
+	if err != nil {
+		return ForincStatement{}, 0, err
+	}
+	idx += nTokens
+	if tokens[idx].Type != Newline {
+		return ForincStatement{}, 0, msg(line, column,
+			"Foreach statement collection expression not followed by newline.")
+	}
+	idx++
+	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
+	if err != nil {
+		return ForincStatement{}, 0, err
+	}
+	idx += numTokens
+	return ForincStatement{
+		line, column,
+		indexName, indexType,
+		startExpr, endExpr,
+		body, isDec}, idx, nil
+}
+
 func parseWhile(tokens []Token, indentation int) (WhileStatement, int, error) {
 	line := tokens[0].LineNumber
 	column := tokens[0].Column
@@ -1685,6 +1743,7 @@ func parseBreak(tokens []Token) (BreakStatement, int, error) {
 	if tokens[idx].Type != Newline {
 		return BreakStatement{}, 0, msg(line, column, "Break statement not terminated with newline.")
 	}
+	idx++
 	return BreakStatement{line, column}, idx, nil
 }
 
@@ -1698,6 +1757,7 @@ func parseContinue(tokens []Token) (ContinueStatement, int, error) {
 	if tokens[idx].Type != Newline {
 		return ContinueStatement{}, 0, msg(line, column, "Continue statement not terminated with newline.")
 	}
+	idx++
 	return ContinueStatement{line, column}, idx, nil
 }
 
@@ -1869,6 +1929,10 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseTypeswitch(tokens[i:], indentation)
 					case "select":
 						statement, numTokens, err = parseSelect(tokens[i:], indentation)
+					case "forinc":
+						statement, numTokens, err = parseForinc(tokens[i:], indentation, false)
+					case "fordec":
+						statement, numTokens, err = parseForinc(tokens[i:], indentation, true)
 					case "break":
 						statement, numTokens, err = parseBreak(tokens[i:])
 					case "continue":

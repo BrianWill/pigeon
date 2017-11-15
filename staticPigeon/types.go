@@ -53,6 +53,8 @@ var reservedWords = []string{
 	"default",
 	"break",
 	"continue",
+	"forinc",
+	"fordec",
 	"if",
 	"else",
 	"elseif",
@@ -218,6 +220,7 @@ func (t LocalFuncStatement) Statement()  {}
 func (t IfStatement) Statement()         {}
 func (t WhileStatement) Statement()      {}
 func (t ForeachStatement) Statement()    {}
+func (t ForincStatement) Statement()     {}
 func (t AssignmentStatement) Statement() {}
 func (t ReturnStatement) Statement()     {}
 func (t FunctionCall) Statement()        {}
@@ -243,13 +246,16 @@ func (t LocalsStatement) Line() int {
 	return t.Vars[0].LineNumber
 }
 func (t IfStatement) Line() int {
-	return t.Condition.Line()
+	return t.LineNumber
 }
 func (t WhileStatement) Line() int {
-	return t.Condition.Line()
+	return t.LineNumber
 }
 func (t ForeachStatement) Line() int {
-	return t.Collection.Line()
+	return t.LineNumber
+}
+func (t ForincStatement) Line() int {
+	return t.LineNumber
 }
 func (t AssignmentStatement) Line() int {
 	return t.Targets[0].Line()
@@ -550,6 +556,17 @@ type ForeachStatement struct {
 	ValType    ParsedDataType
 	Collection Expression
 	Body       []Statement
+}
+
+type ForincStatement struct {
+	LineNumber int
+	Column     int
+	IndexName  string
+	IndexType  ParsedDataType
+	StartVal   Expression
+	EndVal     Expression
+	Body       []Statement
+	Dec        bool
 }
 
 type ReturnStatement struct {
