@@ -3,17 +3,16 @@ global middleRow (list "_" "_" "_")
 global bottomRow (list "_" "_" "_")
 
 func playerMove currentPlayer
-    locals move row col slot
-    as move nil
-    while (eq move nil)
+    locals row col slot
+    while true
         as row nil
         while (eq row nil)
             as row (prompt "Select [t]op, [m]iddle, or [b]ottom row, player" currentPlayer)
             if (eq row "t")
                 as row topRow
-            elseif (eq row "m")
+            elif (eq row "m")
                 as row middleRow
-            elseif (eq row "b")
+            elif (eq row "b")
                 as row bottomRow
             else
                 (print "Invalid input. Try again.")
@@ -23,9 +22,9 @@ func playerMove currentPlayer
             as col (prompt "Select [l]eft, [m]iddle, or [r]ight column, player" currentPlayer)
             if (eq col "l")
                 as col 0
-            elseif (eq col "m")
+            elif (eq col "m")
                 as col 1
-            elseif (eq col "r")
+            elif (eq col "r")
                 as col 2
             else
                 (print "Invalid input. Try again.")
@@ -33,7 +32,7 @@ func playerMove currentPlayer
         as slot (get row col)
         if (eq slot "_")
             (set row col currentPlayer)
-            as move true                       // signal that we're done
+            return
         else 
             (print "That slot is occupied! Try again.")
         
@@ -42,52 +41,51 @@ func playerMove currentPlayer
 func winner
     locals topRowFull middleRowFull bottomRowFull
     // check top row
-    if (and (neq topRow[0] "_") (eq topRow[0] topRow[1] topRow[2]))
-        return topRow[0]
+    if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get topRow 1) (get topRow 2)))
+        return (get topRow 0)
     // check middle row
-    if (and (neq middleRow[0] "_") (eq middleRow[0] middleRow[1] middleRow[2]))
-        return middleRow[0]
+    if (and (neq (get middleRow 0) "_") (eq (get middleRow 0) (get middleRow 1) (get middleRow 2)))
+        return (get middleRow 0)
     // check bottom row
-    if (and (neq bottomRow[0] "_") (eq bottomRow[0] bottomRow[1] bottomRow[2]))
-        return bottomRow[0]
+    if (and (neq (get bottomRow 0) "_") (eq (get bottomRow 0) (get bottomRow 1) (get bottomRow 2)))
+        return (get bottomRow 0)
     // check left column
-    if (and (neq topRow[0] "_") (eq topRow[0] middleRow[0] bottomRow[0]))
-        return topRow[0]
+    if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get middleRow 0) (get bottomRow 0)))
+        return (get topRow 0)
     // check middle column
-    if (and (neq topRow[1] "_") (eq topRow[1] middleRow[1] bottomRow[1]))
-        return topRow[1]
+    if (and (neq (get topRow 1) "_") (eq (get topRow 1) (get middleRow 1) (get bottomRow 1)))
+        return (get topRow 1)
     // check right column
-    if (and (neq topRow[2] "_") (eq topRow[2] middleRow[2] bottomRow[2]))
-        return topRow[2]
+    if (and (neq (get topRow 2) "_") (eq (get topRow 2) (get middleRow 2) (get bottomRow 2)))
+        return (get topRow 2)
     // check top-left to bottom-right diagonal
-    if (and (neq topRow[0] "_") (eq topRow[0] middleRow[1] bottomRow[2]))
-        return topRow[0]
+    if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get middleRow 1) (get bottomRow 2)))
+        return (get topRow 0)
     // check bottom-left to top-right diagonal
-    if (and (neq bottomRow[0] "_") (eq bottomRow[0] middleRow[1] topRow[2]))
-        return bottomRow[0]
+    if (and (neq (get bottomRow 0) "_") (eq (get bottomRow 0) (get middleRow 1) (get topRow 2)))
+        return (get bottomRow 0)
     // check tie
-    as topRowFull (and (neq topRow[0] "_") (neq topRow[1] "_") (neq topRow[2] "_"))
-    as middleRowFull (and (neq middleRow[0] "_") (neq middleRow[1] "_") (neq middleRow[2] "_"))
-    as bottomRowFull (and (neq bottomRow[0] "_") (neq bottomRow[1] "_") (neq bottomRow[2] "_"))
+    as topRowFull (and (neq (get topRow 0) "_") (neq (get topRow 1) "_") (neq (get topRow 2) "_"))
+    as middleRowFull (and (neq (get middleRow 0) "_") (neq (get middleRow 1) "_") (neq (get middleRow 2) "_"))
+    as bottomRowFull (and (neq (get bottomRow 0) "_") (neq (get bottomRow 1) "_") (neq (get bottomRow 2) "_"))
     if (and topRowFull middleRowFull bottomRowFull)
         return "tie"
     return "_"
 
 func main
-    locals w done currentPlayer
+    locals w currentPlayer
     as currentPlayer "X"
-    as done false
     while (not done)
         (print (concat topRow "\n" middleRow "\n" bottomRow "\n"))
         as w (winner)
         if (eq w "X")
             (print "X's win!")
-            as done true
-        elseif (eq w "O")
+            return
+        elif (eq w "O")
             (print "O's win!")
-        elseif (eq w "tie")
+        elif (eq w "tie")
             (print "Tie!")
-            as done true
+            return
         else
             (playerMove currentPlayer)
             // toggle the current player

@@ -127,7 +127,7 @@ var operators = []string{
 	"getrune",
 	"charlist",
 	"runelist",
-	"charlist",
+	"charslice",
 	"charslice",
 }
 
@@ -176,6 +176,7 @@ type DataType interface {
 
 type ParsedDataType struct {
 	LineNumber  int
+	Column      int
 	Type        string
 	Params      []ParsedDataType
 	ReturnTypes []ParsedDataType // non-nil only for functions with return types

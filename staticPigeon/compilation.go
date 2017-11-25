@@ -3,7 +3,6 @@ package staticPigeon
 import (
 	"errors"
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -362,7 +361,7 @@ func isType(child DataType, parent DataType, exact bool) bool {
 func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 	if parsed.Type == "A" {
 		if len(parsed.Params) != 2 {
-			return nil, errors.New("Array type must have two type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "Array type must have two type parameters.")
 		}
 		t, err := getDataType(parsed.Params[0], pkg)
 		if err != nil {
@@ -370,7 +369,7 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 		}
 		size, err := strconv.Atoi(parsed.Params[1].Type)
 		if err != nil {
-			return nil, errors.New("Array type must have integer as second type parameter.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "Array type must have integer as second type parameter.")
 		}
 		return ArrayType{size, t}, nil
 	}
@@ -395,41 +394,41 @@ func getDataType(parsed ParsedDataType, pkg *Package) (DataType, error) {
 		return FunctionType{params, returnTypes}, nil
 	case "L":
 		if len(params) != 1 {
-			return nil, errors.New("List type has wrong number of type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "List type has wrong number of type parameters.")
 		}
 		return BuiltinType{"L", params}, nil
 	case "S":
 		if len(params) != 1 {
-			return nil, errors.New("List type has wrong number of type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "List type has wrong number of type parameters.")
 		}
 		return BuiltinType{"S", params}, nil
 	case "Ch":
 		if len(params) != 1 {
-			return nil, errors.New("Channel type has wrong number of type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "Channel type has wrong number of type parameters.")
 		}
 		return BuiltinType{"Ch", params}, nil
 	case "M":
 		if len(params) != 2 {
-			return nil, errors.New("Map type has wrong number of type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "Map type has wrong number of type parameters.")
 		}
 		return BuiltinType{"M", params}, nil
 	case "P":
 		if len(params) != 1 {
-			return nil, errors.New("Pointer type has wrong number of type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "Pointer type has wrong number of type parameters.")
 		}
 		return BuiltinType{"P", params}, nil
 	case "I", "F", "Byte", "Str", "Bool", "Err", "Any":
 		if len(params) != 0 {
-			return nil, errors.New("Type " + parsed.Type + " should not have any type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "Type "+parsed.Type+" should not have any type parameters.")
 		}
 		return BuiltinType{parsed.Type, params}, nil
 	default:
 		t, ok := pkg.Types[parsed.Type]
 		if !ok {
-			return nil, errors.New("Unknown type. " + fmt.Sprint(parsed.Type))
+			return nil, msg(parsed.LineNumber, parsed.Column, "Unknown type. "+fmt.Sprint(parsed.Type))
 		}
 		if len(parsed.Params) > 0 || len(parsed.ReturnTypes) > 0 {
-			return nil, errors.New("Type " + parsed.Type + " should not have any type parameters.")
+			return nil, msg(parsed.LineNumber, parsed.Column, "Type "+parsed.Type+" should not have any type parameters.")
 		}
 		return t, nil
 	}
@@ -877,7 +876,7 @@ func compileType(dt DataType, pkg *Package) (string, error) {
 		}
 		return typeStr, nil
 	case StructDefinition:
-		return "", errors.New("Invalid type")
+		return "", msg(t.LineNumber, t.Column, "Invalid type")
 	}
 
 	return "", nil
@@ -1089,7 +1088,7 @@ func compileLocalFunc(fn LocalFuncStatement, pkg *Package, outerLocals map[strin
 		paramTypes[i] = v.Type
 	}
 	outerLocals[fn.Name] = Variable{fn.LineNumber, fn.Column, fn.Name,
-		ParsedDataType{fn.LineNumber, "Fn", paramTypes, fn.ReturnTypes},
+		ParsedDataType{fn.LineNumber, fn.Column, "Fn", paramTypes, fn.ReturnTypes},
 	}
 	locals := map[string]Variable{}
 	header := fn.Name + " := func("
@@ -1632,7 +1631,7 @@ func compileAssignmentStatement(s AssignmentStatement, pkg *Package, locals map[
 		}
 		// shouldn't be the case that any target expression returns more than one value
 		if len(rts) != 1 {
-			return "", errors.New("Improper target of assignment on line")
+			return "", msg(s.LineNumber, s.Column, "Improper target of assignment on line")
 		}
 		if !isType(valueTypes[i], rts[0], false) {
 			return "", msg(s.LineNumber, s.Column, "Value in assignment does not match expected type.")
@@ -1809,7 +1808,7 @@ func (s Struct) getMemberType(name string) (DataType, error) {
 			return s.MemberTypes[i], nil
 		}
 	}
-	return nil, errors.New("Struct does not contain member '" + name + "'")
+	return nil, msg(s.LineNumber, s.Column, "Struct does not contain member '"+name+"'")
 }
 
 func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
@@ -2131,7 +2130,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		case ArrayType:
 			returnType = t.Type
 			if !isNumber(operandTypes[1]) {
-				return "", nil, errors.New("get operation on an array requires a number as second operand")
+				return "", nil, msg(o.LineNumber, o.Column, "get operation on an array requires a number as second operand")
 			}
 			code += operandCode[0] + "[int64(" + operandCode[1] + ")]"
 		default:
@@ -2217,7 +2216,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		returnType = operandTypes[0]
 	case "slice":
 		if len(o.Operands) != 3 {
-			return "", nil, errors.New("slice operation requires three operands")
+			return "", nil, msg(o.LineNumber, o.Column, "slice operation requires three operands")
 		}
 		if !isNumber(operandTypes[1]) || !isNumber(operandTypes[2]) {
 			return "", nil, msg(o.LineNumber, o.Column, "slice operation's second and third operands must be numbers.")
@@ -2588,7 +2587,6 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 	return code, []DataType{returnType}, nil
 }
 
-// returns map of valid breakpoints
 func Compile(inputFilename string, outputDir string) (map[string]*Package, error) {
 	packages := map[string]*Package{}
 	_, err := ProcessPackage(inputFilename, packages, []string{}, outputDir)
@@ -2603,11 +2601,6 @@ var packagePrefixNum = 0
 // 'packages' = all previously processed packages
 // 'ancestorPaths' = all package full paths up the chain from this one we're processing (needed for detecting recursive dependencies)
 func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths []string, outputDir string) (*Package, error) {
-	// if std lib
-	if filename == "file" || filename == "http" {
-		filename = build.Default.GOPATH + "/src/github.com/BrianWill/pigeon/staticPigeon/stdlib/" +
-			filename + ".spigeon"
-	}
 	path, err := filepath.Abs(filename)
 	if err != nil {
 		return nil, err
@@ -2657,28 +2650,28 @@ func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths
 		case GlobalDefinition:
 			un := strings.ToUpper(d.Name)
 			if packageNames[un] {
-				return nil, errors.New("Duplicate top-level name: " + d.Name)
+				return nil, msg(d.LineNumber, d.Column, "Duplicate top-level name: "+d.Name)
 			}
 			pkg.Globals[d.Name] = d
 			packageNames[un] = true
 		case FunctionDefinition:
 			un := strings.ToUpper(d.Name)
 			if packageNames[un] {
-				return nil, errors.New("Duplicate top-level name: " + d.Name)
+				return nil, msg(d.LineNumber, d.Column, "Duplicate top-level name: "+d.Name)
 			}
 			pkg.Funcs[d.Name] = d
 			packageNames[un] = true
 		case StructDefinition:
 			un := strings.ToUpper(d.Name)
 			if packageNames[un] {
-				return nil, errors.New("Duplicate top-level name: " + d.Name)
+				return nil, msg(d.LineNumber, d.Column, "Duplicate top-level name: "+d.Name)
 			}
 			pkg.StructDefs[d.Name] = d
 			packageNames[un] = true
 		case InterfaceDefinition:
 			un := strings.ToUpper(d.Name)
 			if packageNames[un] {
-				return nil, errors.New("Duplicate top-level name: " + d.Name)
+				return nil, msg(d.LineNumber, d.Column, "Duplicate top-level name: "+d.Name)
 			}
 			pkg.Interfaces[d.Name] = d
 			pkg.Types[d.Name] = d
@@ -2691,7 +2684,7 @@ func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths
 			}
 			_, ok = st[d.Receiver.Name]
 			if ok {
-				return nil, errors.New("Duplicate method " + d.Name + " defined for type " + d.Receiver.Name)
+				return nil, msg(d.LineNumber, d.Column, "Duplicate method "+d.Name+" defined for type "+d.Receiver.Name)
 			}
 			st[d.Receiver.Name] = d
 		case NativeImportDefinition:
@@ -2718,7 +2711,7 @@ func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths
 				}
 				un := strings.ToUpper(localName)
 				if packageNames[un] {
-					return nil, errors.New("Duplicate top-level name: " + localName)
+					return nil, msg(d.LineNumber, d.Column, "Duplicate top-level name: "+localName)
 				}
 				packageNames[un] = true
 				g, ok := otherPkg.Globals[foreignName]
@@ -2743,7 +2736,7 @@ func ProcessPackage(filename string, packages map[string]*Package, ancestorPaths
 					pkg.Types[localName] = inter
 					continue
 				}
-				return nil, errors.New("Imported name is not an exported name in foreign package: " + foreignName)
+				return nil, msg(d.LineNumber, d.Column, "Imported name is not an exported name in foreign package: "+foreignName)
 			}
 		default:
 			return nil, errors.New("Unrecognized definition")

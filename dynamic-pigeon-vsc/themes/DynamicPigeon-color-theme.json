@@ -1,0 +1,95 @@
+{
+	"name": "DynamicPigeon",
+	"type": "dark",
+	"colors": {
+		"editor.background": "#1e1e1e",
+		"editor.foreground": "#d4d4d4",
+		"activityBarBadge.background": "#007acc",
+		"sideBarTitle.foreground": "#bbbbbb"
+	},
+	"tokenColors": [
+		{
+			"settings": {
+				"foreground": "#eeffffff",
+				"background": "#263238ff"
+			}
+		},
+		{
+			"name": "Comment",
+			"scope": [
+				"comment"
+			],
+			"settings": {
+				"fontStyle": "italic",
+				"foreground": "#6e7477"
+			}
+		},
+		{
+			"name": "Entity",
+			"scope": [
+				"entity.name"
+			],
+			"settings": {
+				"fontStyle": "bold",
+				"foreground": "#4e83a0"
+			}
+		},
+		{
+			"name": "Keyword, Control",
+			"scope": [
+				"keyword.control"
+			],
+			"settings": {
+				"fontStyle": "bold",
+				"foreground": "#d17171"
+			}
+		},
+		{
+			"name": "Keyword, Control, Escape",
+			"scope": [
+				"keyword.control.escape"
+			],
+			"settings": {
+				"fontStyle": "bold",
+				"foreground": "#b2bb39"
+			}
+		},
+		{
+			"name": "Keyword, Vars",
+			"scope": [
+				"keyword.vars"
+			],
+			"settings": {
+				"foreground": "#60a55e"
+			}
+		},
+		{
+			"name": "Keyword, Operator",
+			"scope": [
+				"keyword.operator"
+			],
+			"settings": {
+				"foreground": "#7ba3a3"
+			}
+		},
+		{
+			"name": "Constant, Numeric",
+			"scope": [
+				"constant.numeric"
+			],
+			"settings": {
+				"foreground": "#a3779d"
+			}
+		},
+		{
+			"name": "String",
+			"scope": [
+				"string"
+			],
+			"settings": {
+				"foreground": "#db85a6"
+			}
+		}
+	
+	]
+}

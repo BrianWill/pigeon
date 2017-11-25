@@ -1,0 +1,78 @@
+
+// assumes start is less than len and end is less than len+1
+func sublist a start end
+    locals b
+    as b (list)
+    forinc i start end
+        (push b (get a i))
+    return b
+
+
+// strings = list of strings, separator = string, returns string
+func join strings separator
+    locals s lastIdx
+    if (eq (len strings) 0)
+        return ""
+    as s ""
+    as lastIdx (dec (len strings))
+    foreach i v (sublist strings 0 lastIdx)
+        as s (concat s v separator)
+    return (concat s (get strings lastIdx))
+
+
+// s = string, start and end = integers, return string
+func substr s start end
+    return (join (sublist (charlist s) start end) "")
+
+
+
+// s = string, ss (substring) = string, returns integer
+// assumes the string lengths are greater than 0
+func index s ss
+    locals match
+    as s (charlist s)      
+    as ss (charlist ss)
+    forinc i 0 (inc (sub (len s) (len ss)))
+        // we aren't using substr
+        as match true
+        foreach j ch ss
+            if (neq ch (get s (add i j)))
+                as match false
+                break
+        if match
+            return i
+    return -1
+
+
+// s = string, chars = list of strings, returns boolean
+func containsAny s chars
+    foreach i ch (charlist s)
+        foreach j ch2 chars
+            if (eq ch ch2)
+                return true
+    return false
+
+// s = string, cutset = string, returns string
+func trim s cutset
+    locals chars start end
+    as cutset (charlist cutset)
+    // search from the start
+    forinc i 0 (len s)
+        if (not (containsAny (getchar s i) cutset))
+            as start i
+            break
+    if (eq start nil)
+        return ""
+    // search from the end
+    fordec i (len s) 0
+        if (not (containsAny (getchar s i) cutset))
+            as end (inc i)
+            break 
+    return (substr s start end)
+
+
+func main
+    (println (trim "   Hello, world!   " " "))        // "Hello, world!"
+    (println (trim "   Hello, world!   " "e !H"))     // "llo, world"
+    (println (trim "   Hello, world!   " "e!H"))      // "   Hello, world!   "
+

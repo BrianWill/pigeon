@@ -1,67 +1,92 @@
 package stdlib
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"reflect"
-	"strconv"
-	"time"
 )
 
 type Nil int
 
 type ListType struct {
-	list []interface{}
+	List *[]interface{}
 }
 
-const serverURL = "http://localhost:7070/"
+var Breakpoints = make(map[int]bool)
 
 type MapType map[interface{}]interface{}
 
 func Add(numbers ...interface{}) interface{} {
+	if len(numbers) < 2 {
+		log.Fatalln("Add operation has too few operands.")
+	}
 	var sum float64
 	for _, n := range numbers {
 		switch n := n.(type) {
 		case float64:
 			sum += n
 		default:
-			panic("Attempted to add a non-number.")
+			log.Fatalln("Attempted to add a non-number.")
 		}
 	}
 	return sum
 }
 
+func Inc(numbers ...interface{}) interface{} {
+	if len(numbers) != 1 {
+		log.Fatalln("Inc operation has too few operands.")
+	}
+	val, ok := numbers[0].(float64)
+	if !ok {
+		log.Fatalln("Attempted to inc a non-number.")
+	}
+	return val + 1
+}
+
+func Dec(numbers ...interface{}) interface{} {
+	if len(numbers) != 1 {
+		log.Fatalln("Dec operation has too few operands.")
+	}
+	val, ok := numbers[0].(float64)
+	if !ok {
+		log.Fatalln("Attempted to inc a non-number.")
+	}
+	return val - 1
+}
+
 func Sub(numbers ...interface{}) interface{} {
-	var sum float64
-	for _, n := range numbers {
+	if len(numbers) < 2 {
+		log.Fatalln("Sub operation has too few operands.")
+	}
+	val, ok := numbers[0].(float64)
+	if !ok {
+		log.Fatalln("Attempted to subtract a non-number.")
+	}
+	for _, n := range numbers[1:] {
 		switch n := n.(type) {
 		case float64:
-			sum -= n
+			val -= n
 		default:
-			panic("Attempted to subtract a non-number.")
+			log.Fatalln("Attempted to subtract a non-number.")
 		}
 	}
-	return sum
+	return val
 }
 
 func Mul(numbers ...interface{}) interface{} {
 	if len(numbers) < 2 {
-		panic("Multiplication operation has too few operands.")
+		log.Fatalln("Mul operation has too few operands.")
 	}
 	product, ok := numbers[0].(float64)
 	if !ok {
-		panic("Attempted to multiply a non-number.")
+		log.Fatalln("Attempted to multiply a non-number.")
 	}
 	for _, n := range numbers[1:] {
 		switch n := n.(type) {
 		case float64:
 			product *= n
 		default:
-			panic("Attempted to multiply a non-number.")
+			log.Fatalln("Attempted to multiply a non-number.")
 		}
 	}
 	return product
@@ -69,18 +94,18 @@ func Mul(numbers ...interface{}) interface{} {
 
 func Div(numbers ...interface{}) interface{} {
 	if len(numbers) < 2 {
-		panic("Division operation has too few operands.")
+		log.Fatalln("Div operation has too few operands.")
 	}
 	quotient, ok := numbers[0].(float64)
 	if !ok {
-		panic("Attempted to divide a non-number.")
+		log.Fatalln("Attempted to divide a non-number.")
 	}
 	for _, n := range numbers[1:] {
 		switch n := n.(type) {
 		case float64:
 			quotient /= n
 		default:
-			panic("Attempted to divide a non-number.")
+			log.Fatalln("Attempted to divide a non-number.")
 		}
 	}
 	return quotient
@@ -88,26 +113,26 @@ func Div(numbers ...interface{}) interface{} {
 
 func Mod(numbers ...interface{}) interface{} {
 	if len(numbers) != 2 {
-		panic("Modulus operation does not have two operands.")
+		log.Fatalln("Modulus operation does not have two operands.")
 	}
 	a, ok1 := numbers[0].(float64)
 	b, ok2 := numbers[1].(float64)
 	if !ok1 || !ok2 {
-		panic("Attempted modulus with a non-number.")
+		log.Fatalln("Attempted modulus with a non-number.")
 	}
 	return float64(int(a) % int(b))
 }
 
 func Eq(values ...interface{}) interface{} {
 	if len(values) < 2 {
-		panic("Attempted equality test with fewer than 2 operands.")
+		log.Fatalln("Attempted equality test with fewer than 2 operands.")
 	}
 
 	for _, val := range values {
 		switch val.(type) {
 		case float64, bool, string, Nil, ListType, MapType:
 		default:
-			panic("Attempted equality test with type other than a number, boolean, string, or null.")
+			log.Fatalln("Attempted equality test with type other than a number, boolean, string, or null.")
 		}
 	}
 
@@ -164,7 +189,7 @@ func Neq(values ...interface{}) interface{} {
 
 func Id(vals ...interface{}) interface{} {
 	if len(vals) < 2 {
-		panic("Too few operands for 'id' operation.")
+		log.Fatalln("Too few operands for 'id' operation.")
 	}
 	first := vals[0]
 	for _, v := range vals[1:] {
@@ -177,27 +202,27 @@ func Id(vals ...interface{}) interface{} {
 
 func Not(vals ...interface{}) interface{} {
 	if len(vals) != 1 {
-		panic("Incorrect number of operands for get operation.")
+		log.Fatalln("Incorrect number of operands for get operation.")
 	}
 	b, ok := vals[0].(bool)
 	if !ok {
-		panic("Attempted logical not operation on a non-boolean value.")
+		log.Fatalln("Attempted logical not operation on a non-boolean value.")
 	}
 	return !b
 }
 
 func Lt(numbers ...interface{}) interface{} {
 	if len(numbers) < 2 {
-		panic("Too few operands for 'lt' operation.")
+		log.Fatalln("Too few operands for 'lt' operation.")
 	}
 	prev, ok := numbers[0].(float64)
 	if !ok {
-		panic("Attempted 'lt' operation on a non-number.")
+		log.Fatalln("Attempted 'lt' operation on a non-number.")
 	}
 	for _, n := range numbers[1:] {
 		f, ok := n.(float64)
 		if !ok {
-			panic("Attempted 'lt' operation on a non-number.")
+			log.Fatalln("Attempted 'lt' operation on a non-number.")
 		}
 		if prev >= f {
 			return false
@@ -209,16 +234,16 @@ func Lt(numbers ...interface{}) interface{} {
 
 func Gt(numbers ...interface{}) interface{} {
 	if len(numbers) < 2 {
-		panic("Too few operands for 'gt' operation.")
+		log.Fatalln("Too few operands for 'gt' operation.")
 	}
 	prev, ok := numbers[0].(float64)
 	if !ok {
-		panic("Attempted 'gt' operation on a non-number.")
+		log.Fatalln("Attempted 'gt' operation on a non-number.")
 	}
 	for _, n := range numbers[1:] {
 		f, ok := n.(float64)
 		if !ok {
-			panic("Attempted 'gt' operation on a non-number.")
+			log.Fatalln("Attempted 'gt' operation on a non-number.")
 		}
 		if prev <= f {
 			return false
@@ -230,16 +255,16 @@ func Gt(numbers ...interface{}) interface{} {
 
 func Lte(numbers ...interface{}) interface{} {
 	if len(numbers) < 2 {
-		panic("Too few operands for 'lte' operation.")
+		log.Fatalln("Too few operands for 'lte' operation.")
 	}
 	prev, ok := numbers[0].(float64)
 	if !ok {
-		panic("Attempted 'lte' operation on a non-number.")
+		log.Fatalln("Attempted 'lte' operation on a non-number.")
 	}
 	for _, n := range numbers[1:] {
 		f, ok := n.(float64)
 		if !ok {
-			panic("Attempted 'lte' operation on a non-number.")
+			log.Fatalln("Attempted 'lte' operation on a non-number.")
 		}
 		if prev > f {
 			return false
@@ -251,16 +276,16 @@ func Lte(numbers ...interface{}) interface{} {
 
 func Gte(numbers ...interface{}) interface{} {
 	if len(numbers) < 2 {
-		panic("Too few operands for 'gte' operation.")
+		log.Fatalln("Too few operands for 'gte' operation.")
 	}
 	prev, ok := numbers[0].(float64)
 	if !ok {
-		panic("Attempted 'gte' operation on a non-number.")
+		log.Fatalln("Attempted 'gte' operation on a non-number.")
 	}
 	for _, n := range numbers[1:] {
 		f, ok := n.(float64)
 		if !ok {
-			panic("Attempted 'gte' operation on a non-number.")
+			log.Fatalln("Attempted 'gte' operation on a non-number.")
 		}
 		if prev < f {
 			return false
@@ -272,74 +297,77 @@ func Gte(numbers ...interface{}) interface{} {
 
 func Get(args ...interface{}) interface{} {
 	if len(args) != 2 {
-		panic("Incorrect number of operands for 'get' operation.")
+		log.Fatalln("Incorrect number of operands for 'get' operation.")
 	}
 	switch v := args[0].(type) {
 	case ListType:
 		f, ok := args[1].(float64)
 		if !ok {
-			panic("Second operand to 'get' on a list should be a number.")
+			log.Fatalln("Second operand to 'get' on a list should be a number.")
 		}
-		return v.list[int(f)]
+		if int(f) >= len(*v.List) {
+			log.Fatalln("Index of 'get' exceeds bounds of the list.")
+		}
+		return (*v.List)[int(f)]
 	case MapType:
 		switch key := args[1].(type) {
 		case float64, string:
 			return v[key]
 		default:
-			panic("Second operand to 'get' on a map should be a string or number.")
+			log.Fatalln("Second operand to 'get' on a map should be a string or number.")
 		}
 	default:
-		panic("First operand to 'get' must be a map or a list.")
+		log.Fatalln("First operand to 'get' must be a map or a list.")
 	}
 	return nil
 }
 
 func Set(args ...interface{}) interface{} {
 	if len(args) != 3 {
-		panic("Incorrect number of operands for 'set' operation.")
+		log.Fatalln("Incorrect number of operands for 'set' operation.")
 	}
 	switch v := args[0].(type) {
 	case ListType:
 		f, ok := args[1].(float64)
 		if !ok {
-			panic("Second operand to 'set' on a list should be a number.")
+			log.Fatalln("Second operand to 'set' on a list should be a number.")
 		}
-		v.list[int(f)] = args[2]
+		(*v.List)[int(f)] = args[2]
 	case MapType:
 		switch key := args[1].(type) {
 		case float64, string:
 			v[key] = args[2]
 		default:
-			panic("Second operand to 'set' on a map should be a string or number.")
+			log.Fatalln("Second operand to 'set' on a map should be a string or number.")
 		}
 	default:
-		panic("First operand to 'set' must be a map or a list.")
+		log.Fatalln("First operand to 'set' must be a map or a list.")
 	}
 	return Nil(0)
 }
 
-func Append(args ...interface{}) interface{} {
+func Push(args ...interface{}) interface{} {
 	if len(args) < 2 {
-		panic("Too few operands for 'append' operation.")
+		log.Fatalln("Too few operands for 'push' operation.")
 	}
 	list, ok := args[0].(ListType)
 	if !ok {
-		panic("First operand to 'append' must be a list.")
+		log.Fatalln("First operand to 'push' must be a list.")
 	}
 	for _, v := range args[1:] {
-		list.list = append(list.list, v)
+		*list.List = append(*list.List, v)
 	}
 	return Nil(0)
 }
 
 func Or(args ...interface{}) interface{} {
 	if len(args) < 2 {
-		panic("Too few operands for 'or' operation.")
+		log.Fatalln("Too few operands for 'or' operation.")
 	}
 	for _, a := range args {
 		b, ok := a.(bool)
 		if !ok {
-			panic("Operands of 'or' must be booleans.")
+			log.Fatalln("Operands of 'or' must be booleans.")
 		}
 		if b {
 			return true
@@ -350,12 +378,12 @@ func Or(args ...interface{}) interface{} {
 
 func And(args ...interface{}) interface{} {
 	if len(args) < 2 {
-		panic("Too few operands for 'or' operation.")
+		log.Fatalln("Too few operands for 'or' operation.")
 	}
 	for _, a := range args {
 		b, ok := a.(bool)
 		if !ok {
-			panic("Operands of 'or' must be booleans.")
+			log.Fatalln("Operands of 'or' must be booleans.")
 		}
 		if !b {
 			return false
@@ -366,60 +394,31 @@ func And(args ...interface{}) interface{} {
 
 func Print(args ...interface{}) interface{} {
 	if len(args) == 0 {
-		panic("Print operation needs at least one operand.")
+		log.Fatalln("Print operation needs at least one operand.")
 	}
-	s := ""
-	for _, v := range args {
-		s += fmt.Sprint(v) + " "
+	fmt.Print(args...)
+	return Nil(0)
+}
+
+func Println(args ...interface{}) interface{} {
+	if len(args) == 0 {
+		log.Fatalln("Println operation needs at least one operand.")
 	}
-	s = s[:len(s)-1]
-	line := bytes.NewBuffer([]byte(s))
-	resp, err := http.Post(serverURL+"writeOutput", "application/json", line)
-	if err != nil {
-		log.Fatalln(err)
-		return err
-	}
-	defer resp.Body.Close()
+	fmt.Println(args...)
 	return Nil(0)
 }
 
 func Prompt(args ...interface{}) interface{} {
 	if len(args) > 1 {
-		Print(args...)
+		fmt.Println(args...)
 	}
-	resp, err := http.Get(serverURL + "acceptInput")
-	if err != nil {
-		log.Fatalln(err)
-		return nil
-	}
-	for ; ; time.Sleep(pollSleepTime) {
-		defer resp.Body.Close()
-		resp, err = http.Get(serverURL + "readInput")
-		if err != nil {
-			log.Fatalln(err)
-			return nil
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln(err)
-			return nil
-		}
-		var input []string
-		err = json.Unmarshal(body, &input)
-		if err != nil {
-			log.Fatalln(err)
-			return nil
-		}
-		if len(input) >= 1 {
-			return input[0]
-		}
-	}
+	log.Fatalln("implement prompt")
+	return nil
 }
 
 func Concat(args ...interface{}) interface{} {
 	if len(args) < 1 {
-		panic("Concat operation needs two or more operands.")
+		log.Fatalln("Concat operation needs two or more operands.")
 	}
 	return fmt.Sprint(args...)
 }
@@ -429,15 +428,15 @@ func List(args ...interface{}) interface{} {
 	for i, a := range args {
 		list[i] = a
 	}
-	return ListType{list}
+	return ListType{&list}
 }
 
 func Map(args ...interface{}) interface{} {
 	if len(args) == 0 {
-		panic("'Map' operation needs at least one operand.")
+		log.Fatalln("'Map' operation needs at least one operand.")
 	}
 	if len(args)%2 != 0 {
-		panic("'Map' operations needs an even number of operands.")
+		log.Fatalln("'Map' operations needs an even number of operands.")
 	}
 	_map := make(MapType)
 	for i := 0; i < len(args); {
@@ -449,24 +448,64 @@ func Map(args ...interface{}) interface{} {
 
 func Len(args ...interface{}) interface{} {
 	if len(args) != 1 {
-		panic("'len' operator must have just one operand.")
+		log.Fatalln("'len' operator must have just one operand.")
 	}
 	switch a := args[0].(type) {
 	case ListType:
-		return len(a.list)
+		return float64(len(*a.List))
 	case MapType:
-		return len(a)
+		return float64(len(a))
 	case string:
-		return len(a)
+		return float64(len(a))
 	default:
-		panic("'len' operator operand must be a map or list.")
+		log.Fatalln("'len' operator operand must be a map or list.")
+		return nil
 	}
 }
 
+func Charlist(args ...interface{}) interface{} {
+	if len(args) != 1 {
+		log.Fatalln("'charlist' operation needs one operand.")
+	}
+	s, ok := args[0].(string)
+	if !ok {
+		log.Fatalln("'charlist' operation operand must be a string.")
+	}
+	list := make([]interface{}, len(s))
+	for i, a := range []rune(s) {
+		list[i] = string(a)
+	}
+	return ListType{&list}
+}
+
+func Getchar(args ...interface{}) interface{} {
+	if len(args) != 2 {
+		log.Fatalln("'getchar' operation needs two operands.")
+	}
+	s, ok := args[0].(string)
+	if !ok {
+		log.Fatalln("'getchar' operation's first operand must be a string.")
+	}
+	idx, ok := args[1].(float64)
+	if !ok {
+		log.Fatalln("'getchar' operation's second operand must be a number.")
+	}
+	for i, a := range []rune(s) {
+		if i == int(idx) {
+			return string(a)
+		}
+	}
+	log.Fatalln("index for 'getchar' operation is out of bounds")
+	return ListType{}
+}
+
 func (l ListType) String() string {
-	list := l.list
+	list := l.List
+	if len(*l.List) == 0 {
+		return "[]"
+	}
 	s := "["
-	for _, v := range list {
+	for _, v := range *list {
 		s += fmt.Sprintf("%v ", v)
 	}
 	return s[:len(s)-1] + "]"
@@ -481,55 +520,4 @@ type DebugVar struct {
 // do nothing (used to supress unused variable compile errors)
 func NullOp(args ...interface{}) {
 	// do nothing
-}
-
-const pollSleepTime = 300 * time.Millisecond
-
-func PollBreakpoints(breakpoints *map[int]bool) error {
-	for ; ; time.Sleep(pollSleepTime) {
-		resp, err := http.Get(serverURL + "getBreakpoints")
-		if err != nil {
-			return err
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln("Error reading response in PollBreakpoints")
-			return err
-		}
-		resp.Body.Close() // can't use defer because we're in an infinite loop
-		strBreakpoints := map[string]bool{}
-		err = json.Unmarshal(body, &strBreakpoints)
-		if err != nil {
-			log.Fatalln("Error unmarshalling breakpoints in PollContinue")
-			return err
-		}
-		*breakpoints = map[int]bool{}
-		for k := range strBreakpoints {
-			linenum, err := strconv.Atoi(k)
-			if err != nil {
-				log.Fatalln("Error: breakpoint not a valid integer in PollContinue")
-				return err
-			}
-			(*breakpoints)[linenum] = true
-		}
-	}
-}
-
-func PollContinue(line int, globals, locals map[string]interface{}) error {
-	for ; ; time.Sleep(pollSleepTime) {
-		resp, err := http.Get(serverURL + "checkContinue/" + strconv.Itoa(line))
-		if err != nil {
-			return err
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln("Error reading response in PollContinue")
-			return err
-		}
-		resp.Body.Close() // can't use defer because we're in an infinite loop
-		if string(body) == "true" {
-			break
-		}
-	}
-	return nil
 }

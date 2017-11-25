@@ -33,14 +33,25 @@ func lex(text string) ([]Token, error) {
 			line++
 			column = 1
 			i++
+		} else if r == '\r' {
+			if runes[i+1] != '\n' {
+				return nil, msg(line, column, "Improper newline: expecting LF (linefeed) after CR (carriage return).")
+			}
+			tokens = append(tokens, Token{Newline, "\n", line, column})
+			line++
+			column = 1
+			i += 2
 		} else if r == '/' { // start of a comment
 			if runes[i+1] != '/' {
 				return nil, msg(line, column, "Expected second / (slash).")
 			}
-			for runes[i] != '\n' {
+			for runes[i] != '\n' && runes[i] != '\r' {
 				i++
 			}
 			i++
+			if runes[i] == '\n' { // LF after CR
+				i++
+			}
 			if len(tokens) > 1 && tokens[len(tokens)-1].Type != Newline {
 				tokens = append(tokens, Token{Newline, "\n", line, column})
 			}
@@ -105,7 +116,7 @@ func lex(text string) ([]Token, error) {
 			for {
 				current := runes[endIdx]
 				// loop will never run past end of runes because \n appended to end of file
-				if current == '\n' {
+				if current == '\n' || current == '\r' {
 					return nil, msg(line, column, "String literal not closed.")
 				}
 				if current == '"' && prev != '\\' { // end of the string
@@ -126,7 +137,7 @@ func lex(text string) ([]Token, error) {
 				current := runes[endIdx]
 				// loop will never run past end of runes because \n appended to end of file
 				// A number literal should always end with space, newline, or )
-				if strings.Contains("> \n)]", string(current)) {
+				if strings.Contains("> \r\n)]", string(current)) {
 					break
 				} else if current == '.' {
 					if decimalPointIdx != -1 {
@@ -177,7 +188,7 @@ func lex(text string) ([]Token, error) {
 				current := runes[endIdx]
 				// loop will never run past end of runes because \n appended to end of file
 				// A word should always end with space, newline, <, >, ., [, or )
-				if strings.Contains(" \n)<>.[", string(current)) {
+				if strings.Contains(" \r\n)<>.[", string(current)) {
 					break
 				} else if !(isAlpha(current) || isNumeral(current)) {
 					return nil, msg(line, column, "Word improperly formed.")
@@ -222,12 +233,24 @@ func lex(text string) ([]Token, error) {
 			return nil, msg(line, column, "Unexpected character "+string(r)+".")
 		}
 	}
-	// filter out blank lines
+
+	// TODO filter out blank lines and spaces before newlines in one pass
+	// filter out blank lines with indentation
 	filteredTokens := []Token{}
 	for i := 0; i < len(tokens)-1; {
 		if tokens[i].Type == Indentation && tokens[i+1].Type == Newline {
 			i += 2
-		} else if tokens[i].Type == Newline && tokens[i+1].Type == Newline {
+		} else {
+			filteredTokens = append(filteredTokens, tokens[i])
+			i++
+		}
+	}
+	tokens = append(filteredTokens, tokens[len(tokens)-1])
+
+	// filter out blank lines
+	filteredTokens = []Token{}
+	for i := 0; i < len(tokens)-1; {
+		if tokens[i].Type == Newline && tokens[i+1].Type == Newline {
 			i++
 		} else {
 			filteredTokens = append(filteredTokens, tokens[i])
@@ -235,6 +258,7 @@ func lex(text string) ([]Token, error) {
 		}
 	}
 	tokens = append(filteredTokens, tokens[len(tokens)-1])
+
 	// remove all spaces followed by newlines
 	filteredTokens = []Token{}
 	for i := 0; i < len(tokens); i++ {
@@ -244,6 +268,7 @@ func lex(text string) ([]Token, error) {
 		filteredTokens = append(filteredTokens, tokens[i])
 	}
 	tokens = filteredTokens
+
 	// remove all sequences of [newline -> indentation -> comma], replace with space
 	if tokens[0].Type == Comma || tokens[1].Type == Comma {
 		return nil, msg(line, column, "Unexpected comma at start of file.")
@@ -733,7 +758,7 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 				return ParsedDataType{}, 0, err
 			}
 			idx += n
-			return ParsedDataType{line, primary.Content, paramTypes, returnTypes}, idx, nil
+			return ParsedDataType{line, tokens[idx].Column, primary.Content, paramTypes, returnTypes}, idx, nil
 		}
 		dataType, n, err := parseType(tokens[idx:], line)
 		if err != nil {
@@ -759,7 +784,7 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 			}
 			if tokens[idx].Type == NumberLiteral {
 				// special case for arrays (we expect a number literal, not just a constant expression)
-				paramTypes = append(paramTypes, ParsedDataType{line, tokens[idx].Content, nil, nil})
+				paramTypes = append(paramTypes, ParsedDataType{line, tokens[idx].Column, tokens[idx].Content, nil, nil})
 				idx++
 			} else {
 				dataType, n, err := parseType(tokens[idx:], line)
@@ -775,7 +800,7 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 		}
 		idx++
 	}
-	return ParsedDataType{line, primary.Content, paramTypes, returnTypes}, idx, nil
+	return ParsedDataType{line, tokens[idx].Column, primary.Content, paramTypes, returnTypes}, idx, nil
 }
 
 // expects to end with newline or >, but does not consume the newline or >

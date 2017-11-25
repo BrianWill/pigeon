@@ -44,7 +44,7 @@ func contains s ss
     locals match       // boolean
     forinc i 0 (inc (sub (len s) (len ss)))
         as match true
-        forinc j I 0 (len ss)
+        forinc j 0 (len ss)
             if (neq (getchar s j) (getchar ss j))
                 as match false
                 break
@@ -55,9 +55,9 @@ func contains s ss
 // s = string, ss (substring) = string, returns integer
 func index s ss
     locals match      // boolean
-    forinc i I 0 (inc (sub (len s) (len ss)))
+    forinc i 0 (inc (sub (len s) (len ss)))
         as match true
-        forinc j I 0 (len ss)
+        forinc j 0 (len ss)
             if (neq (getchar s j) (getchar ss j))
                 as match false
                 break
