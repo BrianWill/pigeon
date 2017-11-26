@@ -1,9 +1,14 @@
 package stdlib
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"math"
+	"math/rand"
+	"os"
 	"reflect"
+	"time"
 )
 
 type Nil int
@@ -409,11 +414,24 @@ func Println(args ...interface{}) interface{} {
 }
 
 func Prompt(args ...interface{}) interface{} {
-	if len(args) > 1 {
+	if len(args) >= 1 {
 		fmt.Println(args...)
 	}
-	log.Fatalln("implement prompt")
-	return nil
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	if scanner.Err() != nil {
+		log.Fatalln(scanner.Err())
+	}
+	s := scanner.Text()
+	return s
+}
+
+func List(args ...interface{}) interface{} {
+	list := make([]interface{}, len(args))
+	for i, a := range args {
+		list[i] = a
+	}
+	return ListType{&list}
 }
 
 func Concat(args ...interface{}) interface{} {
@@ -423,12 +441,24 @@ func Concat(args ...interface{}) interface{} {
 	return fmt.Sprint(args...)
 }
 
-func List(args ...interface{}) interface{} {
-	list := make([]interface{}, len(args))
-	for i, a := range args {
-		list[i] = a
+func Floor(args ...interface{}) interface{} {
+	if len(args) != 1 {
+		log.Fatalln("'floor' operation needs one operand.")
 	}
-	return ListType{&list}
+	switch v := args[0].(type) {
+	case float64:
+		return math.Floor(v)
+	default:
+		log.Fatalln("'floor' operation operand must be a number")
+		return nil
+	}
+}
+
+func RandNum(args ...interface{}) interface{} {
+	if len(args) != 0 {
+		log.Fatalln("'randNum' operation should have no operands.")
+	}
+	return rand.Float64()
 }
 
 func Map(args ...interface{}) interface{} {
@@ -520,4 +550,8 @@ type DebugVar struct {
 // do nothing (used to supress unused variable compile errors)
 func NullOp(args ...interface{}) {
 	// do nothing
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }

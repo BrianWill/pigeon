@@ -47,16 +47,8 @@ func lex(text string) ([]Token, error) {
 			}
 			for runes[i] != '\n' && runes[i] != '\r' {
 				i++
+				column++
 			}
-			i++
-			if runes[i] == '\n' { // LF after CR
-				i++
-			}
-			if len(tokens) > 1 && tokens[len(tokens)-1].Type != Newline {
-				tokens = append(tokens, Token{Newline, "\n", line, column})
-			}
-			line++
-			column = 1
 		} else if r == '(' {
 			tokens = append(tokens, Token{OpenParen, "(", line, column})
 			column++
@@ -862,7 +854,8 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 					}
 					statement = expression.(Statement)
 					if tokens[i+numTokens].Type != Newline {
-						return nil, 0, msg(t.LineNumber, t.Column, "Statement not terminated with newline.")
+						return nil, 0, msg(t.LineNumber, tokens[i+numTokens].Column,
+							"Expecting newline.")
 					}
 					numTokens++ // include the newline
 				default:

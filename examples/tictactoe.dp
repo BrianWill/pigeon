@@ -1,3 +1,4 @@
+
 global topRow (list "_" "_" "_")
 global middleRow (list "_" "_" "_")
 global bottomRow (list "_" "_" "_")
@@ -7,7 +8,7 @@ func playerMove currentPlayer
     while true
         as row nil
         while (eq row nil)
-            as row (prompt "Select [t]op, [m]iddle, or [b]ottom row, player" currentPlayer)
+            as row (prompt (concat "Player " currentPlayer ": select [t]op, [m]iddle, or [b]ottom row"))
             if (eq row "t")
                 as row topRow
             elif (eq row "m")
@@ -15,11 +16,11 @@ func playerMove currentPlayer
             elif (eq row "b")
                 as row bottomRow
             else
-                (print "Invalid input. Try again.")
+                (println "Invalid input. Try again.")
                 as row nil
         as col nil
         while (eq col nil)
-            as col (prompt "Select [l]eft, [m]iddle, or [r]ight column, player" currentPlayer)
+            as col (prompt (concat "Player " currentPlayer ": select [l]eft, [m]iddle, or [r]ight column"))
             if (eq col "l")
                 as col 0
             elif (eq col "m")
@@ -27,14 +28,14 @@ func playerMove currentPlayer
             elif (eq col "r")
                 as col 2
             else
-                (print "Invalid input. Try again.")
+                (println "Invalid input. Try again.")
                 as col nil
         as slot (get row col)
         if (eq slot "_")
             (set row col currentPlayer)
             return
         else 
-            (print "That slot is occupied! Try again.")
+            (println "That slot is occupied! Try again.")
         
 
 // returns "X" if X wins, returns "O" if O wins, returns "_" if no one wins, and returns "tie" if tied
@@ -72,19 +73,22 @@ func winner
         return "tie"
     return "_"
 
+
+
 func main
     locals w currentPlayer
     as currentPlayer "X"
-    while (not done)
+    while true
         (print (concat topRow "\n" middleRow "\n" bottomRow "\n"))
         as w (winner)
         if (eq w "X")
-            (print "X's win!")
+            (println "X's win!")
             return
         elif (eq w "O")
-            (print "O's win!")
+            (println "O's win!")
+            return
         elif (eq w "tie")
-            (print "Tie!")
+            (println "Tie!")
             return
         else
             (playerMove currentPlayer)
@@ -93,3 +97,11 @@ func main
                 as currentPlayer "O"
             else
                 as currentPlayer "X"
+
+
+
+
+
+
+
+

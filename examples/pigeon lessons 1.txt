@@ -1,0 +1,877 @@
+DyanmicPigeon, an educational language
+
+
+
+
+
+
+
+
+(add 3 5)              // 3 + 5
+(sub 10 4)             // 10 - 4
+(mul 2 -11.77)         // 2 * -11.77
+(div 9 18)             // 9 / 18
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(add 8.2 13 -5 20)              // 8.2 + 13 + -5 + 20
+(add 8.2 (mul 4 3) -5 20)       // 8.2 + (4 * 3) + -5 + 20
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// true and false are values just like numbers are values
+
+(eq 5 5)                      // is 5 equal to 5 (true)
+(eq 5 7)                      // is 5 equal to 7 (false)
+
+(lt 5 7)                      // is 5 less than 7 (true)
+(gt 5 7)                      // is 5 greater than 7 (false)
+
+(lte 5 7)                     // is 5 less than or equal to 7 (true)
+(lte 7 7)                     // is 7 less than or equal to 7 (true)
+(gte 5 7)                     // is 5 greater than or equal to 7 (false)
+(gte 7 7)                     // is 7 greater than or equal to 7 (true)
+
+
+
+
+
+
+
+
+
+
+
+
+
+(and true true true)          // are all of the values true? (true)
+(and true false true)         // are all of the values true? (false)
+
+(and (eq 9 9) (eq 5 7))       // false
+
+
+(or true false true)          // is at least one value true? (true)
+(or false false false)        // is at least one value true? (false)
+
+(or (eq 9 9) (eq 5 7))        // true
+
+
+(not true)                    // false
+(not false)                   // true
+
+
+
+
+
+
+
+
+
+
+
+
+
+// a variable stores a value
+// a 'locals' statement creates variables
+// an 'as' statment assigns a value to a variable
+
+locals ted bob amy            // create three variables: ted, bob, amy
+as ted 3                      // assign 3 to ted
+as amy true                   // assign true to amy
+as bob -7.5                   // assign -7.5 to bob
+as ted (eq bob 4)             // assign false to ted
+as amy (add bob 2)            // assign -5.5 to amy
+
+
+
+
+
+
+
+
+
+
+
+
+// before its first assignment, a variable stores 
+// the value 'nil' (which represents 'nothing')
+
+locals ted bob                
+as ted 4
+as ted bob                    // assign nil to ted
+
+
+
+
+
+
+
+
+
+
+
+
+locals anya kim
+as anya "Hi ,world."
+as kim (concat "time" "warp")      // assign "timewarp" to kim
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+locals anya kim
+as anya "Hi ,world."
+as kim (concat "time" "warp")      // assign "timewarp" to kim
+
+(print 3)                          // print "3"
+(println 3)                        // print "3" followed by a newline
+(print "hi")                       // print "hi"
+(println anya)                     // print "Hi, world." followed by a newline
+(println kim 4)                    // print "timewarp 4"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// an 'if' statement has a condition and a body (one or more other statements)
+if (eq x 7)                   // execution of the body depends upon the value of 'x'
+    (print "hi")              // first statement of the body
+    (print "yo")              // second statement of the body
+(print "bye")                 // first statement after the 'if'
+
+
+
+
+
+
+
+
+
+
+
+
+
+// an 'if' can contain other 'if's
+if (eq x 7)                   
+    (print "hi")              
+    if (eq y 11)
+        (print "yo")              
+    (print "aloha")
+(print "bye")                 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// mutual exclusion: one (but only one) of these bodies will execute
+if (eq x 7)                   
+    (print "hi")              
+    (print "yo")              
+if (not (eq x 7))                    // the logical inverse
+    (print "aloha")            
+    (print "later")            
+
+
+
+
+
+
+
+
+
+
+
+// mutual exclusion: one (but only one) of these bodies will execute
+as cond (eq x 7)
+if cond                   
+    (print "hi")              
+    (print "yo")              
+if (not cond)                       // the logical inverse
+    (print "aloha")            
+    (print "later")  
+
+
+
+
+
+
+
+
+
+
+
+
+// an 'if' can have an 'else' clause
+if (eq x 7)                   
+    (print "hi")              
+    (print "yo")              
+else                       // 'else' body executes only if the 'if' body does not
+    (print "aloha")            
+    (print "later")            
+
+
+
+
+
+
+
+
+
+
+// when we want more than two mutually exclusive cases, we can nest 'if's in 'else's
+if (eq x 7)                   
+    (print "hi")              
+else
+    if (eq x 9)
+        (print "yo")
+    else
+        if (eq x 11)
+            (print "aloha")            
+        else
+            (print "later")
+
+
+
+
+
+
+
+
+
+
+// an 'if' can have one or more 'elif' ('else if') clauses 
+if (eq x 7)                   
+    (print "hi")              
+elif (eq x 9)
+    (print "yo")
+elif (eq x 11)
+    (print "aloha")            
+else
+    (print "later")
+
+
+
+
+
+
+
+
+
+
+
+
+// an 'if' can have one or more 'elif' clauses 
+if (eq x 7)                   
+    (print "hi")              
+elif (eq x 9)
+    (print "yo")
+elif (eq x 11)
+    (print "aloha")            
+(print "later")
+
+
+
+
+
+
+
+
+
+
+
+// a 'while' is like an 'if' but repeats until the condition tests false
+// this will print "hi" three times
+as x 0
+while (lt x 3)
+    (print "hi")
+    as x (add x 1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+// a 'while' is like an 'if' but repeats until the condition tests false
+// this will print: 2 3 4 5 6
+as x 2
+while (lt x 7)
+    (print x)
+    as x (add x 1)
+
+
+
+
+
+
+
+
+
+
+
+// a 'while' is like an 'if' but repeats until the condition tests false
+// this will print: 2 3 4 5 6
+as x 2
+while (lt x 7)
+    (print x)
+    as x (inc x)              // increment x
+
+
+
+
+
+
+
+
+
+
+
+
+
+// a 'forinc' loop has a variable, a starting value, and an end value
+// this will print: 2 3 4 5 6
+forinc x 2 7
+    (print x)
+
+
+
+
+
+
+
+
+
+
+
+
+
+// a 'fordec' loop decrements until variable is less than the end value
+// initial value of x is one less than the provided start value
+// this will print: 6 5 4 3 2
+fordec x 7 2
+    (print x)
+
+
+
+
+
+
+
+
+
+
+
+
+// a function is like an operator you define
+// 'func' defines a new function but does not call it
+func george
+    (print "hi")
+    (print "yo")
+
+
+(george)                        // 'call' the function
+(george)                        // 'call' the function again
+
+
+
+
+
+
+
+
+
+
+
+// a function is like an operator you define
+func george
+    (print "hi")
+    (print "yo")
+
+
+// program execution begins by calling the function 'main'
+func main
+    (george)                    // 'call' the function george
+    (george)                    // 'call' the function george again
+
+
+
+
+
+
+
+
+
+func george
+    locals y                    // 'locals' statement must be first in the function
+    as y 4
+    (print y)
+
+
+func main
+    locals x                        
+    as x 5
+    (george)
+    as y 10                     // compile error: no variable 'y' exists in 'main'
+
+
+
+
+
+
+
+
+
+
+
+
+func george
+    locals x                    // separate from 'x' of 'main'
+    as x 4
+    (print x)
+
+
+func main
+    locals x                    // separate from 'x' of 'george'
+    (george)
+    as x 10                     // assigns to 'x' of 'main'
+
+
+
+
+
+
+
+
+
+func george
+    (print "hi")
+    return 9
+
+
+func main
+    locals x                    
+    as x (george)               // assign 9 to 'x'
+
+
+
+
+
+
+
+
+
+
+func george
+    (print "hi")
+    // without a return, a function returns nil by default
+
+
+func main
+    locals x                    
+    as x (george)               // assign nil to 'x'
+
+
+
+
+
+
+
+
+
+
+// 'george' has two parameter variables: 'cat' and 'dog'
+func george cat dog
+    as cat (add cat 2)              // parameters are variables
+    return (mul cat dog)
+
+
+func main
+    locals x                    
+    as x (george 4 3)               // assign 18 to 'x'
+    (george 4)                      // runtime error: too few arguments
+
+
+
+
+
+
+
+
+
+
+
+
+
+global x 6                  // create global 'x' with initial value 6
+
+func lisa                 
+    as x (add x 4)          // increment global 'x' by 4
+
+func main
+    (print x)               // print 6
+    as x 10                 // assign 10 to global x
+    (lisa)
+    (print x)               // print 14
+
+
+
+
+
+
+
+
+
+
+global x 6                  
+
+func lisa x                 // 'lisa' has its own 'x'   
+    as x (add x 4)          // increment parameter 'x' by 4
+    return x            
+
+func main
+    (print x)               // print 6
+    as x 10                 // assign 10 to global x
+    (print (lisa 5))        // print 9
+    (print x)               // print 10
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x y z
+    as x (list)                   // a list with no items
+    as y (list 600 52 "hi")       // a list with three items
+    as z (list "yo")              // a list with one item
+    (len x)                       // 0
+    (len y)                       // 3
+    (len z)                       // 1
+    (get y 0)                     // 600
+    (get y 1)                     // 52
+    (get y 2)                     // "hi"
+    (get z 0)                     // "yo"
+    (set y 0 "bye")               // change value at index 0 of 'y's list to "bye"
+    (get y 0)                     // "bye"
+    (print y)                     // prints: "bye" 52 "hi"
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x y
+    as x (list 6 "hi" 78)
+    as y x                     // 'y' will now reference the same list as 'x'
+    (set y 1 "yo")             // modify index 1 of the list referenced by 'y'
+    (get x 1)                  // "yo"
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x
+    as x (list 6 "hi" 78)
+    (len x)                        // 3
+    (append x 9)                
+    (len x)                        // 4
+    (append x "yo")
+    (len x)                        // 5
+    (get x 4)                      // "yo"
+    
+    
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x y
+    as x (list 6 "hi" 78)
+    as y (list -4 19)
+    (set x 0 y)                
+    (set x 1 x)                         
+    (get (get x 0) 0)            // -4
+    (get (get x 1) 2)            // 78        
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x
+    as x (list 6 "hi" 78)
+    forinc i 0 (len x)
+        (println i (get x i))             
+    // prints:
+    // 0 6
+    // 1 hi
+    // 2 78
+
+
+
+
+
+
+
+
+
+func main
+    locals x
+    as x (list 6 "hi" 78)
+    foreach i v x
+        (println i v)
+    // prints:
+    // 0 6
+    // 1 hi
+    // 2 78
+
+
+
+
+
+
+
+
+
+
+func main
+    foreach i v (list 6 "hi" 78)
+        (println i v)
+    // prints:
+    // 0 6
+    // 1 hi
+    // 2 78
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x
+    // a new map with two key-value pairs: 
+    // key "hi" with value 6 and key "bye" with value "yo"
+    as x (map "hi" 6 "bye" "yo")
+    (len x)                   // 2
+    (get x "hi")              // 6
+    (get x "bye")             // "yo"
+    (get x "asdf")            // nil
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x 
+    as x (map)                // assign a new, empty map to 'x'
+    (set x "hi" 6)
+    (set x "bye" "yo")
+    (set x "hi" 8)
+    (get x "hi")              // 8
+    (get x "bye")             // "yo"
+    (len x)                   // 2
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x
+    as x (map "hi" 6 "bye" "yo")
+    // the only way to loop through all the keys is with foreach
+    foreach k v x
+        (println k v)
+    // prints (in no particular order!):
+    // bye yo
+    // hi 6
+
+
+
+
+
+
+
+func terry a b
+    return (mul a b)
+
+
+func main
+    locals ian
+    as ian terry           // functions are values!
+    (ian 9 3)              // 27
+
+
+// store functions in variables, lists, and maps
+// pass functions as arguments
+// return functions
+
+
+
+
+
+
+
+
+
+
+func jenny x
+    if (gt x 0)
+        (print "hi")
+        (jenny (dec x))
+        (print "bye")
+
+func main
+    (jenny 3)           // prints "hihihibyebyebye"
+
+
+
+
+
+
+
+
+
+func factorial n
+    if (eq n 0)
+        return 1
+    else
+        return (mul n (factorial (dec n)))
+
+
+
+
+
+
+
+
+

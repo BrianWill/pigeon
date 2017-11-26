@@ -84,7 +84,7 @@ func compileExpression(e Expression, pkg *Package, locals map[string]string) (st
 		case StringLiteral:
 			code = e.Content
 		case BooleanLiteral:
-			code = e.Content
+			code = "interface{}(" + e.Content + ")"
 		case NilLiteral:
 			code = "_std.Nil(0)"
 		}
@@ -448,7 +448,8 @@ func compileFunctionCall(s FunctionCall, pkg *Package, locals map[string]string)
 		} else {
 			// previous check means we don't have to check for zero val
 			if _, ok := pkg.Funcs[s.Content]; !ok {
-				return "", msg(s.LineNumber, s.Column, "calling non-existent function.")
+				return "", msg(s.LineNumber, s.Column,
+					"calling non-existent function: "+s.Content)
 			}
 			code += strings.Title(s.Content)
 		}

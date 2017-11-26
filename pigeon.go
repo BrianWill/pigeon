@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
-	"github.com/BrianWill/pigeon/staticPigeon"
 )
 
 type runStateEnum string
@@ -30,7 +29,7 @@ func Run(filename string) (*exec.Cmd, error) {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err := cmd.Start()
+	err := cmd.Run()
 	if err != nil {
 		return nil, err
 	}
@@ -45,56 +44,39 @@ func main() {
 				fmt.Println("Must specify a file to run.")
 				return
 			}
-			gopath := os.Getenv("GOPATH")
-			basedir := gopath + "/src/pigeon_output/"
-			outputFile := "output.go"
+			basedir := os.Getenv("GOPATH") + "/src/pigeon_output/"
+			outputFile := basedir + "output.go"
 			if _, err := os.Stat(basedir); os.IsNotExist(err) {
 				os.Mkdir(basedir, os.ModePerm)
 			}
+			var code []byte
 			if strings.HasSuffix(os.Args[2], ".sp") {
-				packages, err := staticPigeon.Compile(os.Args[2], "pigeon_output/")
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				for _, p := range packages {
-					pkgDir := basedir + p.Prefix
-					if _, err := os.Stat(pkgDir); os.IsNotExist(err) {
-						os.Mkdir(pkgDir, os.ModePerm)
-					}
-					outputFilename := pkgDir + "/" + p.Prefix + ".go"
-					err = ioutil.WriteFile(outputFilename, []byte(p.Code), os.ModePerm)
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-					err = exec.Command("go", "fmt", outputFilename).Run()
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-				}
+				// packages, err := staticPigeon.Compile(os.Args[2], "pigeon_output/")
+				// if err != nil {
+				// 	fmt.Println(err)
+				// 	return
+				// }
 			} else if strings.HasSuffix(os.Args[2], ".dp") {
 				pkg, err := dynamicPigeon.Compile(os.Args[2], "pigeon_output/")
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
-				outputFilename := basedir + outputFile
-				err = ioutil.WriteFile(outputFilename, []byte(pkg.Code), os.ModePerm)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				err = exec.Command("go", "fmt", outputFilename).Run()
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
+				code = []byte(pkg.Code)
 			} else {
 				log.Fatal("File has improper extension.")
 			}
-			_, err := Run(basedir + outputFile)
+			err := ioutil.WriteFile(outputFile, code, os.ModePerm)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			err = exec.Command("go", "fmt", outputFile).Run()
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			_, err = Run(outputFile)
 			if err != nil {
 				fmt.Println(err)
 				return

@@ -1,0 +1,398 @@
+DyanmicPigeon, an educational language
+
+
+
+
+
+// corrections:
+// 1. 'push', not 'append'
+// 2. fordec counts down through end
+
+func main
+    // prints: 4 3 2 1 0
+    fordec i 5 0
+        (print i)
+
+
+
+
+
+
+
+
+// fizz buzz:
+// print all the numbers from 1 through 100, except...
+// ...for numbers evenly divisible by 3, instead print fizz
+// ...for numbers evenly divisible by 5, instead print buzz
+// ...for numbers evenly divisible by 3 and 5, instead print fizzbuzz
+
+
+
+
+
+
+
+func main
+    locals i
+    as i 1
+    while (lte i 100)
+        (println i)
+        as i (inc i)
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    forinc i 1 101
+        (println i)
+
+
+
+
+
+
+
+
+
+
+
+
+func isEvenlyDivisible n divisor
+    return (eq 0 (mod n divisor))
+
+func main
+    if (isEvenlyDivisible 7 3)
+        (println "7 is evenly divisible by 3")
+    else
+        (println "7 is NOT evenly divisible by 3")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func isEvenlyDivisible n divisor
+    return (eq 0 (mod n divisor))
+
+func main
+    locals by3 by5
+    forinc i 1 101
+        as by3 (isEvenlyDivisible i 3)
+        as by5 (isEvenlyDivisible i 5)
+        if (and by3 by5)
+            (println "fizzbuzz")
+        elif by3
+            (println "fizz")
+        elif by5
+            (println "buzz")
+        else
+            (println i)
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals by3 by5
+    forinc i 1 101
+        as by3 (eq 0 (mod i 3))
+        as by5 (eq 0 (mod i 5))
+        if by3                         // bug! order matters!
+            (println "fizz")
+        elif (and by3 by5)
+            (println "fizzbuzz")
+        elif by5
+            (println "buzz")
+        else
+            (println i)
+
+
+
+
+
+
+
+
+
+
+
+
+// assumes start is less than len and end is less than len+1
+func sublist a start end
+    locals b
+    as b (list)
+    forinc i start end
+        (push b (get a i))
+    return b
+
+func main
+    locals a
+    as a (list "A", "B", "C", "D", "E", "F")
+    (sublist a 0 4)                  // list of "A", "B", "C", "D"
+    (sublist a 2 6)                  // list of "C", "D", "E", "F"
+    (sublist a 2 3)                  // list of "C"
+    (sublist a 2 2)                  // empty list
+    (sublist a 2 1)                  // empty list
+
+
+
+
+
+
+
+
+
+// strings = list of strings, separator = string, returns string
+func join strings separator
+    locals s lastIdx
+    if (eq (len strings) 0)
+        return ""
+    as s ""
+    as lastIdx (dec (len strings))
+    foreach i v (sublist strings 0 lastIdx)
+        as s (concat s v separator)
+    return (concat s (get strings lastIdx))
+
+
+func main
+    locals a
+    as a (list "A" "B" "Cat" "Dog")
+    (join a "")                  // "ABCatDog"
+    (join a " ")                 // "A B Cat Dog"
+    (join a ", ")                // "A, B, Cat, Dog"
+    (join a "..")                // "A..B..Cat..Dog"
+
+
+
+
+
+
+
+
+
+
+
+// s = string, start and end = integers, return string
+func substr s start end
+    locals chars
+    as chars (charlist s)
+    as chars (sublist chars start end)
+    return (join chars "")
+
+
+func main
+    (substr "Hello, world!" 0 4)        // "Hell"
+    (substr "Hello, world!" 3 9)        // "lo, wor"
+    (substr "Hello, world!" 5 6)        // ","
+    
+
+
+
+
+
+
+
+
+
+
+
+
+// s = string, start and end = integers, return string
+func substr s start end
+    locals chars
+    as chars (sublist (charlist s) start end)
+    return (join chars "")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// s = string, start and end = integers, return string
+func substr s start end
+    return (join (sublist (charlist s) start end) "")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// s = string, ss (substring) = string, returns integer
+// assumes the string lengths are greater than 0
+func index s ss
+    locals ss2
+    forinc i 0 (inc (sub (len s) (len ss)))
+        as ss2 (substr s i (add i (len ss)))
+        if (eq ss ss2)
+            return i
+    return -1
+
+func main
+    (index "Hello, world!" "Hell")          // 0
+    (index "Hello, world!" "hell")          // -1
+    (index "Hello, world!" "world")         // 7
+    (index "Hello, world!" "o")             // 4
+
+
+
+
+
+
+
+
+// s = string, ss (substring) = string, returns integer
+// assumes the string lengths are greater than 0
+func index s ss
+    forinc i 0 (inc (sub (len s) (len ss)))
+        if (eq ss (substr s i (add i (len ss))))
+            return i
+    return -1
+
+
+
+
+
+
+
+
+
+
+
+
+// s = string, ss (substring) = string, returns integer
+// assumes the string lengths are greater than 0
+func index s ss
+    locals match
+    as s (charlist s)      
+    as ss (charlist ss)
+    forinc i 0 (inc (sub (len s) (len ss)))
+        // we aren't using substr
+        as match true
+        foreach j ch ss
+            if (neq ch (get s (add i j)))
+                as match false
+                break
+        if match
+            return i
+    return -1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// s = string, chars = list of strings, returns boolean
+func containsAny s chars
+    foreach i ch (charlist s)
+        foreach j ch2 chars
+            if (eq ch ch2)
+                return true
+    return false
+
+
+func main
+    (containsAny "Hello, world!" (charlist "qwerty"))      // true ("e" is in the string)
+    (containsAny "Hello, world!" (charlist "zxcv"))        // false (the string does not contain "a", "s", "d", or "f")
+    (containsAny "Hello, world!" (charlist "!"))           // true ("!" is in the string)
+
+
+
+
+
+
+
+
+
+
+
+
+
+// s = string, cutset = string, returns string
+func trim s cutset
+    locals chars start end
+    as cutset (charlist cutset)
+    // search from the start
+    forinc i 0 (len s)
+        if (not (containsAny (getchar s i) cutset))
+            as start i
+            break
+    if (eq start nil)
+        return ""
+    // search from the end
+    fordec i (len s) 0
+        if (not (containsAny (getchar s i) cutset))
+            as end (inc i)
+            break 
+    return (substr s start end)
+
+
+func main
+    (trim "   Hello, world!   " " ")        // "Hello, world!"
+    (trim "   Hello, world!   " "e !H")     // "llo, world"
+    (trim "   Hello, world!   " "e!H")      // "   Hello, world!   "
+
+
+
+
+
+            
+// charlist
+// getchar
+// break statement
+
+
+// next video:  number-guessing game, hangman game
