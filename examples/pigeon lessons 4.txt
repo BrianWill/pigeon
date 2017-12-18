@@ -1,0 +1,1553 @@
+// StaticPigeon, an educational language
+
+
+// function amber has two parameters, x (a string) and y (a boolean), and returns a boolean
+func amber x Str y Bool : Bool 
+    (println x y)
+    as y (not x)                      // compile error: cannot use 'not' on a string
+    as x y                            // compile error: cannot assign boolean to 'x'
+    return (not y)
+
+
+// main returns nothing (not even nil)
+func main
+    locals answer Bool                // local variable 'answer' is a boolean
+    (println answer)                  // print "false" (the default boolean value)
+    as answer (amber "hi" false)      // OK
+    (println answer)                  // print "true"
+    (amber 4 true)                    // compile error: first argument to 'amber' must be a string
+    return
+
+
+// 1. all data type names in StaticPigeon start with uppercase letters, and all 
+// other names begin with lowercase letters
+// 2. each parameter and local is followed by its type
+// 3. after a function's parameters, a colon precedes the function's return type
+// 4. the colon may be omited if a function returns nothing (as in the case of main)
+// 5. because amber is declared to return a boolean, it must return a boolean
+// 6. a local variable starts out with the default value for its type
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals i I f F         // i is an integer, f is a float
+    as i 5                 // OK
+    as f -2.7              // OK
+    as i 5.0               // compile error: 5.0 is considered a float
+    as f -2                // compile error: -2 is considered an integer
+    as i (add i 7)         // OK
+    as i (add i f)         // compile error: cannot add an integer and float together
+    as f (add f 8.2)       // OK
+    as i (add i (I f))        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x L<I> a I b Str
+    as x (L<I> 6 -32 14)
+    as a (get x 0)                    // assign 6 to 'i'
+    as b (get x 0)                    // compile error: cannot assign an integer to 'b'
+    // prints 0 6, then 1 -32, then 2 14
+    foreach i I v I x
+        (println i v)
+
+
+
+func main
+    locals x L<Str> a I b Str
+    as x (L<Str> "cat" "dog" "moose")
+    as a (get x 0)                    // compile error: cannot assign an integer to 'b'
+    as b (get x 0)                    // assign "cat" to 'b'
+    // prints 0 "cat", then 1 "dog", then 2 "moose"
+    foreach i I v Str x
+        (println i v)
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x M<Str I>
+    as x (M<Str I> "yo" 87 "hi" 3)
+    // prints (but not necessarily in this order): "hi" 3, then "yo" 87
+    foreach k Str v I x
+        (println k v)  
+
+
+
+func main
+    locals x M<F Str>
+    as x (M<F Str> 9.2 "hi" -6.3 "yo")
+    // prints (but not necessarily in this order): 9.2 "hi", then -6.3 "yo"
+    foreach k F v Str x
+        (println k v)  
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals z L<I>                  // 'z' is a list of integers
+    (set z 0 999)                  // runtime error: z is nil
+    (len z)                        // runtime error: z is nil
+    as z (L<I>)
+    (len z)                        // 0
+    (push z 1234)
+    (len z)                        // 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals a A<I 3>                // 'a' is an array of 3 integers
+    (len a)                        // 3
+    (get a 0)                      // 0 (the default integer value)
+    (get a 1)                      // 0
+    (get a 2)                      // 0
+    (get a 3)                      // runtime error: 3 is out of bounds
+    (set a 2 999)                  
+    (get a 2)                      // 999
+    (push a 1234)                  // compile error: cannot use 'push' on arrays
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x A<I 3>                // x is an array of 3 integers
+        ,y A<I 5>                  // y is an array of 5 integers
+        ,z A<I 5>                  // z is an array of 5 integers
+    as x y                         // compile error: x and y are not the same type of array
+    as y z                         // OK
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x A<I 3>
+        ,y A<I 3>
+    (eq x y)                 // true (all elements of both arrays are currently 0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals x A<I 3>
+    as x (A<I 3> 520 -24 10)
+    (get x 0)                  // 520
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// returns the sum of all values in the array
+func sum nums A<I 10> : I
+    locals val I
+    foreach i I v I nums
+        as val (add val v)
+    return val
+
+
+func main
+    locals arr A<I 10>
+    as arr (A<I 10> 1 2 3 4 5 6 7 8 9 10)
+    (println (sum arr))                    // print 55
+
+
+
+
+
+
+
+
+
+
+func main
+    locals arr A<I 10> s S<I>
+    as arr (A<I 10> 10 20 30 40 50 60 70 80 90 100)
+    as s (slice arr 3 7)    // slice referencing index 3 of the array, with 
+                            // length 4 (because 7 - 3 is 4) and capacity 7 (because 10 - 3 is 7)
+    
+    (get s 0)              // 40
+    (get s 1)              // 50
+    (get s 2)              // 60
+    (get s 3)              // 70
+    (get s 4)              // runtime error: out of bounds (index must be less than length)
+
+    (set s 0 -999)         // (set arr 3 -999)
+    (get arr 3)            // -999
+
+    (set arr 6 1234)
+    (get s 3)              // 1234
+
+
+
+
+
+
+
+
+func main
+    locals arr A<I 10> s S<I>
+    as arr (A<I 10> 10 20 30 40 50 60 70 80 90 100)
+    
+    (len s)                      // 0
+    (cap s)                      // 0
+    (get s 0)                    // runtime error: out of bounds
+
+    as s (slice arr 0 7)           
+    (len s)                      // 7
+    (cap s)                      // 10
+    (get s 7)                    // runtime error: out of bounds
+    
+    as s (slice arr 0 10)
+    (len s)                      // 10
+    (cap s)                      // 10
+    (get s 7)                    // 60
+    (get s 9)                    // 100
+    (get s 10)                   // runtime errors: out of bounds
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals arr A<I 10> s S<I> s2 S<I>
+    as arr (A<I 10> 10 20 30 40 50 60 70 80 90 100)
+
+    as s (slice arr 4 9)              // 50 60 70 80 90
+    as s2 (slice arr 8 10)            // 90 100
+
+    (get s 4)                         // 90
+    (get s2 0)                        // 90
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals s S<I>
+    as s (S<I> 10 20 30 40 50)      // create a slice referencing start of a new 
+                                    // underlying array, with length 5 and capacity 5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals arr A<I 10> s S<I> s2 S<I>
+    as arr (A<I 10> 10 20 30 40 50 60 70 80 90 100)
+
+    as s (slice arr 2 8)          // 30 40 50 60 70 80
+    as s2 (slice s 3 5)           // 60 70
+    as s2 (slice arr 5 7)
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals arr A<I 10> s S<I> s2 S<I>
+    as s (slice arr 0 8)             
+    (len s)                          // 8
+    (cap s)                          // 10
+
+    as s2 (append s 1234) 
+    (len s2)                         // 9
+    (cap s2)                         // 10
+    (get s2 8)                       // 1234
+
+    // s unchanged
+    (len s)                          // 8
+    (cap s)                          // 10
+    (get s 8)                        // runtime error: out of bounds
+
+    (set arr 0 -111)
+    (get s 0)                        // -111
+    (get s2 0)                       // -111
+
+
+
+
+
+
+
+
+
+func main
+    locals arr A<I 10> s S<I> s2 S<I>
+    as s (slice arr 0 10)             
+    (len s)                          // 10
+    (cap s)                          // 10
+
+    as s2 (append s 1234) 
+    (len s2)                         // 11
+    (cap s2)                         // 11 (or possibly greater!)
+    (get s2 10)                      // 1234
+
+    // s unchanged
+    (len s)                          // 10
+    (cap s)                          // 10
+    (get s 10)                       // runtime error: out of bounds
+
+    (set arr 0 -111)
+    (get s 0)                        // -111
+    (get s2 0)                       // 0 (s2 references a new, separate array)
+
+
+
+
+
+
+
+
+func main
+    locals s S<I> s2 S<I>
+    as s (S<I> 10 20 30 40 50)             
+    (len s)                          // 5
+    (cap s)                          // 5
+
+    as s2 (append s 123 456 789) 
+    (len s2)                         // 8
+    (cap s2)                         // 8 (or possibly greater!)
+    (get s2 5)                       // 123
+
+    (set s 0 -111)
+    (get s2 0)                       // 10
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 1. create a new array that is big enough to store the existing slice values plus all the new values
+// 2. copy the values in the existing slice to the new array
+// 3. copy the new values into the new array after the existing values
+// 4. return a slice referencing the first index of this new array, with the new length and capacity
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals s S<I>
+    as s (make S<I> 6)      // create a slice with length 6 and capacity 6
+                            // underlying array has all default values
+    (get s 0)               // 0
+    (get s 5)               // 0
+    (len s)                 // 6
+    (cap s)                 // 6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals foo S<I> bar S<I>
+    as foo (S<I> 10 20 30 40 50)
+    as bar (make S<I> 3 7)
+
+    (copy bar foo)                     // 3 (the number of elements copied)
+    (get bar 0)                        // 10
+    (get bar 1)                        // 20
+    (get bar 2)                        // 30
+
+
+
+
+
+
+
+
+
+
+// returns the sum of all values in the array
+func sum nums A<I 10> : I
+    locals val I
+    foreach i I v I nums
+        as val (add val v)
+    return val
+
+
+
+
+func sum nums S<I> : I
+    locals val I
+    foreach i I v I nums
+        as val (add val v)
+    return val
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func naturalNums n I : S<I>
+    locals nums S<I>               // default value is referencing no array, len 0, cap 0
+    forinc i I 0 n
+        as nums (append nums i)
+    return nums
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func naturalNums n I : S<I>
+    locals nums S<I>
+    as nums (make S<I> n)          // avoid overhead of 'append'
+    forinc i I 0 n
+        (set nums i i)
+    return nums
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// making a slice of a slice is dirt cheap (but be clear 
+// that underlying array storage is shared by the new slice)
+
+
+
+
+
+
+
+
+func naturalNums n I : L<I>
+    locals nums L<I>
+    as nums (L<I>)                 // list starts out empty
+    forinc i I 0 n
+        (push nums i)
+    return nums
+
+
+
+
+func naturalNums n I : L<I>
+    locals nums L<I>
+    as nums (make L<I> n)          // list starts out with n 0's
+    forinc i I 0 n
+        (set nums i i)
+    return nums
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// multi-return functions
+
+// zelda returns both an integer and a string
+func zelda : I Str
+    return 3 "hi"
+
+func ian a I b Str
+    (println a b)
+
+func main
+    locals x I y Str
+    as x y (zelda)              // assign 3 to x, "hi" to y
+    (zelda)                     // OK
+    as x (zelda)                // compile error: zelda can only be called in a multi-value context
+    (ian (zelda))               // compile error: zelda can only be called in a multi-value context
+
+
+
+
+
+
+
+
+
+
+
+// define a struct called Ronald with two fields
+struct Ronald
+    foo Str          // a field of type Str called foo
+    bar F            // a field of type F called bar
+
+
+func main
+    locals r Ronald
+    (get r foo)                  // ""
+    (get r bar)                  // 0.0
+    as r (Ronald "hi" 4.6)       // assign to r a Ronald value where foo is "hi" and bar is 4.6
+    (get r foo)                  // "hi"
+    (set r bar 8.1)              // set field bar of r to 8.1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct Cat
+    age I
+    weight F
+    name Str
+
+
+func eat c Cat food F : F
+    return (set c weight (add (get c weight) food))        // this change only seen in the function!
+
+
+func main
+    locals c Cat
+    as c (Cat 10 8.9 "Mittens")
+    (eat c 0.7)                        // 9.6              
+    (get c weight)                     // 8.9 (because the function only received a copy)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func eat c Cat food F : F
+    return (add (get c weight) food)
+
+
+method eat c Cat food F : F
+    return (add (get c weight) food)
+
+
+method eat d Dog food F : F
+    return (add (get d weight) food)
+
+
+func main
+    locals c Cat d Dog
+    (eat c 0.7)                          // call function 'eat'
+    (mc eat c 0.7)                       // call 'eat' of Cat
+    (mc eat d 1.4)                       // call 'eat' of Dog
+    
+
+
+
+
+
+
+
+
+
+
+interface Jack
+    foo I Str : Str         // method named foo; takes an int and a string; returns a string
+    bar                     // method named bar; takes no arguments; returns nothing
+
+
+// struct Cat implements Jack
+method foo c Cat i I s Str : Str
+    // ... do stuff
+
+method bar c Cat
+    // ... do stuff
+
+
+// struct Dog implements Jack
+method foo c Dog i I s Str : Str
+    // ... do stuff
+
+method bar c Dog
+    // ... do stuff
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals j Jack c Cat
+    (println j)              // nil
+    as j (Jack c)            // create a Jack value referencing the Cat value and the Cat method table
+    as j c                   // same as previous statement, but cast left implicit
+
+
+// 1. a reference to the value of the implementing struct
+// 2. a reference to the implementing struct's method table
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals j Jack c Cat d Dog
+    as j c                   // same as previous statement, but cast left implicit
+    (mc bar j)               // calls method bar of Cat
+    (mc meow j)              // compile error: Jack does not have a method 'meow'
+    (get j name)             // compile error: Jack is not a struct, it does not have fields
+    as j d
+    (mc bar j)               // calls method bar of Dog
+
+
+
+
+
+
+
+
+
+
+
+interface Eater
+    eat F : F         // method named eat; takes a float; returns a float
+
+
+
+func feed e Eater food F
+    (mc eat e food)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// assume Jack is an interface type with implementors Cat, Dog, Bird, and others
+func alice j Jack
+    typeswitch v j
+    case Cat
+        // ... clause executed if j holds a Cat; v in this clause is a Cat value
+    case Dog
+        // ... clause executed if j holds a Dog; v in this clause is a Dog value
+    case Bird
+        // ... clause executed if j holds a Bird; v in this clause is a Bird value
+    default
+        // ... clause executed if j holds neither a Cat, Dog, nor Bird; v in this clause is a Jack value
+        // (default clause is optional)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals a Any
+    as a (Any 35)                          // OK (cast could be left implicit)
+    as a "yo"                              // OK
+    as a true                              // OK
+    as a (Cat 10 11.3 "Mittens")           // OK
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals a A<Any 5>              // an array that can store values of any type
+    (set a 0 "yo")                 // OK
+    (set a 1 -7.2)                 // OK
+    (set a 2 false)                // OK
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct Olivia
+    j Jack
+    a Any
+    i I
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func bill a Any
+    typeswitch v a
+    case Cat
+        // ... clause executed if 'a' holds a Cat; v in this clause is a Cat value
+    case I
+        // ... clause executed if 'a' holds an I; v in this clause is an I value
+    case Str
+        // ... clause executed if 'a' holds a Str; v in this clause is a Str value
+    default
+        // ... clause executed if j holds neither a Cat, I, nor Str; v in this clause is a Jack value
+        // (default clause is optional)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals i I p P<I>
+    as p (ref i)             // assign to p a pointer to the location of variable 'i'
+    as i 4
+
+    (add p 7)                // compile error: cannot use 'add' on a pointer
+    (add (dr p) 7)           // 11
+
+    (set p 2)
+    (println i)              // 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals p P<F>          // 'p' starts out nil
+    (println p)            // nil
+    (dr p)                 // runtime error: cannot dereference a nil pointer
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 1. By using pointers, a single value/variable can be referenced from multiple places
+
+func main
+    locals i I p1 P<I> p2 P<I> p3 P<I>
+    as p1 (ref i)
+    as p2 (ref i)
+    as p3 (ref i)
+    as i 9                 // one assignment affects all three pointers
+    (dr p1)                // 9
+    (dr p2)                // 9
+    (dr p3)                // 9
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 2. By passing a pointer into a function, the function can store a
+// new value at the referenced location:
+
+func foo a P<I>
+    (set a 11)
+
+func main
+    locals z I
+    as z 5
+    (foo (ref z))
+    (println z)          // 11
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 3. Pointers are only 4 or 8 bytes
+
+func foo c P<Cat>
+    // ... 'c' is only 4 or 8 bytes
+
+func bar nums P<A<I 50>>
+    // ... 'nums' is only 4 or 8 bytes
+
+// (more common to use slices instead of pointers to arrays)
+func bar nums S<I>
+    // ... 'nums' is no more than 24 bytes
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 'ref' on struct field
+func main
+    locals c Cat p P<Str>
+    as p (ref c name)              // pointer to field 'name' of 'c'
+
+
+// 'ref' on array index
+func main
+    locals arr A<I 10> p P<I>
+    as p (ref arr 2)              // pointer to index 2 of 'arr'
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo : Cat
+    return (Cat 10 8.9 "Mittens")
+
+
+func main
+    locals p P<Str>
+    as p (ref (foo) name)          // compile error: can only get pointers to fields of struct variables
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo a I b F
+    // ...
+
+func bar a I b F : Str
+    // ... 
+     
+func main
+    // f is a variable that can reference functions which take an integer and a float and return a string
+    locals f Fn<I F : Str>     
+    as f bar
+    (f 8 2.0)         // calls bar
+    as f foo          // compile error: foo does not have the right signature
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals f Fn<I F : Str>         
+    (f 8 2.0)                           // runtime error: cannot invoke nil
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// jared takes a function (taking an integer and returning a string) for its first parameter, takes an integer 
+// for its second parameter, and returns a function that returns a float
+func jared a Fn<I : Str> b I : Fn<: F> 
+    // ...    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    // create a local function named evan
+    localfunc evan a I : I
+        return (add a 3)
+    (evan 8)                           // 11
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals a I b I
+    localfunc bar : I
+        // this function has its own local 'x', but we can also use 
+        // 'a' and 'b' of the enclosing function call
+        locals x I
+        as x 2
+        return (add x a)
+    as a 3
+    as b 10
+    (mul (bar) b)                 // 50
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals a I b I
+    localfunc bar : I
+        // this function has its own local 'x' and 'a', but we can also use 
+        // 'b' of the enclosing function call
+        locals a I x I
+        as x 2
+        return (add x a)          // the 'a' local to 'bar'
+    as a 3
+    as b 10
+    (mul (bar) b)                 // 20
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// foo returns a function taking no parameters and returning an int
+func foo : Fn<: I>
+    locals x I
+    localfunc f : I
+        // x is from enclosing call
+        as x (add x 3)
+        return x
+    as x 2
+    return f
+
+func main
+    locals a Fn<: I> b Fn<: I>
+
+    as a (foo)    // assign closure to a (function returned by foo retains variable 'x')
+    (a)           // 5
+    (a)           // 8
+    (a)           // 11
+
+    as b (foo)    // assign a different closure to b (same function but a different retained variable 'x')
+    (b)           // 5
+    (b)           // 8
+    (b)           // 11
+    (b)           // 14
+
+    (a)           // 14
+    (a)           // 17
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    locals a Byte b Byte c Byte
+    as a (Byte 131)      // 1000_0011
+    as b (Byte 25)       // 0001_1001
+    as c (band a b)      // 0000_0001
+    (println c)          // prints 1
+
+
+
+func main
+    locals a Byte b Byte c Byte
+    as a (Byte 131)                // 1000_0011
+    as b (Byte 25)                 // 0001_1001
+    as c (bor a b)                 // 1001_1011  
+    (println c)                    // prints 155
+
+
+func main
+    locals a Byte b Byte c Byte
+    as a (Byte 131)                // 1000_0011
+    as b (Byte 25)                 // 0001_1001
+    as c (bxor a b)                // 1001_1010  
+    (println c)                    // prints 154
+
+
+func main
+    locals a Byte b Byte c Byte
+    as a (Byte 131)               // 1000_0011
+    as b (bnot a)                 // 0111_1100
+    (println b)                   // prints 124
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// each goroutine runs independently
+// program execution ends 
+
+
+
+func tom
+    (println "yo")
+
+func main
+    (println "before")
+    go (tom)                  // spawn a new goroutine which starts execution by calling tom
+    (println "after")
+
+
+
+
+
+
+func main
+    go (foo (bar))    // bar is called in the original goroutine before the new goroutine is created
+
+
+
+
+
+
+interface Error
+    error : Str         // method named error; returns a string
+
+
+func doSomething : Error
+    if (trySomething)
+        return nil
+    else
+        return (newError "oh no!") 
+
+
+func main
+    locals e Error
+    as e (doSomething)
+    if (eq e nil)
+        (println "doSomething failed!:" (error e))
+    else
+        (println "doSomething succeeded!")
+
+
+
+
+
+
+
+
+
+
+
+
+func doSomething : Str I Error
+    // ... upon success, return nil error
+    // ... upon failure, return non-nil error (other returned values don't matter)
+
+
+
+
+// Structs and arrays come in all sizes: a few bytes up to thousands or even 
+// occasionally millions or billions of bytes. No matter what a pointer points
+//  to, a pointer value is always just an address, and all addressses within a 
+// single system are the same size. On a 32-bit machine, addresses are 32 bits;
+// on a 64-bit machine, addresses are 64 bits. Therefore, it is often more 
+// efficient for functions to have pointer parameters instead of struct or array
+//  parameters. A function call argument value is always copied in full to its
+// corresponding parameter: for a large struct or array, that can be a lot of 
+// bytes to copy; for a pointer, it’s always just 32 or 64 bits.
+
+
+
+
+// function values
+// nested functions
+
+
+// goroutines
+// channels, select
+
+
+
+// bitwise operations
+// files
+
+
+

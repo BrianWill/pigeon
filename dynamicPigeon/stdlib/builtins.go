@@ -434,8 +434,26 @@ func List(args ...interface{}) interface{} {
 	return ListType{&list}
 }
 
+func Lconcat(args ...interface{}) interface{} {
+	if len(args) < 2 {
+		log.Fatalln("'lconcat' operation needs two or more operands.")
+	}
+	list := []interface{}{}
+	for _, v := range args {
+		switch v := v.(type) {
+		case ListType:
+			for _, val := range *(v.List) {
+				list = append(list, val)
+			}
+		default:
+			log.Fatalln("'lconcat' operands must all be lists.")
+		}
+	}
+	return ListType{&list}
+}
+
 func Concat(args ...interface{}) interface{} {
-	if len(args) < 1 {
+	if len(args) < 2 {
 		log.Fatalln("Concat operation needs two or more operands.")
 	}
 	return fmt.Sprint(args...)

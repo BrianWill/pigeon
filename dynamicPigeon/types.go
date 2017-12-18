@@ -81,6 +81,7 @@ var operators = []string{
 	"println",
 	"prompt",
 	"concat",
+	"lconcat",
 	"len",
 	"floor",
 	"ceil",

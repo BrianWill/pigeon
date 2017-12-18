@@ -151,7 +151,7 @@ func sublist a start end
 
 func main
     locals a
-    as a (list "A", "B", "C", "D", "E", "F")
+    as a (list "A" "B" "C" "D" "E" "F")
     (sublist a 0 4)                  // list of "A", "B", "C", "D"
     (sublist a 2 6)                  // list of "C", "D", "E", "F"
     (sublist a 2 3)                  // list of "C"

@@ -1,0 +1,74 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "StaticPigeon",
+	"scopeName": "source.sp",
+	"patterns": [
+		{
+			"name": "comment.static-pigeon",
+			"match": "//.*"
+		},
+		{
+			"name": "typename.static-pigeon",
+			"match": "\\b[A-Z]\\w*\\b"
+		},
+		{
+			"name": "keyword.control.escape.static-pigeon",
+			"match": "\\b(break|continue|return)\\b"
+		},
+		{
+			"name": "keyword.control.block.static-pigeon",
+			"match": "\\b(if|elif|else|while|foreach|fordec|forinc|typeswitch|case|default)\\b"
+		},
+		{
+			"name": "keyword.vars.static-pigeon",
+			"match": "\\b(locals|as|localfunc)\\b"
+		},
+		{
+			"name": "entity.name.static-pigeon",
+			"match": "\\b(global|func|struct|interface|method)\\b"
+		},
+		{
+			"name": "keyword.operator.arithmetic.static-pigeon",
+			"match": "\\b(add|sub|mul|dec|mod|floor|ceil|round|inc|dec)\\b"
+		},
+		{
+			"name": "keyword.operator.pointers.static-pigeon",
+			"match": "\\b(ref|dr|sr)\\b"
+		},
+		{
+			"name": "keyword.operator.logic.static-pigeon",
+			"match": "\\b(eq|neq|not|lt|lte|gt|gte|and|or|bor|band|bxor|bnot)\\b"
+		},
+		{
+			"name": "keyword.operator.collections.static-pigeon",
+			"match": "\\b(list|map|len|get|set|push|lconcat|mc|slice|copy|cap|append|make)\\b"
+		},
+		{
+			"name": "keyword.operator.string.static-pigeon",
+			"match": "\\b(charlist|runelist|getchar|getrune|concat)\\b"
+		},
+		{
+			"name": "keyword.operator.misc.static-pigeon",
+			"match": "\\b(print|println|prompt|randNum|parseNum|newError)\\b"
+		},
+		{
+			"name": "constant.numeric.static-pigeon",
+			"match": "\\b\\d+(\\.\\d*)?\\b"
+		},
+		{
+			"name": "constant.numeric.static-pigeon",
+			"match": "\\b(nil|true|false)\\b"
+		},
+		{
+			"name": "string.quoted.double.static-pigeon",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.static-pigeon",
+					"match": "\\\\."
+				}
+			]
+		}
+	]
+}

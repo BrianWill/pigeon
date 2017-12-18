@@ -1,0 +1,48 @@
+{
+    "name": "pigeon",
+    "displayName": "Pigeon",
+    "description": "syntax highlighting for DynamicPigeon and StaticPigeon",
+    "version": "0.0.1",
+    "publisher": "BrianWill",
+    "engines": {
+        "vscode": "^1.18.0"
+    },
+    "categories": [
+        "Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "static-pigeon",
+                "aliases": ["StaticPigeon", "static-pigeon"],
+                "extensions": [".sp"],
+                "configuration": "./sp-language-configuration.json"
+            },
+            {
+                "id": "dynamic-pigeon",
+                "aliases": ["DynamicPigeon", "dynamic-pigeon"],
+                "extensions": [".dp"],
+                "configuration": "./dp-language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "static-pigeon",
+                "scopeName": "source.sp",
+                "path": "./syntaxes/static-pigeon.tmLanguage.json"
+            },
+            {
+                "language": "dynamic-pigeon",
+                "scopeName": "source.dp",
+                "path": "./syntaxes/dynamic-pigeon.tmLanguage.json"
+            }
+        ],
+        "themes": [
+            {
+                "label": "Pigeon",
+                "uiTheme": "vs-dark",
+                "path": "./themes/Pigeon-color-theme.json"
+            }
+        ]
+    }
+}

@@ -5,7 +5,7 @@ More accurately, Pigeon is *two* educational programming languages:
 - DynamicPigeon
 - StaticPigeon
 
-DynamicPigeon ([docs](dynamic-pigeon.md)) teaches basic programming concepts common to all mainstream languages:
+DynamicPigeon ([reference](dynamic-pigeon.md)) teaches basic programming concepts common to all mainstream languages:
 
 - variables
 - operations
@@ -14,37 +14,20 @@ DynamicPigeon ([docs](dynamic-pigeon.md)) teaches basic programming concepts com
 - functions
 - lists and hashmaps
 
-StaticPigeon builds upon DynamicPigeon to teach most of the core concepts of the Go language. Once a student is comfortable with StaticPigeon, learning Go should then be mostly a matter of adjusting to different syntax.
-
-The StaticPigeon documentation is split into three parts:
-
-Part one ([docs](static-pigeon-tier-1.md)):
+StaticPigeon ([reference](static-pigeon-reference.md)) builds upon DynamicPigeon to teach most of the core concepts of the Go language (*sans* goroutines and channels):
 
 - static typing
+- arrays and slices
 - multi-return functions
 - structs
 - methods
 - interfaces
-- pointers
 - typeswitches
-- break and continue statements
-
-Part two ([docs](static-pigeon-tier-2.md)):
-
-- arrays and slices
-- imports
-- standard library file package
-- foreach loops
+- pointers
 - bitwise operations
+- reading/writing files
 
-Part three ([docs](static-pigeon-tier-3.md)):
-
-- function variables, nested functions, closures
-- goroutines
-- channels, `select` statements
-- standard library networking packages
-
-Once comfortable with StaticPigeon, students should learn Go ([docs](go-lang.md)).
+Once a student is comfortable with StaticPigeon, learning Go is mostly a matter of adjusting to different syntax. ([Learning Go after Pigeon](go-lang.md)) 
 
 # Installation and usage
 
@@ -57,6 +40,6 @@ go get github.com/BrianWill/pigeon
 This will put the Pigeon executable in your Go bin directory. Assuming the Go bin directory is on your shell path, you can then run the compiler from any directory like so:
 
 ```
-pigeon somefile.dpigeon      # compile and run a DynamicPigeon program
-pigeon somefile.spigeon      # compile and run a StaticPigeon program
+pigeon somefile.dpigeon      # compile and run somefile.dpigeon as a DynamicPigeon program
+pigeon somefile.spigeon      # compile and run somefile.spigeon as a StaticPigeon program
 ```

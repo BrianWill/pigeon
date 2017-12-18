@@ -1,7 +1,7 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "DynamicPigeon",
-	"scopeName": "source.dpigeon",
+	"scopeName": "source.dp",
 	"patterns": [
 		{
 			"name": "comment.dynamic-pigeon",
@@ -33,7 +33,7 @@
 		},
 		{
 			"name": "keyword.operator.collections.dynamic-pigeon",
-			"match": "\\b(list|map|len|get|set|push)\\b"
+			"match": "\\b(list|map|len|get|set|push|lconcat)\\b"
 		},
 		{
 			"name": "keyword.operator.string.dynamic-pigeon",

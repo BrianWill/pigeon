@@ -1,4 +1,6 @@
 
+// tic-tac-toe
+
 global topRow (list "_" "_" "_")
 global middleRow (list "_" "_" "_")
 global bottomRow (list "_" "_" "_")
@@ -6,30 +8,32 @@ global bottomRow (list "_" "_" "_")
 func playerMove currentPlayer
     locals row col slot
     while true
-        as row nil
-        while (eq row nil)
+        while true
             as row (prompt (concat "Player " currentPlayer ": select [t]op, [m]iddle, or [b]ottom row"))
             if (eq row "t")
                 as row topRow
+                break
             elif (eq row "m")
                 as row middleRow
+                break
             elif (eq row "b")
                 as row bottomRow
+                break
             else
                 (println "Invalid input. Try again.")
-                as row nil
-        as col nil
-        while (eq col nil)
+        while true
             as col (prompt (concat "Player " currentPlayer ": select [l]eft, [m]iddle, or [r]ight column"))
             if (eq col "l")
                 as col 0
+                break
             elif (eq col "m")
                 as col 1
+                break
             elif (eq col "r")
                 as col 2
+                break
             else
                 (println "Invalid input. Try again.")
-                as col nil
         as slot (get row col)
         if (eq slot "_")
             (set row col currentPlayer)
@@ -40,7 +44,6 @@ func playerMove currentPlayer
 
 // returns "X" if X wins, returns "O" if O wins, returns "_" if no one wins, and returns "tie" if tied
 func winner
-    locals topRowFull middleRowFull bottomRowFull
     // check top row
     if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get topRow 1) (get topRow 2)))
         return (get topRow 0)
@@ -66,12 +69,11 @@ func winner
     if (and (neq (get bottomRow 0) "_") (eq (get bottomRow 0) (get middleRow 1) (get topRow 2)))
         return (get bottomRow 0)
     // check tie
-    as topRowFull (and (neq (get topRow 0) "_") (neq (get topRow 1) "_") (neq (get topRow 2) "_"))
-    as middleRowFull (and (neq (get middleRow 0) "_") (neq (get middleRow 1) "_") (neq (get middleRow 2) "_"))
-    as bottomRowFull (and (neq (get bottomRow 0) "_") (neq (get bottomRow 1) "_") (neq (get bottomRow 2) "_"))
-    if (and topRowFull middleRowFull bottomRowFull)
-        return "tie"
-    return "_"
+    foreach i s (lconcat topRow middleRow bottomRow)
+        if (eq s "_")
+            return "_"   // not a tie
+    return "tie"
+    
 
 
 
@@ -97,11 +99,5 @@ func main
                 as currentPlayer "O"
             else
                 as currentPlayer "X"
-
-
-
-
-
-
 
 

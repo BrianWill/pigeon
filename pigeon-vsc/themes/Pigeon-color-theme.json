@@ -1,5 +1,5 @@
 {
-	"name": "DynamicPigeon",
+	"name": "Pigeon",
 	"type": "dark",
 	"colors": {
 		"editor.background": "#1e1e1e",
@@ -22,6 +22,15 @@
 			"settings": {
 				"fontStyle": "italic",
 				"foreground": "#6e7477"
+			}
+		},
+		{
+			"name": "Typename",
+			"scope": [
+				"typename"
+			],
+			"settings": {
+				"foreground": "#ca9155"
 			}
 		},
 		{

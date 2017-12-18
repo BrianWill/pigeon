@@ -3,13 +3,29 @@ DyanmicPigeon, an educational language
 
 
 
-// correction: 
+
+
+// corrections: 
 
 (list "A", "B", "C", "D", "E", "F")     // compile error: invalid commas
 (list "A" "B" "C" "D" "E" "F")          // OK
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+// "7365" 365 
 
 
 // convert numbers to strings
@@ -28,6 +44,8 @@ func parseInteger s
         as result (add result (mul factor n))
         as factor (mul factor 10)
     return result
+
+
 
 
 
@@ -62,14 +80,11 @@ func numeralToNumber s
 
 
 
-func numeralToNumber s
-    locals idx
-    if (neq (len s) 0)
-        return nil
-    as idx (index "0123456789" s)       // index function from previous video
-    if (eq idx -1)
-        return nil
-    return idx
+
+
+
+
+
 
 
 
@@ -79,6 +94,11 @@ func main
     (parseInteger "999")                // 999
     (parseInteger "")                   // nil
     (parseInteger "234asdf")            // nil
+
+
+
+
+
 
 
 
@@ -98,13 +118,6 @@ func randInt start end
 
 
 
-
-
-
-
-
-
-// number-guessing game: pick a number between one and 10
 func main
     (println (randInt 1 11))           // print random integer between 1 and 10 (inclusive)
 
@@ -118,6 +131,12 @@ func main
 
 
 
+
+
+
+
+
+// number-guessing game: pick a number between one and 10
 func main
     locals guess n
     as n (randInt 1 11)
@@ -137,21 +156,35 @@ func main
 
 
 
+
+
+
+
+// number-guessing game: pick a number between one and 10
 func main
     locals guess n
     as n (randInt 1 11)
     while true
-        as guess (parseInteger (prompt "Pick a number between 1 and 10 (inclusive): "))
+        as guess (prompt "Pick a number between 1 and 10 (inclusive): ")
+        as guess (parseInteger guess)
         if (eq guess nil)
             (println "Your guess was not a number!")
         elif (not (and (gte guess 1) (lte guess 10)))
             (println "Your guess was not between 1 and 10!")    
         elif (eq guess n)
             (println "You win!")
-            break
+            return
         else
             (println "You lose! The number was" n)
-            break
+            return
+
+
+
+
+
+
+
+
 
 
 
@@ -160,11 +193,6 @@ func main
 
 
 // hangman
-
-
-global alphabet "abcdefghijklmnopqrstuvwxyz"
-global words (list "zebra" "moose" "alligator" "elephant"
-    ,"ibex" "jerboa" "cat" "hippopotamus" "pterodactyl")   // continue line using comma
 
 
 func randInt start end 
@@ -202,8 +230,35 @@ func join strings separator
         as s (concat s v separator)
     return (concat s (get strings lastIdx))
 
+
+
+
+
+func getLetter found
+    locals letter alphabet
+    as alphabet "abcdefghijklmnopqrstuvwxyz"
+    while true
+        as letter (prompt "Pick a letter:" (join found " "))
+        if (and (eq (len letter) 1) (containsAny alphabet (list letter)))
+            return letter
+        (println "Invalid input: must enter a single lowercase letter.")
+
+
+func updateFound found word letter
+    locals complete
+    as complete true
+    foreach i ch (charlist word)
+        if (eq letter ch)
+            (set found i letter)
+        if (eq (get found i) "_")
+            as complete false
+    return complete
+
+
 func main
-    locals word found letter complete nGuesses
+    locals words word found letter nGuesses
+    as words (list "zebra" "moose" "alligator" "elephant" 
+        ,"ibex" "jerboa" "cat" "hippopotamus" "pterodactyl")   // continue line using comma
     as word (get words (randInt 0 (len words)))                         
     as nGuesses (len word)  // for an N-letter word, player has N guesses
     as found (list)
@@ -211,23 +266,14 @@ func main
         (push found "_")
     while (gt nGuesses 0)
         (println "You have" nGuesses "remaining guesses.")
-        while true
-            as letter (prompt "Pick a letter:" (join found " "))
-            if (and (eq (len letter) 1) (containsAny alphabet (list letter)))
-                break
-            (println "Invalid input: must enter a single lowercase letter.")
-        as complete true
-        foreach i ch (charlist word)
-            if (eq letter ch)
-                (set found i letter)
-            if (eq (get found i) "_")
-                as complete false
+        as letter (getLetter found)
         if (not (containsAny word (list letter)))
             as nGuesses (dec nGuesses)
-        if complete
+        if (updateFound found word letter)
             (println "You win! The word was:" word)
             return
     (println "You lose! The word was:" word)
+
 
 
 
@@ -247,34 +293,35 @@ global middleRow (list "_" "_" "_")
 global bottomRow (list "_" "_" "_")
 
 func playerMove currentPlayer
-    locals row col slot
+    locals row col
     while true
-        as row nil
-        while (eq row nil)
+        while true
             as row (prompt (concat "Player " currentPlayer ": select [t]op, [m]iddle, or [b]ottom row"))
             if (eq row "t")
                 as row topRow
+                break
             elif (eq row "m")
                 as row middleRow
+                break
             elif (eq row "b")
                 as row bottomRow
+                break
             else
                 (println "Invalid input. Try again.")
-                as row nil
-        as col nil
-        while (eq col nil)
+        while true
             as col (prompt (concat "Player " currentPlayer ": select [l]eft, [m]iddle, or [r]ight column"))
             if (eq col "l")
                 as col 0
+                break
             elif (eq col "m")
                 as col 1
+                break
             elif (eq col "r")
                 as col 2
+                break
             else
                 (println "Invalid input. Try again.")
-                as col nil
-        as slot (get row col)
-        if (eq slot "_")
+        if (eq (get row col) "_")
             (set row col currentPlayer)
             return
         else 
@@ -283,7 +330,6 @@ func playerMove currentPlayer
 
 // returns "X" if X wins, returns "O" if O wins, returns "_" if no one wins, and returns "tie" if tied
 func winner
-    locals topRowFull middleRowFull bottomRowFull
     // check top row
     if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get topRow 1) (get topRow 2)))
         return (get topRow 0)
@@ -309,12 +355,11 @@ func winner
     if (and (neq (get bottomRow 0) "_") (eq (get bottomRow 0) (get middleRow 1) (get topRow 2)))
         return (get bottomRow 0)
     // check tie
-    as topRowFull (and (neq (get topRow 0) "_") (neq (get topRow 1) "_") (neq (get topRow 2) "_"))
-    as middleRowFull (and (neq (get middleRow 0) "_") (neq (get middleRow 1) "_") (neq (get middleRow 2) "_"))
-    as bottomRowFull (and (neq (get bottomRow 0) "_") (neq (get bottomRow 1) "_") (neq (get bottomRow 2) "_"))
-    if (and topRowFull middleRowFull bottomRowFull)
-        return "tie"
-    return "_"
+    foreach i s (lconcat topRow middleRow bottomRow)
+        if (eq s "_")
+            return "_"   // not a tie
+    return "tie"
+    
 
 
 

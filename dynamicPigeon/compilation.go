@@ -77,7 +77,7 @@ func compileExpression(e Expression, pkg *Package, locals map[string]string) (st
 				}
 				code = name
 			} else {
-				return "", msg(e.LineNumber, e.Column, "Name is undefined.")
+				return "", msg(e.LineNumber, e.Column, "Name is undefined: "+e.Content)
 			}
 		case NumberLiteral:
 			code = "float64(" + e.Content + ")"
