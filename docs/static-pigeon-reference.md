@@ -61,24 +61,27 @@ Booleans (`Bool`) remain unchanged from DynamicPigeon. The default boolean value
 
 Strings (`Str`) have additional operators related to slices. The default string value is `""` (an empty string). 
 
-Whereas DynamicPigeon has just one type of number, StaticPigeon has two:
+Whereas DynamicPigeon has just one type of number, StaticPigeon has three:
 
 - 64-bit signed integers (`I`)
+- 8-bit unsigned integers (`Byte`)
 - 64-bit floating-point (`F`)
 
-A number literal with a decimal point is a floating-point number; a number literal *without* a decimal point is an integer.
+A number literal with a decimal point is a floating-point number; a number literal *without* a decimal point is an integer. Byte values are created by using `Byte` as an operator with an integer operand:
 
 ```
--25             // an integer
--25.0           // a float
+25              // an integer
+25.0            // a float
+(Byte 25)       // a byte
 ```
 
 The inputs of an arithmetic operation must all be the same. The type returned is the type of the inputs:
 
 ```
-(add 5 2 8.2)          // compile error (mixing integers and floats)
-(mul 5 2 8)            // OK (returns an integer)
-(mul 5.0 2.0 8.0)      // OK (returns a float)
+(add 5 2 8.2)                // compile error: mixing integers and floats
+(mul 5 2 8)                  // returns an integer
+(mul 5.0 2.0 8.0)            // returns a float
+(add (Byte 5) (Byte 2))      // returns a byte
 ```
 
 The default integer value is `0`, and the default float value is `0.0`.
@@ -109,8 +112,8 @@ func main
     as a (M<I Str> 3 "hi" 9 "yo")    // assign to 'a' a new map of intgers to strings with two key-value pairs
     as b (get a 3)                   // "hi"
     as b (get a 4)                   // "" (default string value because the map has no key 4)
-    (set 8 "aloha")                  // add new key-value pair: key 8 with value "aloha"
-    (set 8.0 "aloha")                // compile error: key must be an integer, not a float
+    (set a 8 "aloha")                  // add new key-value pair: key 8 with value "aloha"
+    (set a 8.0 "aloha")                // compile error: key must be an integer, not a float
 ```
 
 The default map value is nil.
@@ -225,7 +228,7 @@ func foo a F : I
 func foo x F
     if (eq x 4.3)
         (println "x equals 4.3")
-    elif (eq x 1.6)
+    elif (eq x 1.689)
         (println "x equals 1.689")
     elif (eq x 7.9)
         (println "x equals 7.9")
@@ -287,7 +290,7 @@ func main
 ```
 func main
     // this loop prints 1 3 5 7 9
-    forinc i 0 10
+    forinc i I 0 10
         if (eq 0 (mod i 2))        // if 'i' is an even number
             continue
         (println i)
@@ -299,10 +302,10 @@ func main
 // assume Fruit is an interface implemented by structs Banana, Orange, and others
 func foo f Fruit 
     // the order of the cases does not matter
-    typeswitch v f
-    case Banana
+    typeswitch f
+    case b Banana
         // ... executed if 'f' references an Banana
-    case Orange
+    case o Orange
         // ... executed if 'f' references an Orange
     // the default clause (if present) must come last
     default
@@ -398,7 +401,7 @@ func main
 func main
     (eq 53 53 53)                  // true (all operands equal)
     (eq 53 4 53)                   // false (not all operands equal)
-    (eq "hi" 53 53)                // false (not all operands equal)
+    (eq "hi" 53 53)                // compile error: operands must be matching types
     (eq "hi" "hi" "hi" "hi")       // true (all operands equal)
     (eq "hi")                      // compile error: expecting at least two operands
 ```

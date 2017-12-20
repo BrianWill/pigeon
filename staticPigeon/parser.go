@@ -737,11 +737,37 @@ func parseInterface(tokens []Token, line int, pkg *Package) (InterfaceDefinition
 	return InterfaceDefinition{line, column, name.Content, methods, pkg}, idx, nil
 }
 
+// consumes any number of types separated by spaces (returns upon any other kind of token)
+// expects type first before any space
+func parseTypeList(tokens []Token, line int) ([]ParsedDataType, int, error) {
+	idx := 0
+	types := make([]ParsedDataType, 0)
+	if tokens[idx].Type == Space {
+		idx++
+	}
+	for {
+		if tokens[idx].Type != TypeName {
+			break
+		}
+		dt, n, err := parseType(tokens[idx:], tokens[idx].LineNumber)
+		if err != nil {
+			return []ParsedDataType{}, 0, err
+		}
+		idx += n
+		types = append(types, dt)
+		if tokens[idx].Type != Space {
+			break
+		}
+		idx++
+	}
+	return types, idx, nil
+}
+
 func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 	column := tokens[0].Column
 	idx := 0
-	primary := tokens[idx]
-	if primary.Type != TypeName {
+	baseType := tokens[idx].Content
+	if tokens[idx].Type != TypeName {
 		return ParsedDataType{}, 0, msg(line, column, "Expecting type name.")
 	}
 	idx++
@@ -749,58 +775,35 @@ func parseType(tokens []Token, line int) (ParsedDataType, int, error) {
 	returnTypes := []ParsedDataType{}
 	if tokens[idx].Type == OpenAngle {
 		idx++
-		if tokens[idx].Type == Space {
-			idx++
-		}
-		if tokens[idx].Type == Colon {
-			returnTypes, n, err := parseReturnTypes(tokens[idx:], line)
-			if err != nil {
-				return ParsedDataType{}, 0, err
-			}
-			idx += n
-			return ParsedDataType{line, tokens[idx].Column, primary.Content, paramTypes, returnTypes}, idx, nil
-		}
-		dataType, n, err := parseType(tokens[idx:], line)
+		var n int
+		var err error
+		paramTypes, n, err = parseTypeList(tokens[idx:], tokens[idx].LineNumber)
 		if err != nil {
 			return ParsedDataType{}, 0, err
 		}
 		idx += n
-		paramTypes = append(paramTypes, dataType)
-
-		for {
-			if tokens[idx].Type != Space {
-				break
-			}
-			idx++
-			if tokens[idx].Type == Colon {
-				var n int
-				var err error
-				returnTypes, n, err = parseReturnTypes(tokens[idx:], line)
-				if err != nil {
-					return ParsedDataType{}, 0, err
-				}
-				idx += n
-				break
-			}
+		if baseType == "A" {
 			if tokens[idx].Type == NumberLiteral {
-				// special case for arrays (we expect a number literal, not just a constant expression)
+				// special case for arrays (we expect a number literal, not just a number expression)
 				paramTypes = append(paramTypes, ParsedDataType{line, tokens[idx].Column, tokens[idx].Content, nil, nil})
 				idx++
 			} else {
-				dataType, n, err := parseType(tokens[idx:], line)
-				if err != nil {
-					return ParsedDataType{}, 0, err
-				}
-				idx += n
-				paramTypes = append(paramTypes, dataType)
+				return ParsedDataType{}, 0, msg(line, column, "Expecting number for array size.")
 			}
+		} else if tokens[idx].Type == Colon {
+			idx++
+			returnTypes, n, err = parseTypeList(tokens[idx:], tokens[idx].LineNumber)
+			if err != nil {
+				return ParsedDataType{}, 0, err
+			}
+			idx += n
 		}
 		if tokens[idx].Type != CloseAngle {
 			return ParsedDataType{}, 0, msg(line, column, "Expecting closing angle bracket.")
 		}
 		idx++
 	}
-	return ParsedDataType{line, tokens[idx].Column, primary.Content, paramTypes, returnTypes}, idx, nil
+	return ParsedDataType{line, tokens[idx].Column, baseType, paramTypes, returnTypes}, idx, nil
 }
 
 // expects to end with newline or >, but does not consume the newline or >
@@ -932,24 +935,6 @@ func parseExpression(tokens []Token, line int) (Expression, int, error) {
 	default:
 		return nil, 0, msg(line, column, "Improper expression: "+fmt.Sprintf("%#v", token))
 	}
-
-Loop:
-	for len(tokens) > idx {
-		var err error
-		var n int
-		switch tokens[idx].Type {
-		case Dot:
-			expr, n, err = parseDot(tokens[idx:], token, line)
-		case OpenSquare:
-			expr, n, err = parseOpenSquare(tokens[idx:], token, line)
-		default:
-			break Loop
-		}
-		if err != nil {
-			return nil, 0, err
-		}
-		idx += n
-	}
 	return expr, idx, nil
 }
 
@@ -1008,7 +993,6 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 	}
 	functionCall := true
 	typeExpression := false
-	methodCall := false
 	var leadingCall Expression
 	var op Token
 	var dt ParsedDataType
@@ -1020,14 +1004,6 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 		idx++
 	case IdentifierWord:
 		op = t
-		idx++
-	case Dot:
-		idx++
-		if tokens[idx].Type != IdentifierWord {
-			return nil, 0, msg(line, column, "Method call expects a method name after the dot.")
-		}
-		op = tokens[idx]
-		methodCall = true
 		idx++
 	case OpenParen:
 		var numTokens int
@@ -1060,6 +1036,8 @@ Loop:
 		case CloseParen:
 			idx++
 			break Loop
+		default:
+			return nil, 0, msg(line, column, "Expecting space or end paren.")
 		}
 		expr, numTokens, err := parseExpression(tokens[idx:], line)
 		if err != nil {
@@ -1070,11 +1048,15 @@ Loop:
 	}
 
 	var expr Expression
-	if methodCall {
-		if len(arguments) < 1 {
-			return nil, 0, msg(line, column, "Method call must have a receiver.")
+	if op.Content == "mc" {
+		if len(arguments) < 2 {
+			return nil, 0, msg(line, column, "Method call must have a method name and a receiver.")
 		}
-		expr = MethodCall{line, column, op.Content, arguments[0], arguments[1:]}
+		if name, ok := arguments[0].(Token); ok {
+			expr = MethodCall{line, column, name.Content, arguments[1], arguments[2:]}
+		} else {
+			return nil, 0, msg(line, column, "First argument to 'mc' must be the method name.")
+		}
 	} else if typeExpression {
 		expr = TypeExpression{line, column, dt, arguments}
 	} else if functionCall {
@@ -1219,11 +1201,11 @@ func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int,
 		return TypeswitchStatement{}, 0, msg(line, column, "Missing space.")
 	}
 	idx++
-	value, nTokens, err := parseExpression(tokens[idx:], line)
+	value, n, err := parseExpression(tokens[idx:], line)
 	if err != nil {
 		return TypeswitchStatement{}, 0, err
 	}
-	idx += nTokens
+	idx += n
 	if tokens[idx].Type == Space {
 		idx++
 	}
@@ -1353,7 +1335,7 @@ func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
 
 	for idx+1 < len(tokens) {
 		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation &&
-			tokens[idx+1].Content == "elseif" {
+			tokens[idx+1].Content == "elif" {
 			elseifClause, numTokens, err := parseElif(tokens[idx+1:], indentation)
 			if err != nil {
 				return IfStatement{}, 0, err

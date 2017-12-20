@@ -9,20 +9,8 @@ import (
 	"strings"
 
 	"github.com/BrianWill/pigeon/dynamicPigeon"
+	"github.com/BrianWill/pigeon/staticPigeon"
 )
-
-type runStateEnum string
-
-const (
-	stopped runStateEnum = "stopped"
-	running runStateEnum = "running"
-	paused  runStateEnum = "paused"
-)
-
-type RunState struct {
-	state     runStateEnum
-	lastBreak int
-}
 
 func Run(filename string) (*exec.Cmd, error) {
 	cmd := exec.Command("go", "run", filename)
@@ -37,50 +25,47 @@ func Run(filename string) (*exec.Cmd, error) {
 }
 
 func main() {
-	if len(os.Args) >= 2 {
-		subcommand := os.Args[1]
-		if subcommand == "run" {
-			if len(os.Args) < 3 {
-				fmt.Println("Must specify a file to run.")
-				return
-			}
-			basedir := os.Getenv("GOPATH") + "/src/pigeon_output/"
-			outputFile := basedir + "output.go"
-			if _, err := os.Stat(basedir); os.IsNotExist(err) {
-				os.Mkdir(basedir, os.ModePerm)
-			}
-			var code []byte
-			if strings.HasSuffix(os.Args[2], ".sp") {
-				// packages, err := staticPigeon.Compile(os.Args[2], "pigeon_output/")
-				// if err != nil {
-				// 	fmt.Println(err)
-				// 	return
-				// }
-			} else if strings.HasSuffix(os.Args[2], ".dp") {
-				pkg, err := dynamicPigeon.Compile(os.Args[2], "pigeon_output/")
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				code = []byte(pkg.Code)
-			} else {
-				log.Fatal("File has improper extension.")
-			}
-			err := ioutil.WriteFile(outputFile, code, os.ModePerm)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			err = exec.Command("go", "fmt", outputFile).Run()
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			_, err = Run(outputFile)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+
+	if len(os.Args) < 2 {
+		fmt.Println("Must specify a file to run.")
+		return
+	}
+	basedir := os.Getenv("GOPATH") + "/src/pigeon_output/"
+	outputFile := basedir + "output.go"
+	if _, err := os.Stat(basedir); os.IsNotExist(err) {
+		os.Mkdir(basedir, os.ModePerm)
+	}
+	var code []byte
+	if strings.HasSuffix(os.Args[1], ".sp") {
+		pkg, err := staticPigeon.Compile(os.Args[1], "pigeon_output/")
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
+		code = []byte(pkg.Code)
+	} else if strings.HasSuffix(os.Args[1], ".dp") {
+		pkg, err := dynamicPigeon.Compile(os.Args[1], "pigeon_output/")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		code = []byte(pkg.Code)
+	} else {
+		log.Fatal("File has improper extension.")
+	}
+	err := ioutil.WriteFile(outputFile, code, os.ModePerm)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = exec.Command("go", "fmt", outputFile).Run()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	_, err = Run(outputFile)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 }

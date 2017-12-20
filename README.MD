@@ -5,7 +5,7 @@ More accurately, Pigeon is *two* educational programming languages:
 - DynamicPigeon
 - StaticPigeon
 
-DynamicPigeon ([reference](dynamic-pigeon.md)) teaches basic programming concepts common to all mainstream languages:
+DynamicPigeon ([reference](docs/dynamic-pigeon-reference.md), [notes](docs/dynamic-pigeon-notes.md)) teaches basic programming concepts common to all mainstream languages:
 
 - variables
 - operations
@@ -14,7 +14,7 @@ DynamicPigeon ([reference](dynamic-pigeon.md)) teaches basic programming concept
 - functions
 - lists and hashmaps
 
-StaticPigeon ([reference](static-pigeon-reference.md)) builds upon DynamicPigeon to teach most of the core concepts of the Go language (*sans* goroutines and channels):
+StaticPigeon ([reference](docs/static-pigeon-reference.md), [notes](docs/static-pigeon-notes.md)) builds upon DynamicPigeon to teach most of the core concepts of the Go language (*sans* goroutines and channels):
 
 - static typing
 - arrays and slices
@@ -27,11 +27,11 @@ StaticPigeon ([reference](static-pigeon-reference.md)) builds upon DynamicPigeon
 - bitwise operations
 - reading/writing files
 
-Once a student is comfortable with StaticPigeon, learning Go is mostly a matter of adjusting to different syntax. ([Learning Go after Pigeon](go-lang.md)) 
+Once a student is comfortable with StaticPigeon, learning Go is mostly a matter of adjusting to different syntax. ([Learning Go after Pigeon](docs/go-lang.md)) 
 
 # Installation and usage
 
-Because Pigeon compiles to Go, you'll need to install the [Go tool](https://golang.org/doc/install) if you haven't already. Once the Go tool is installed, you can install the Pigeon compiler with one command:
+Because Pigeon compiles to Go, you'll need to install the [Go tools](https://golang.org/doc/install) if you haven't already. Once the Go tool is installed, you can install the Pigeon compiler with one command:
 
 ```
 go get github.com/BrianWill/pigeon

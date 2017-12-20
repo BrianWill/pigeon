@@ -141,3 +141,7 @@ func Runeslice2string(r []int64) string {
 func Charslice2string(s []string) string {
 	return strings.Join(s, "")
 }
+
+func NoOp(discardMe ...interface{}) {
+	// nada
+}

@@ -675,3 +675,9 @@ function main
 We can use any expression in the brackets to specify the index/key.
 
 Notice that an assignment statement is used in place of a `set` operation. (This is not really any more compact than just using `set`, but we introduce it here because this mirrors how `set` is expressed in most other languages.)
+
+
+
+
+
+

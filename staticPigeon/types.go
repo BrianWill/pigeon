@@ -57,22 +57,12 @@ var reservedWords = []string{
 	"fordec",
 	"if",
 	"else",
-	"elseif",
+	"elif",
 	"while",
 	"foreach",
 	"return",
 	"as",
 	"locals",
-	"localfunc",
-	"select",
-	"sending",
-	"rcving",
-	"asinc",
-	"asdec",
-	"asadd",
-	"assub",
-	"asmul",
-	"asdiv",
 	"_p",
 	"_main",
 	"_break",
@@ -86,6 +76,8 @@ var operators = []string{
 	"mul",
 	"div",
 	"mod",
+	"inc",
+	"dec",
 	"eq",
 	"neq",
 	"not",
@@ -100,16 +92,16 @@ var operators = []string{
 	"slice",
 	"ref",
 	"dr",
+	"sr",
 	"or",
 	"and",
+	"mc",
 	"print",
 	"println",
 	"prompt",
 	"concat",
 	"len",
 	"istype",
-	"send",
-	"rcv",
 	"band", // bitwise and
 	"bor",  // bitwise or
 	"bxor", // bitwise xor
@@ -134,6 +126,7 @@ var operators = []string{
 var builtinTypes = []string{
 	"I",
 	"F",
+	"Byte",
 	"Fn",
 	"Str",
 	"Bool",
@@ -633,7 +626,7 @@ func (p *Package) getExportedDefinition(name string) Definition {
 
 func msg(line int, column int, s string) error {
 	return errors.New("Line " + strconv.Itoa(line) + ", column " +
-		strconv.Itoa(column) + " . " + s)
+		strconv.Itoa(column) + ": " + s)
 }
 
 func debug(args ...interface{}) {
