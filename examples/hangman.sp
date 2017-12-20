@@ -1,0 +1,83 @@
+
+// hangman
+
+func randInteger start I end I : I
+    locals n F
+    as n (randFloat)                     
+    as n (mul n (F (sub end start)))
+    as n (add n (F start))
+    return (I (floor n))
+
+
+
+
+
+// assumes start is less than len and end is less than len+1
+func sublist a L<Str> start I end I : L<Str>
+    locals b L<Str>
+    as b (L<Str>)
+    forinc i I start end
+        (push b (get a i))
+    return b
+
+
+func containsAny s Str chars L<Str> : Bool
+    foreach i I ch Str (charlist s)
+        foreach j I ch2 Str chars
+            if (eq ch ch2)
+                return true
+    return false
+
+
+func join strings L<Str> separator Str : Str
+    locals s Str lastIdx I
+    if (eq (len strings) 0)
+        return ""
+    as s ""
+    as lastIdx (dec (len strings))
+    foreach i I v Str (sublist strings 0 lastIdx)
+        as s (concat s v separator)
+    return (concat s (get strings lastIdx))
+
+
+
+func getLetter found L<Str> : Str
+    locals letter Str alphabet Str
+    as alphabet "abcdefghijklmnopqrstuvwxyz"
+    while true
+        as letter (prompt "Pick a letter:" (join found " "))
+        if (and (eq (len letter) 1) (containsAny alphabet (L<Str> letter)))
+            return letter
+        (println "Invalid input: must enter a single lowercase letter.")
+    return ""
+
+
+func updateFound found L<Str> word Str letter Str : Bool
+    locals complete Bool
+    as complete true
+    foreach i I ch Str (charlist word)
+        if (eq letter ch)
+            (set found i letter)
+        if (eq (get found i) "_")
+            as complete false
+    return complete
+
+
+func main
+    locals words L<Str> word Str found L<Str> letter Str nGuesses I
+    as words (L<Str> "zebra" "moose" "alligator" "elephant" 
+        ,"ibex" "jerboa" "cat" "hippopotamus" "pterodactyl")   // continue line using comma
+    as word (get words (randInteger 0 (len words)))
+    as nGuesses (len word)  // for an N-letter word, player has N guesses
+    as found (L<Str>)
+    forinc i I 0 (len word)
+        (push found "_")
+    while (gt nGuesses 0)
+        (println "You have" nGuesses "remaining guesses.")
+        as letter (getLetter found)
+        if (not (containsAny word (L<Str> letter)))
+            as nGuesses (dec nGuesses)
+        if (updateFound found word letter)
+            (println "You win! The word was:" word)
+            return
+    (println "You lose! The word was:" word)

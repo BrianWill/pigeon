@@ -78,6 +78,8 @@ var operators = []string{
 	"mod",
 	"inc",
 	"dec",
+	"floor",
+	"ceil",
 	"eq",
 	"neq",
 	"not",
@@ -457,11 +459,12 @@ type LocalFuncStatement struct {
 }
 
 type TypeswitchStatement struct {
-	LineNumber int
-	Column     int
-	Value      Expression
-	Cases      []TypeswitchCase
-	Default    []Statement
+	LineNumber      int
+	Column          int
+	Value           Expression
+	Cases           []TypeswitchCase
+	Default         []Statement
+	DefaultVariable string
 }
 
 type TypeswitchCase struct {

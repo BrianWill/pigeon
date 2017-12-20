@@ -1144,6 +1144,9 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 			return "", err
 		}
 		name := c.Variable.Name
+		if _, ok := locals[name]; ok {
+			return "", msg(s.LineNumber, s.Column, "typeswitch variable name '"+name+"'conflicts with existing local variable")
+		}
 		newLocals := map[string]Variable{}
 		for k, v := range locals {
 			newLocals[k] = v
@@ -1162,11 +1165,20 @@ func compileTypeswitchStatement(s TypeswitchStatement, expectedReturnTypes []Dat
 		code += body + "}"
 	}
 	if s.Default != nil {
-		body, err := compileBody(s.Default, expectedReturnTypes, pkg, locals, insideLoop, false)
+		name := s.DefaultVariable
+		if _, ok := locals[name]; ok {
+			return "", msg(s.LineNumber, s.Column, "typeswitch variable name '"+name+"'conflicts with existing local variable")
+		}
+		newLocals := map[string]Variable{}
+		for k, v := range locals {
+			newLocals[k] = v
+		}
+		newLocals[name] = Variable{s.LineNumber, s.Column, name, ParsedDataType{}}
+		body, err := compileBody(s.Default, expectedReturnTypes, pkg, newLocals, insideLoop, false)
 		if err != nil {
 			return "", nil
 		}
-		code += " else { \n" + body + "}"
+		code += " else { \n" + name + ":= _inter \n _std.NoOp(" + name + ") \n" + body + "}"
 	}
 	return code + "\n}\n", nil
 }
@@ -2199,6 +2211,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 		code += ")"
 	case "prompt":
+		returnType = BuiltinType{"Str", nil}
 		code += "_std.Prompt("
 		for i := range o.Operands {
 			code += operandCode[i] + ", "
@@ -2286,15 +2299,17 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
 			switch t.Name {
+			case "Str":
+				code += "_std.StrLen(" + operandCode[0] + ")"
 			case "L":
-				code += "len(*" + operandCode[0] + ")"
+				code += "int64(len(*" + operandCode[0] + "))"
 			case "M", "S":
-				code += "len(" + operandCode[0] + ")"
+				code += "int64(len(" + operandCode[0] + "))"
 			default:
 				return "", nil, msg(o.LineNumber, o.Column, "len operand must be a list or map")
 			}
 		case ArrayType:
-			code += "len(" + operandCode[0] + ")"
+			code += "int64(len(" + operandCode[0] + "))"
 		default:
 			return "", nil, msg(o.LineNumber, o.Column, "len operation requires a list, map, array, or slice as operand")
 		}
@@ -2337,6 +2352,24 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 		returnType = BuiltinType{"F", nil}
 		code += "_std.RandFloat()"
+	case "floor":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "'floor' operation takes one float operand")
+		}
+		returnType = BuiltinType{"F", nil}
+		if !isType(operandTypes[0], BuiltinType{"F", nil}, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "'floor' operation has non-float operand")
+		}
+		code += "_std.Floor(" + operandCode[0] + ")"
+	case "ceil":
+		if len(o.Operands) != 1 {
+			return "", nil, msg(o.LineNumber, o.Column, "'ceil' operation takes one float operand")
+		}
+		returnType = BuiltinType{"F", nil}
+		if !isType(operandTypes[0], BuiltinType{"F", nil}, true) {
+			return "", nil, msg(o.LineNumber, o.Column, "'ceil' operation has non-float operand")
+		}
+		code += "_std.Ceil(" + operandCode[0] + ")"
 	case "parseInt":
 		if len(o.Operands) != 1 {
 			return "", nil, msg(o.LineNumber, o.Column, "parseInt operation takes one string operand")
@@ -2420,6 +2453,11 @@ func Compile(filename string, outputDir string) (*Package, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// debug
+	// for i, t := range tokens {
+	// 	fmt.Println(i, t)
+	// }
 
 	pkg := &Package{
 		Globals:          map[string]GlobalDefinition{},

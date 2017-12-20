@@ -310,22 +310,14 @@ func parse(tokens []Token, pkg *Package) ([]Definition, error) {
 			var numTokens int
 			var err error
 			switch t.Content {
-			case "import":
-				definition, numTokens, err = parseImport(tokens[i:], line, pkg)
-			case "nativeimport":
-				definition, numTokens, err = parseNativeImport(tokens[i:], line, pkg)
 			case "struct":
 				definition, numTokens, err = parseStruct(tokens[i:], line, pkg)
-			case "nativestruct":
-				definition, numTokens, err = parseNativeStruct(tokens[i:], line, pkg)
 			case "interface":
 				definition, numTokens, err = parseInterface(tokens[i:], line, pkg)
 			case "method":
 				definition, numTokens, err = parseMethod(tokens[i:], line, pkg)
 			case "func":
 				definition, numTokens, err = parseFunction(tokens[i:], line, pkg)
-			case "nativefunc":
-				definition, numTokens, err = parseNativeFunc(tokens[i:], line, pkg)
 			case "global":
 				definition, numTokens, err = parseGlobal(tokens[i:], line, pkg)
 			default:
@@ -1095,6 +1087,10 @@ Outer:
 	return expr, idx, nil
 }
 
+func isReserved(t Token) bool {
+	return t.Type == OperatorWord || t.Type == ReservedWord || t.Type == TypeName
+}
+
 func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, int, error) {
 	column := tokens[0].Column
 	idx := 1
@@ -1102,6 +1098,9 @@ func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, 
 		idx++
 	}
 	name := tokens[idx]
+	if isReserved(name) {
+		return FunctionDefinition{}, 0, msg(line, column, "Function name cannot be a reserved word and cannot be uppercase.")
+	}
 	if name.Type != IdentifierWord {
 		return FunctionDefinition{}, 0, msg(line, column, "Function missing name.")
 	}
@@ -1143,56 +1142,6 @@ func parseFunction(tokens []Token, line int, pkg *Package) (FunctionDefinition, 
 	}, idx, nil
 }
 
-func parseNativeFunc(tokens []Token, line int, pkg *Package) (FunctionDefinition, int, error) {
-	column := tokens[0].Column
-	idx := 1
-	if tokens[idx].Type == Space {
-		idx++
-	}
-	name := tokens[idx]
-	if name.Type != IdentifierWord {
-		return FunctionDefinition{}, 0, msg(line, column, "Native function missing name.")
-	}
-	idx++
-	var params []Variable
-	var returnTypes []ParsedDataType
-	var err error
-	if tokens[idx].Type == Newline {
-		idx++
-	} else if tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
-		idx += 2
-	} else {
-		if tokens[idx].Type != Space {
-			return FunctionDefinition{}, 0, msg(line, column, "Missing space.")
-		}
-		idx++
-		var nTokens int
-		params, returnTypes, nTokens, err = parseParameters(tokens[idx:], line)
-		if err != nil {
-			return FunctionDefinition{}, 0, err
-		}
-		idx += nTokens
-	}
-	if tokens[idx].Type != MultilineStringLiteral {
-		return FunctionDefinition{}, 0, msg(line, column, "Native function expecting multi-line string.")
-	}
-	body := tokens[idx].Content
-	body = body[3 : len(body)-3]
-	idx++
-	if tokens[idx].Type != Newline {
-		return FunctionDefinition{}, 0, msg(line, column, "Native function expecting newline.")
-	}
-	idx++
-	return FunctionDefinition{
-		line, column,
-		name.Content,
-		params, returnTypes,
-		nil,
-		body,
-		pkg,
-	}, idx, nil
-}
-
 func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int, error) {
 	line := tokens[0].LineNumber
 	column := tokens[0].Column
@@ -1230,6 +1179,7 @@ func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int,
 		}
 	}
 	var defaultBody []Statement
+	var defaultName string
 	if idx+1 < len(tokens) {
 		if tokens[idx].Type == Indentation &&
 			len(tokens[idx].Content) == indentation &&
@@ -1237,14 +1187,14 @@ func parseTypeswitch(tokens []Token, indentation int) (TypeswitchStatement, int,
 			idx++
 			var nTokens int
 			var err error
-			defaultBody, nTokens, err = parseDefaultCase(tokens[idx:], indentation)
+			defaultBody, defaultName, nTokens, err = parseDefaultCase(tokens[idx:], indentation)
 			if err != nil {
 				return TypeswitchStatement{}, 0, err
 			}
 			idx += nTokens
 		}
 	}
-	return TypeswitchStatement{line, column, value, cases, defaultBody}, idx, nil
+	return TypeswitchStatement{line, column, value, cases, defaultBody, defaultName}, idx, nil
 }
 
 func parseTypeswitchCase(tokens []Token, indentation int) (TypeswitchCase, int, error) {
@@ -1285,23 +1235,32 @@ func parseTypeswitchCase(tokens []Token, indentation int) (TypeswitchCase, int, 
 	return TypeswitchCase{line, column, v, body}, idx, nil
 }
 
-func parseDefaultCase(tokens []Token, indentation int) ([]Statement, int, error) {
+func parseDefaultCase(tokens []Token, indentation int) ([]Statement, string, int, error) {
 	line := tokens[0].LineNumber
 	column := tokens[0].Column
 	idx := 1
+	if tokens[idx].Type != Space {
+		return nil, "", 0, msg(line, column, "Missing space.")
+	}
+	idx++
+	if tokens[idx].Type != IdentifierWord {
+		return nil, "", 0, msg(line, column, "Expecting identifier.")
+	}
+	name := tokens[idx].Content
+	idx++
 	if tokens[idx].Type == Space {
 		idx++
 	}
 	if tokens[idx].Type != Newline {
-		return nil, 0, msg(line, column, "Default case not followed by newline.")
+		return nil, "", 0, msg(line, column, "Default case not followed by newline.")
 	}
 	idx++
 	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
 	if err != nil {
-		return nil, 0, err
+		return nil, "", 0, err
 	}
 	idx += numTokens
-	return body, idx, nil
+	return body, name, idx, nil
 }
 
 func parseIf(tokens []Token, indentation int) (IfStatement, int, error) {
@@ -1707,6 +1666,12 @@ func parseReturn(tokens []Token) (ReturnStatement, int, error) {
 	line := tokens[0].LineNumber
 	column := tokens[0].Column
 	idx := 1
+	if tokens[idx].Type == Newline {
+		return ReturnStatement{line, column, nil}, idx + 1, nil
+	}
+	if tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
+		return ReturnStatement{line, column, nil}, idx + 2, nil
+	}
 	if tokens[idx].Type != Space {
 		return ReturnStatement{}, 0, msg(line, column, "Missing space.")
 	}
@@ -1848,51 +1813,6 @@ func parseLocals(tokens []Token) (LocalsStatement, int, error) {
 	return LocalsStatement{tokens[0].LineNumber, tokens[0].Column, locals}, idx, nil
 }
 
-// exactly like parseFunction but with more indentation
-func parseLocalFunc(tokens []Token, indentation int) (LocalFuncStatement, int, error) {
-	line := tokens[0].LineNumber
-	column := tokens[0].Column
-	idx := 1
-	if tokens[idx].Type == Space {
-		idx++
-	}
-	name := tokens[idx]
-	if name.Type != IdentifierWord {
-		return LocalFuncStatement{}, 0, msg(line, column, "Local function missing name.")
-	}
-	idx++
-	var params []Variable
-	var returnTypes []ParsedDataType
-	var err error
-	if tokens[idx].Type == Newline {
-		idx++
-	} else if tokens[idx].Type == Space && tokens[idx+1].Type == Newline {
-		idx += 2
-	} else {
-		if tokens[idx].Type != Space {
-			return LocalFuncStatement{}, 0, msg(line, column, "Expecting space.")
-		}
-		idx++
-		var nTokens int
-		params, returnTypes, nTokens, err = parseParameters(tokens[idx:], line)
-		if err != nil {
-			return LocalFuncStatement{}, 0, err
-		}
-		idx += nTokens
-	}
-	body, nTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
-	if err != nil {
-		return LocalFuncStatement{}, 0, err
-	}
-	idx += nTokens
-	return LocalFuncStatement{
-		tokens[0].LineNumber, tokens[0].Column,
-		name.Content,
-		params, returnTypes,
-		body,
-	}, idx, nil
-}
-
 // expected to start with Indentation token.
 // 'indentation' = the number of spaces indentation on which the body should be aligned
 // May return zero statements if body is empty.
@@ -1928,8 +1848,6 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseForeach(tokens[i:], indentation)
 					case "locals":
 						statement, numTokens, err = parseLocals(tokens[i:])
-					case "localfunc":
-						statement, numTokens, err = parseLocalFunc(tokens[i:], indentation)
 					case "return":
 						statement, numTokens, err = parseReturn(tokens[i:])
 					case "typeswitch":

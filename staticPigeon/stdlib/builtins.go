@@ -1,11 +1,16 @@
 package std
 
 import (
+	"bufio"
 	"fmt"
+	"log"
+	"math"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type List []interface{}
@@ -33,10 +38,17 @@ func (l *List) Set(idx int64, item interface{}) {
 	(*l)[idx] = item
 }
 
-func Prompt(args ...interface{}) {
-	if len(args) > 1 {
-		fmt.Print(args...)
+func Prompt(args ...interface{}) string {
+	if len(args) >= 1 {
+		fmt.Println(args...)
 	}
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	if scanner.Err() != nil {
+		log.Fatalln(scanner.Err())
+	}
+	s := scanner.Text()
+	return s
 }
 
 func init() {
@@ -142,6 +154,18 @@ func Charslice2string(s []string) string {
 	return strings.Join(s, "")
 }
 
+func Floor(i float64) float64 {
+	return math.Floor(i)
+}
+
+func Ceil(i float64) float64 {
+	return math.Ceil(i)
+}
+
 func NoOp(discardMe ...interface{}) {
 	// nada
+}
+
+func StrLen(s string) int64 {
+	return int64(utf8.RuneCountInString(s))
 }
