@@ -705,9 +705,24 @@ func main
 
 Returns an integer which uniquely identifies the open file. (No guarantee is made about what this integer value will be other than it will be unique amongst all the open files.)
 
+```
+func main
+    locals file I err Str
+    as file err (createFile "myFile.txt")
+    if (neq err "")
+        (println "Error:" err)
+        return
+```
+
 `openFile`
 
+Opens a file for both reading and writing.
+
+
+
 `readFile`
+
+When reading at end of file, returns `0` and `"EOF"` ('end of file').
 
 `writeFile`
 

@@ -1,0 +1,179 @@
+// hangman (with slices instead of lists)
+
+func randInteger start I end I : I
+    locals n F
+    as n (randFloat)                     
+    as n (mul n (F (sub end start)))
+    as n (add n (F start))
+    return (I (floor n))
+
+// import "math/rand"
+// t := time.Now()
+// rand.Seed(t.UnixNano())
+// rand.RandIntN(end)
+
+
+
+
+
+
+import "fmt"
+import "math/rand"
+
+
+
+// don't need 'sublist' function because 'slice' does what we want
+
+
+
+
+func containsAny s Str chars S<Str> : Bool
+    foreach i I ch Str (charslice s)
+        foreach j I ch2 Str chars
+            if (eq ch ch2)
+                return true
+    return false
+
+
+func containsAny(s string, chars []string) bool {
+    for i, r := range s {
+        ch := string(r)
+        for j, ch2 := range chars {
+            if ch == ch2 {
+                return true
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+func join strings S<Str> separator Str : Str
+    locals s Str lastIdx I
+    if (eq (len strings) 0)
+        return ""
+    as s ""
+    as lastIdx (dec (len strings))
+    foreach i I v Str (slice strings 0 lastIdx)
+        as s (concat s v separator)
+    return (concat s (get strings lastIdx))
+
+func join(strings []string, separator string) string {
+    var s string
+    var lastIdx int
+    if len(strings) == 0 {
+        return ""
+    }
+    s = ""
+    lastIdx = len(strings) - 1
+    for i, v := range strings[0:lastIdx] {
+        s += string(v) + separator         // s = s + v + separator
+    }
+    return s + strings[lastIdx]
+}
+
+
+
+
+
+func getLetter found S<Str> : Str
+    locals letter Str alphabet Str
+    as alphabet "abcdefghijklmnopqrstuvwxyz"
+    while true
+        as letter (prompt "Pick a letter:" (join found " "))
+        if (and (eq (len letter) 1) (containsAny alphabet (S<Str> letter)))
+            return letter
+        (println "Invalid input: must enter a single lowercase letter.")
+    return ""
+
+func getLetter(found []string) string {
+    var letter string
+    var alphabet string
+    alphabet = "abcdefghijklmnopqrstuvwxyz"
+    for true {
+        letter = prompt("Pick a letter:", join(found, " "))
+        if len(letter) == 1 && containsAny(alphabet, []string{letter}) {
+            return letter
+        }
+        fmt.Println("Invalid input: must enter a single lowercase letter.")
+    }
+    return ""
+}
+
+
+func updateFound found S<Str> word Str letter Str : Bool
+    locals complete Bool
+    as complete true
+    foreach i I ch Str (charslice word)
+        if (eq letter ch)
+            (set found i letter)
+        if (eq (get found i) "_")
+            as complete false
+    return complete
+
+func updateFound(found []string, word string, letter string) bool {
+    var complete bool
+    complete = true
+    for i, r := range word {
+        if letter == string(r) {
+            found[i] = letter
+        }
+        if found[i] == "_" {
+            complete = false
+        }
+    }
+    return complete
+}
+
+
+
+
+
+func main
+    locals words S<Str> word Str found S<Str> letter Str nGuesses I
+    as words (S<Str> "zebra" "moose" "alligator" "elephant" 
+        ,"ibex" "jerboa" "cat" "hippopotamus" "pterodactyl")   // continue line using comma
+    as word (get words (randInteger 0 (len words)))
+    as nGuesses (len word)  // for an N-letter word, player has N guesses
+    as found (S<Str>)
+    forinc i I 0 (len word)
+        as found (append found "_")
+    while (gt nGuesses 0)
+        (println "You have" nGuesses "remaining guesses.")
+        as letter (getLetter found)
+        if (not (containsAny word (S<Str> letter)))
+            as nGuesses (dec nGuesses)
+        if (updateFound found word letter)
+            (println "You win! The word was:" word)
+            return
+    (println "You lose! The word was:" word)
+
+func main() {
+    var words []string
+    var word string
+    var found []string
+    var letter string
+    var nGuesses int
+    words = []string{"zebra", "moose", "alligator", "elephant", "ibex", "jerboa", "cat", "hippopotamus", "pterodactyl"}
+    nGuesses = len(word)
+    found = []string{}
+    for i := 0; i < len(word); i++ {
+        found = append(found, "_")
+    }
+    for nGuesses > 0 {
+        fmt.Println("You have", nGuesses, "remaining guesses.")
+        letter = getLetter(found)
+        if !containsAny(word, []string{letter}) {
+            nGuesses--
+        }
+        if updateFound(found, word, letter) {
+            fmt.Println("You win! The word was:", word)
+            return
+        }
+    }
+    fmt.Println("You lose! The word was:", word)
+}

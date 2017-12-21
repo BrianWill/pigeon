@@ -48,6 +48,10 @@
 			"match": "\\b(charlist|runelist|getchar|getrune|concat)\\b"
 		},
 		{
+			"name": "keyword.operator.file.static-pigeon",
+			"match": "\\b(createFile|openFile|readFile|writeFile|seekFile|seekFileStart|seekFileEnd)\\b"
+		},
+		{
 			"name": "keyword.operator.misc.static-pigeon",
 			"match": "\\b(print|println|prompt|randNum|parseNum|newError)\\b"
 		},

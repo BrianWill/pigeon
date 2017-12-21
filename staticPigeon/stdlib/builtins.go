@@ -15,11 +15,6 @@ import (
 
 type List []interface{}
 
-func NewList(items ...interface{}) *List {
-	l := List(items)
-	return &l
-}
-
 func (s *List) String() string {
 	strs := make([]string, len(*s))
 	for i, v := range *s {
@@ -168,4 +163,103 @@ func NoOp(discardMe ...interface{}) {
 
 func StrLen(s string) int64 {
 	return int64(utf8.RuneCountInString(s))
+}
+
+func CreateFile(name string) (int64, string) {
+	f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return 0, err.Error()
+	}
+	id := int64(f.Fd())
+	openFilesById[id] = f
+	return id, ""
+}
+
+func OpenFile(name string) (int64, string) {
+	f, err := os.OpenFile(name, os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return 0, err.Error()
+	}
+	id := int64(f.Fd())
+	openFilesById[id] = f
+	return id, ""
+}
+
+var openFilesById = map[int64]*os.File{}
+
+func CloseFile(id int64) string {
+	if f, ok := openFilesById[id]; ok {
+		if err := f.Close(); err != nil {
+			log.Fatal("Error closing file.")
+		}
+		delete(openFilesById, id)
+		return ""
+	} else {
+		return "Error closing file: no open file has id '" + strconv.FormatInt(id, 10) + "'"
+	}
+}
+
+func ReadFile(id int64, bytes []byte) (int64, string) {
+	if f, ok := openFilesById[id]; ok {
+		n, err := f.Read(bytes)
+		if err != nil {
+			return int64(n), err.Error()
+		} else {
+			return int64(n), ""
+		}
+	} else {
+		return 0, "Error reading file: no open file has id '" + strconv.FormatInt(id, 10) + "'"
+	}
+}
+
+func WriteFile(id int64, bytes []byte) (int64, string) {
+	if f, ok := openFilesById[id]; ok {
+		n, err := f.Write(bytes)
+		if err != nil {
+			return int64(n), err.Error()
+		} else {
+			return int64(n), ""
+		}
+	} else {
+		return 0, "Error writing file: no open file has id '" + strconv.FormatInt(id, 10) + "'"
+	}
+}
+
+func SeekFile(id int64, offset int64) (int64, string) {
+	if f, ok := openFilesById[id]; ok {
+		n, err := f.Seek(offset, 1)
+		if err != nil {
+			return int64(n), err.Error()
+		} else {
+			return int64(n), ""
+		}
+	} else {
+		return 0, "Error seeking file: no open file has id '" + strconv.FormatInt(id, 10) + "'"
+	}
+}
+
+func SeekFileStart(id int64, offset int64) (int64, string) {
+	if f, ok := openFilesById[id]; ok {
+		n, err := f.Seek(offset, 0)
+		if err != nil {
+			return int64(n), err.Error()
+		} else {
+			return int64(n), ""
+		}
+	} else {
+		return 0, "Error seeking file: no open file has id '" + strconv.FormatInt(id, 10) + "'"
+	}
+}
+
+func SeekFileEnd(id int64, offset int64) (int64, string) {
+	if f, ok := openFilesById[id]; ok {
+		n, err := f.Seek(offset, 2)
+		if err != nil {
+			return int64(n), err.Error()
+		} else {
+			return int64(n), ""
+		}
+	} else {
+		return 0, "Error seeking file: no open file has id '" + strconv.FormatInt(id, 10) + "'"
+	}
 }

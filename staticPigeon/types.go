@@ -102,6 +102,7 @@ var operators = []string{
 	"println",
 	"prompt",
 	"concat",
+	"make",
 	"len",
 	"istype",
 	"band", // bitwise and
@@ -122,7 +123,15 @@ var operators = []string{
 	"charlist",
 	"runelist",
 	"charslice",
-	"charslice",
+	"byteslice",
+	"createFile",
+	"openFile",
+	"closeFile",
+	"readFile",
+	"writeFile",
+	"seekFile",
+	"seekFileStart",
+	"seekFileEnd",
 }
 
 var builtinTypes = []string{
@@ -439,6 +448,7 @@ type Operation struct {
 	LineNumber int
 	Column     int
 	Operator   string
+	MakeType   ParsedDataType // nil for all ops except a 'make' op
 	Operands   []Expression
 }
 

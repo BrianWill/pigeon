@@ -871,31 +871,6 @@ func parseGlobal(tokens []Token, line int, pkg *Package) (GlobalDefinition, int,
 	return GlobalDefinition{line, column, target.Content, value, globalType, pkg}, idx, nil
 }
 
-func parseGoStatement(tokens []Token) (GoStatement, int, error) {
-	line := tokens[0].LineNumber
-	column := tokens[0].Column
-	idx := 1
-	if tokens[idx].Type != Space {
-		return GoStatement{}, 0, msg(line, column, "Expecting space in go statement.")
-	}
-	idx++
-	expr, n, err := parseExpression(tokens[idx:], line)
-	if err != nil {
-		return GoStatement{}, 0, err
-	}
-	idx += n
-	switch expr.(type) {
-	case FunctionCall, MethodCall:
-	default:
-		return GoStatement{}, 0, msg(line, column, "Expecting function call or method call in go statement.")
-	}
-	if tokens[idx].Type != Newline {
-		return GoStatement{}, 0, msg(line, column, "Expecting newline after go statement.")
-	}
-	idx++
-	return GoStatement{line, column, expr}, idx, nil
-}
-
 func parseExpression(tokens []Token, line int) (Expression, int, error) {
 	column := tokens[0].Column
 	if len(tokens) < 1 {
@@ -930,48 +905,36 @@ func parseExpression(tokens []Token, line int) (Expression, int, error) {
 	return expr, idx, nil
 }
 
-// assumes first token is dot
-func parseDot(tokens []Token, expr Expression, line int) (Expression, int, error) {
-	column := tokens[0].Column
-	if tokens[1].Type != IdentifierWord {
-		return nil, 0, msg(line, column, "Identifier expected after dot.")
-	}
-	strLiteral := Token{StringLiteral, "\"" + tokens[1].Content + "\"", line, -1}
-	getOp := Operation{
-		line,
-		column,
-		"get",
-		[]Expression{expr, strLiteral},
-	}
-	return getOp, 2, nil
-}
-
-// assumes first token is open square
-func parseOpenSquare(tokens []Token, expr Expression, line int) (Expression, int, error) {
+func parseMakeOp(tokens []Token) (Operation, int, error) {
+	line := tokens[0].LineNumber
 	column := tokens[0].Column
 	idx := 1
-	if tokens[idx].Type == Space {
-		idx++
+	if tokens[idx].Type != Space {
+		return Operation{}, 0, msg(line, column, "Expecting space.")
 	}
-	indexExpr, nTokens, err := parseExpression(tokens[idx:], line)
+	idx++
+	dt, numTokens, err := parseType(tokens[idx:], line)
 	if err != nil {
-		return nil, 0, err
+		return Operation{}, 0, err
 	}
-	idx += nTokens
+	idx += numTokens
+	if tokens[idx].Type != Space {
+		return Operation{}, 0, msg(line, column, "Expecting space.")
+	}
+	idx++
+	expr, numTokens, err := parseExpression(tokens[idx:], line)
+	if err != nil {
+		return Operation{}, 0, err
+	}
+	idx += numTokens
 	if tokens[idx].Type == Space {
 		idx++
 	}
-	if len(tokens) < idx || tokens[idx].Type != CloseSquare {
-		return nil, 0, msg(line, column, "Improperly formed square brackets.")
+	if tokens[idx].Type != CloseParen {
+		return Operation{}, 0, msg(line, column, "Expecting close paren.")
 	}
-	idx++ // account for ']'
-	getOp := Operation{
-		line,
-		column,
-		"get",
-		[]Expression{expr, indexExpr},
-	}
-	return getOp, idx, nil
+	idx++
+	return Operation{line, column, "make", dt, []Expression{expr}}, idx, nil
 }
 
 // assumes first token is open paren.
@@ -992,6 +955,13 @@ func parseOpenParen(tokens []Token) (Expression, int, error) {
 	switch t.Type {
 	case OperatorWord:
 		op = t
+		if op.Content == "make" {
+			makeOp, numTokens, err := parseMakeOp(tokens[idx:])
+			if err != nil {
+				return nil, 0, err
+			}
+			return makeOp, numTokens + 1, nil
+		}
 		functionCall = false
 		idx++
 	case IdentifierWord:
@@ -1058,30 +1028,7 @@ Loop:
 			expr = FunctionCall{line, column, leadingCall, arguments}
 		}
 	} else {
-		expr = Operation{line, column, op.Content, arguments}
-	}
-
-Outer:
-	for len(tokens) > idx {
-		line := tokens[idx].LineNumber
-		var err error
-		var n int
-		switch tokens[idx].Type {
-		case Dot:
-			expr, n, err = parseDot(tokens[idx:], expr, line)
-		case OpenSquare:
-			expr, n, err = parseOpenSquare(tokens[idx:], expr, line)
-			if err != nil {
-				return nil, 0, err
-			}
-			idx += n
-		default:
-			break Outer
-		}
-		if err != nil {
-			return nil, 0, err
-		}
-		idx += n
+		expr = Operation{line, column, op.Content, ParsedDataType{}, arguments}
 	}
 
 	return expr, idx, nil
@@ -1365,153 +1312,6 @@ func parseElse(tokens []Token, indentation int) (ElseClause, int, error) {
 	}
 	idx += numTokens
 	return ElseClause{line, column, body}, idx, nil
-}
-
-func parseSelect(tokens []Token, indentation int) (SelectStatement, int, error) {
-	line := tokens[0].LineNumber
-	column := tokens[0].Column
-	idx := 1
-	if tokens[idx].Type != Newline {
-		return SelectStatement{}, 0, msg(line, column, "Expecting newline.")
-	}
-	idx++
-	var clauses []SelectClause
-	var defaultClause SelectDefaultClause
-loop:
-	for idx < len(tokens) {
-		if tokens[idx].Type == Indentation && len(tokens[idx].Content) == indentation {
-			idx++
-			if tokens[idx].Type != ReservedWord {
-				return SelectStatement{}, 0, msg(line, column, "Expecting 'send' or 'rcv', or 'default'.")
-			}
-			switch tokens[idx].Content {
-			case "sending":
-				clause, n, err := parseSendClause(tokens[idx:], indentation)
-				if err != nil {
-					return SelectStatement{}, 0, err
-				}
-				clauses = append(clauses, clause)
-				idx += n
-			case "rcving":
-				clause, n, err := parseRcvClause(tokens[idx:], indentation)
-				if err != nil {
-					return SelectStatement{}, 0, err
-				}
-				clauses = append(clauses, clause)
-				idx += n
-			case "default":
-				var n int
-				var err error
-				defaultClause, n, err = parseSelectDefault(tokens[idx:], indentation)
-				if err != nil {
-					return SelectStatement{}, 0, err
-				}
-				idx += n
-				break loop
-			}
-		} else {
-			break
-		}
-	}
-	return SelectStatement{line, column, clauses, defaultClause}, idx, nil
-}
-
-func parseSendClause(tokens []Token, indentation int) (SelectSendClause, int, error) {
-	line := tokens[0].LineNumber
-	column := tokens[0].Column
-	idx := 1
-	if tokens[idx].Type != Space {
-		return SelectSendClause{}, 0, msg(line, column, "Missing space.")
-	}
-	idx++
-	channelExpr, numConditionTokens, err := parseExpression(tokens[idx:], line)
-	if err != nil {
-		return SelectSendClause{}, 0, msg(line, column, "Improper channel expression in select send clause.")
-	}
-	idx += numConditionTokens
-	if tokens[idx].Type != Space {
-		return SelectSendClause{}, 0, msg(line, column, "Missing space.")
-	}
-	idx++
-	valExpr, numConditionTokens, err := parseExpression(tokens[idx:], line)
-	if err != nil {
-		return SelectSendClause{}, 0, msg(line, column, "Improper value expression in select send clause.")
-	}
-	idx += numConditionTokens
-	if tokens[idx].Type != Newline {
-		return SelectSendClause{}, 0, msg(line, column, "Expecting newline in select send clause.")
-	}
-	idx++
-	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
-	if err != nil {
-		return SelectSendClause{}, 0, err
-	}
-	idx += numTokens
-	return SelectSendClause{line, column, channelExpr, valExpr, body}, idx, nil
-}
-
-func parseRcvClause(tokens []Token, indentation int) (SelectRcvClause, int, error) {
-	line := tokens[0].LineNumber
-	column := tokens[0].Column
-	idx := 1
-	if tokens[idx].Type != Space {
-		return SelectRcvClause{}, 0, msg(line, column, "Missing space.")
-	}
-	idx++
-	if tokens[idx].Type != IdentifierWord {
-		return SelectRcvClause{}, 0, msg(line, column, "Expecting variable name for target of select rcv clause.")
-	}
-	targetName := tokens[idx].Content
-	idx++
-	if tokens[idx].Type != Space {
-		return SelectRcvClause{}, 0, msg(line, column, "Missing space.")
-	}
-	idx++
-	dt, n, err := parseType(tokens[idx:], line)
-	if err != nil {
-		return SelectRcvClause{}, 0, err
-	}
-	idx += n
-	if tokens[idx].Type != Space {
-		return SelectRcvClause{}, 0, msg(line, column, "Missing space.")
-	}
-	idx++
-	expr, n, err := parseExpression(tokens[idx:], line)
-	if err != nil {
-		return SelectRcvClause{}, 0, err
-	}
-	idx += n
-	if tokens[idx].Type != Newline {
-		return SelectRcvClause{}, 0, msg(line, column, "Expecting newline in select rcv clause.")
-	}
-	idx++
-	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
-	if err != nil {
-		return SelectRcvClause{}, 0, err
-	}
-	idx += numTokens
-	return SelectRcvClause{
-		line, column,
-		Variable{line, column, targetName, dt},
-		expr,
-		body,
-	}, idx, nil
-}
-
-func parseSelectDefault(tokens []Token, indentation int) (SelectDefaultClause, int, error) {
-	line := tokens[0].LineNumber
-	column := tokens[0].Column
-	idx := 1
-	if tokens[idx].Type != Newline {
-		return SelectDefaultClause{}, 0, msg(line, column, "Elseif clause condition not followed by newline.")
-	}
-	idx++
-	body, numTokens, err := parseBody(tokens[idx:], indentation+indentationSpaces)
-	if err != nil {
-		return SelectDefaultClause{}, 0, err
-	}
-	idx += numTokens
-	return SelectDefaultClause{line, column, body}, idx, nil
 }
 
 func parseForeach(tokens []Token, indentation int) (ForeachStatement, int, error) {
@@ -1852,8 +1652,6 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseReturn(tokens[i:])
 					case "typeswitch":
 						statement, numTokens, err = parseTypeswitch(tokens[i:], indentation)
-					case "select":
-						statement, numTokens, err = parseSelect(tokens[i:], indentation)
 					case "forinc":
 						statement, numTokens, err = parseForinc(tokens[i:], indentation, false)
 					case "fordec":
@@ -1862,8 +1660,6 @@ func parseBody(tokens []Token, indentation int) ([]Statement, int, error) {
 						statement, numTokens, err = parseBreak(tokens[i:])
 					case "continue":
 						statement, numTokens, err = parseContinue(tokens[i:])
-					case "go":
-						statement, numTokens, err = parseGoStatement(tokens[i:])
 					default:
 						return nil, 0, msg(t.LineNumber, t.Column, "Improper reserved word '"+t.Content+"' in body.")
 					}
