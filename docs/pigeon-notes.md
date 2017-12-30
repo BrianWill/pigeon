@@ -1,6 +1,6 @@
-# DynamicPigeon
+# Pigeon
 
-The DynamicPigeon language is a reductively simple programming language for educational purposes. It includes the features common to all popular languages:
+The Pigeon language is a reductively simple programming language for educational purposes. It includes the features common to all popular languages:
 
 ## common elements of high-level languages
 
@@ -38,7 +38,7 @@ It's sometimes useful to leave notes in code, and so we need some way of telling
 // This number sign and everything after it on the line is ignored by the language
 ```
 
-## DynamicPigeon data types
+## data types
 
 Numbers are written as you would expect:
 
@@ -217,9 +217,9 @@ The `prompt` operator takes no operands. It prompts the user on screen to type s
 
 # functions
 
-A DynamicPigeon program is primarily composed of functions. As discussed, a function is a chunk of statements that is given a name such that we can execute the chunk anywhere else in code by just writing the name.
+A Pigeon program is primarily composed of functions. As discussed, a function is a chunk of statements that is given a name such that we can execute the chunk anywhere else in code by just writing the name.
 
-A function definition in DynamicPigeon starts with the reserved word `func`, then the name you've chosen for the function. The body (the statements to execute when the function is called) are written indented on the next lines. For example:
+A function definition in Pigeon starts with the reserved word `func`, then the name you've chosen for the function. The body (the statements to execute when the function is called) are written indented on the next lines. For example:
 
 ```
 // a function named 'david' with a body of two statements
@@ -238,7 +238,7 @@ func heidi
 
 ## the main function
 
-Execution of a DynamicPigeon program begins by calling the function named `main`:
+Execution of a Pigeon program begins by calling the function named `main`:
 
 ```
 func jill
@@ -364,7 +364,7 @@ func main
 
 Each call to a function creates its own set of the local variables, and each set disappears when its call ends. So, say, local variable 'x' in one call is separate from local variable 'x' in another call to that same function.
 
-(Variables in DynamicPigeon do not actually store values *directly*. Instead, assignment stores the *address* of the value. This distinction will be significant when we deal with lists and maps later.)
+(Variables in Pigeon do not actually store values *directly*. Instead, assignment stores the *address* of the value. This distinction will be significant when we deal with lists and maps later.)
 
 ## global variables
 

@@ -1,75 +1,75 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-	"name": "StaticPigeon",
-	"scopeName": "source.sp",
+	"name": "GoPigeon",
+	"scopeName": "source.gopigeon",
 	"patterns": [
 		{
-			"name": "comment.static-pigeon",
+			"name": "comment.go-pigeon",
 			"match": "//.*"
 		},
 		{
-			"name": "typename.static-pigeon",
+			"name": "typename.go-pigeon",
 			"match": "\\b[A-Z]\\w*\\b"
 		},
 		{
-			"name": "keyword.control.escape.static-pigeon",
+			"name": "keyword.control.escape.go-pigeon",
 			"match": "\\b(break|continue|return)\\b"
 		},
 		{
-			"name": "keyword.control.block.static-pigeon",
+			"name": "keyword.control.block.go-pigeon",
 			"match": "\\b(if|elif|else|while|foreach|fordec|forinc|typeswitch|case|default)\\b"
 		},
 		{
-			"name": "keyword.vars.static-pigeon",
+			"name": "keyword.vars.go-pigeon",
 			"match": "\\b(locals|as|localfunc)\\b"
 		},
 		{
-			"name": "entity.name.static-pigeon",
+			"name": "entity.name.go-pigeon",
 			"match": "\\b(global|func|struct|interface|method)\\b"
 		},
 		{
-			"name": "keyword.operator.arithmetic.static-pigeon",
+			"name": "keyword.operator.arithmetic.go-pigeon",
 			"match": "\\b(add|sub|mul|dec|mod|floor|ceil|round|inc|dec)\\b"
 		},
 		{
-			"name": "keyword.operator.pointers.static-pigeon",
+			"name": "keyword.operator.pointers.go-pigeon",
 			"match": "\\b(ref|dr|sr)\\b"
 		},
 		{
-			"name": "keyword.operator.logic.static-pigeon",
+			"name": "keyword.operator.logic.go-pigeon",
 			"match": "\\b(eq|neq|not|lt|lte|gt|gte|and|or|bor|band|bxor|bnot)\\b"
 		},
 		{
-			"name": "keyword.operator.collections.static-pigeon",
+			"name": "keyword.operator.collections.go-pigeon",
 			"match": "\\b(list|map|len|get|set|push|lconcat|mc|slice|copy|cap|append|make)\\b"
 		},
 		{
-			"name": "keyword.operator.string.static-pigeon",
-			"match": "\\b(charlist|runelist|getchar|getrune|concat)\\b"
+			"name": "keyword.operator.string.go-pigeon",
+			"match": "\\b(charlist|runelist|charslice|runeslice|byteslice|getchar|getrune|concat)\\b"
 		},
 		{
-			"name": "keyword.operator.file.static-pigeon",
+			"name": "keyword.operator.file.go-pigeon",
 			"match": "\\b(createFile|openFile|readFile|writeFile|seekFile|seekFileStart|seekFileEnd)\\b"
 		},
 		{
-			"name": "keyword.operator.misc.static-pigeon",
+			"name": "keyword.operator.misc.go-pigeon",
 			"match": "\\b(print|println|prompt|randNum|parseNum|newError)\\b"
 		},
 		{
-			"name": "constant.numeric.static-pigeon",
+			"name": "constant.numeric.go-pigeon",
 			"match": "\\b\\d+(\\.\\d*)?\\b"
 		},
 		{
-			"name": "constant.numeric.static-pigeon",
+			"name": "constant.numeric.go-pigeon",
 			"match": "\\b(nil|true|false)\\b"
 		},
 		{
-			"name": "string.quoted.double.static-pigeon",
+			"name": "string.quoted.double.go-pigeon",
 			"begin": "\"",
 			"end": "\"",
 			"patterns": [
 				{
-					"name": "constant.character.escape.static-pigeon",
+					"name": "constant.character.escape.go-pigeon",
 					"match": "\\\\."
 				}
 			]

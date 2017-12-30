@@ -1,8 +1,8 @@
-# StaticPigeon (notes for new programmers)
+# GoPigeon (notes for new programmers)
 
 ## static typing vs. dynamic typing
 
-While DynamicPigeon is a dynamically-typed language, StaticPigeon is a statically-typed language 
+While DynamicPigeon is a dynamically-typed language, GoPigeon is a statically-typed language 
 
 In a statically-typed language, each variable (including each function parameter) is marked by a designated type such that only values of the designated type can be assigned to the variable. Functions are also marked by a 'return type', such that you must always return values of that type (and only that type) from the function.
 
@@ -17,7 +17,7 @@ In a dynamically typed language, the code will compile and execute regardless of
 
 Static typing has the advantage of detecting all ***type errors*** at compile time, before the code even runs. With dynamic typing, a type error may lurk undetected in some uncommonly executed branch of code. On the other hand, static typing can require more thinking about types up front, which may feel onerous or inhibiting. Some programmers prefer static typing; others prefer dynamic typing.
 
-Here's an example function in StaticPigeon:
+Here's an example function in GoPigeon:
 
 ```
 // function amber has two parameters, x (a string) and y (a boolean), and returns a boolean
@@ -35,7 +35,7 @@ func main
 
 Note a few things:
 
-- all data type names in StaticPigeon start with uppercase letters, and all other names begin with lowercase letters
+- all data type names in GoPigeon start with uppercase letters, and all other names begin with lowercase letters
 - each parameter is followed by its type
 - after a function's parameters, a colon precedes the function's return type
 - the colon may be omited if a function returns nothing (as in the case of main)
@@ -47,7 +47,7 @@ Note a few things:
 
 ## number types
 
-In DynamicPigeon, all numbers are 64-bit floating-point. In StaticPigeon, the 64-bit floating-point number type is called `F`, and we also have a 64-bit integer type called `I`. Though both are numbers, the compiler considers them to be different things. Number literals with a decimal point are considered floats, and number literals without are considered integers. The arithmetic operators work on both floats and integers, but a single operation can only have operands of one type:
+In DynamicPigeon, all numbers are 64-bit floating-point. In GoPigeon, the 64-bit floating-point number type is called `F`, and we also have a 64-bit integer type called `I`. Though both are numbers, the compiler considers them to be different things. Number literals with a decimal point are considered floats, and number literals without are considered integers. The arithmetic operators work on both floats and integers, but a single operation can only have operands of one type:
 
 ```
 func main
@@ -63,7 +63,7 @@ func main
 
 ## multi-return functions and multiple assignment
 
-A function in StaticPigeon may be declared to return multiple values. The values returned from such a function can only be received in an assignment statement with multiple targets:
+A function in GoPigeon may be declared to return multiple values. The values returned from such a function can only be received in an assignment statement with multiple targets:
 
 ```
 // zelda returns both an integer and a string
@@ -79,7 +79,7 @@ func main
 
 ## structs
 
-In StaticPigeon, we can define our own data types called `structs` (as in 'structures'). Structs are defined at the top-level of code (meaning outside any function). A struct is a composite of one or more named elements of data, called 'fields':
+In GoPigeon, we can define our own data types called `structs` (as in 'structures'). Structs are defined at the top-level of code (meaning outside any function). A struct is a composite of one or more named elements of data, called 'fields':
 
 ```
 // define a struct called Ronald with two fields
@@ -701,7 +701,7 @@ Each CPU core can run one thread at a time, *e.g.* given a 4-core CPU, the CPU c
 
 If computers were infinitely fast--that is, if any amount of code could be fully executed instantaneously--we’d have no real reason to parcel out the work of our programs to multiple threads. Sadly, in the real world, all code takes some amount of time to execute, so to speed things up, we sometimes want to multi-thread our programs. 
 
-However, StaticPigeon takes from the Go language a feature called ***goroutines***. A goroutine is a thread of execution managed by the language runtime rather than by the OS. In my StaticPigeon program, I can simultaneously have many, many goroutines (thousands or even hundreds of thousands): the runtime creates some number of actual OS threads (usually one for each CPU core in the system) and then schedules the goroutines to run in the threads.
+However, GoPigeon takes from the Go language a feature called ***goroutines***. A goroutine is a thread of execution managed by the language runtime rather than by the OS. In my GoPigeon program, I can simultaneously have many, many goroutines (thousands or even hundreds of thousands): the runtime creates some number of actual OS threads (usually one for each CPU core in the system) and then schedules the goroutines to run in the threads.
 
 So say we have 4 OS threads and 100 goroutines. The OS decides which (if any) of the 4 threads should run at any moment, and the runtime decides which goroutines should run in these 4 threads.
 
@@ -719,7 +719,7 @@ func main
     (println "after")
 ```
 
-This program, like any other program, starts with a call to main in its original goroutine. After printing "before", main spawns another goroutine, which calls tom. The two goroutines continue execution independently: the original goroutine completes when its call to main returns; the second goroutine completes when its call to tom returns. However, the original goroutine is special in that, when it completes, the program will terminate even if other goroutines have not yet completed. (In Go, there are ways to ensure a goroutine will wait for the completion of other goroutines, but for simplicity we have no such means in StaticPigeon).
+This program, like any other program, starts with a call to main in its original goroutine. After printing "before", main spawns another goroutine, which calls tom. The two goroutines continue execution independently: the original goroutine completes when its call to main returns; the second goroutine completes when its call to tom returns. However, the original goroutine is special in that, when it completes, the program will terminate even if other goroutines have not yet completed. (In Go, there are ways to ensure a goroutine will wait for the completion of other goroutines, but for simplicity we have no such means in GoPigeon).
 
 Nothing is guaranteed about when and for how long the goroutines get time to run on the CPU. In some cases, a goroutine will start execution immediatly after spawning; in other cases, it won’t. In some cases, the goroutine which spawns another will continue running for some time; in other cases, it will wait some time before being resumed. All of this depends on the choices of the runtime and the OS scheduler. The goroutines will be paused and resumed at times we can neither determine nor predict.
 
@@ -747,7 +747,7 @@ For a piece of shared state, we create a lock to govern its access:
 
 Note that ‘lock’ is a misleading name: in the real world, a lock physically restrains access; in code, a lock merely indicates whether a thread *should* access the associated state. As long as all threads remember to properly assert and release locks, everything is fine, but doing this in practice is not always easy.
 
-The Go standard library “sync” package provides locks and a few other synchronization primitives. In StaticPigeon, however, we only can use *channels*, another feature taken from Go.
+The Go standard library “sync” package provides locks and a few other synchronization primitives. In GoPigeon, however, we only can use *channels*, another feature taken from Go.
 
 Channels offer another way to communicate between and coordinate goroutines.
 

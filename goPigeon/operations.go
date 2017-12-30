@@ -462,21 +462,25 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		returnType = operandTypes[0]
 	case "slice":
 		if len(o.Operands) != 3 {
-			return "", nil, msg(o.LineNumber, o.Column, "slice operation requires three operands")
+			return "", nil, msg(o.LineNumber, o.Column, "'slice' operation requires three operands")
 		}
 		if !isNumber(operandTypes[1]) || !isNumber(operandTypes[2]) {
-			return "", nil, msg(o.LineNumber, o.Column, "slice operation's second and third operands must be numbers.")
+			return "", nil, msg(o.LineNumber, o.Column, "'slice' operation's second and third operands must be numbers.")
 		}
 		switch t := operandTypes[0].(type) {
 		case BuiltinType:
-			if t.Name != "S" {
-				return "", nil, msg(o.LineNumber, o.Column, "append operation's first operand must be a slice.")
+			switch t.Name {
+			case "Str":
+				returnType = BuiltinType{"S", []DataType{BuiltinType{"Str", nil}}}
+			case "S":
+				returnType = operandTypes[0]
+			default:
+				return "", nil, msg(o.LineNumber, o.Column, "'slice' operation's first operand must be a slice or string.")
 			}
-			returnType = operandTypes[0]
 		case ArrayType:
 			returnType = BuiltinType{"S", []DataType{t.Type}}
 		default:
-			return "", nil, msg(o.LineNumber, o.Column, "append operation requires first operand to be a slice.")
+			return "", nil, msg(o.LineNumber, o.Column, "'slice' operation requires first operand to be a slice.")
 		}
 		code += operandCode[0] + "[int64(" + operandCode[1] + "):int64(" + operandCode[2] + ")]"
 	case "or":

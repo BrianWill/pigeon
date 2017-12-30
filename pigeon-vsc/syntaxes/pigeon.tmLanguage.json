@@ -1,63 +1,63 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "DynamicPigeon",
-	"scopeName": "source.dp",
+	"scopeName": "source.pigeon",
 	"patterns": [
 		{
-			"name": "comment.dynamic-pigeon",
+			"name": "comment.pigeon",
 			"match": "//.*"
 		},
 		{
-			"name": "keyword.control.escape.dynamic-pigeon",
+			"name": "keyword.control.escape.pigeon",
 			"match": "\\b(break|continue|return)\\b"
 		},
 		{
-			"name": "keyword.control.block.dynamic-pigeon",
+			"name": "keyword.control.block.pigeon",
 			"match": "\\b(if|elif|else|while|foreach|fordec|forinc)\\b"
 		},
 		{
-			"name": "keyword.vars.dynamic-pigeon",
+			"name": "keyword.vars.pigeon",
 			"match": "\\b(locals|as)\\b"
 		},
 		{
-			"name": "entity.name.dynamic-pigeon",
+			"name": "entity.name.pigeon",
 			"match": "\\b(global|func)\\b"
 		},
 		{
-			"name": "keyword.operator.arithmetic.dynamic-pigeon",
+			"name": "keyword.operator.arithmetic.pigeon",
 			"match": "\\b(add|sub|mul|dec|mod|floor|ceil|round|inc|dec)\\b"
 		},
 		{
-			"name": "keyword.operator.logic.dynamic-pigeon",
+			"name": "keyword.operator.logic.pigeon",
 			"match": "\\b(eq|neq|not|lt|lte|gt|gte|and|or)\\b"
 		},
 		{
-			"name": "keyword.operator.collections.dynamic-pigeon",
+			"name": "keyword.operator.collections.pigeon",
 			"match": "\\b(list|map|len|get|set|push|lconcat)\\b"
 		},
 		{
-			"name": "keyword.operator.string.dynamic-pigeon",
+			"name": "keyword.operator.string.pigeon",
 			"match": "\\b(charlist|runelist|getchar|getrune|concat)\\b"
 		},
 		{
-			"name": "keyword.operator.misc.dynamic-pigeon",
+			"name": "keyword.operator.misc.pigeon",
 			"match": "\\b(print|println|prompt|randNum|parseNum)\\b"
 		},
 		{
-			"name": "constant.numeric.dynamic-pigeon",
+			"name": "constant.numeric.pigeon",
 			"match": "\\b\\d+(\\.\\d*)?\\b"
 		},
 		{
-			"name": "constant.numeric.dynamic-pigeon",
+			"name": "constant.numeric.pigeon",
 			"match": "\\b(nil|true|false)\\b"
 		},
 		{
-			"name": "string.quoted.double.dynamic-pigeon",
+			"name": "string.quoted.double.pigeon",
 			"begin": "\"",
 			"end": "\"",
 			"patterns": [
 				{
-					"name": "constant.character.escape.dynamic-pigeon",
+					"name": "constant.character.escape.pigeon",
 					"match": "\\\\."
 				}
 			]

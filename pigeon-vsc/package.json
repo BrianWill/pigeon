@@ -13,28 +13,28 @@
     "contributes": {
         "languages": [
             {
-                "id": "static-pigeon",
-                "aliases": ["StaticPigeon", "static-pigeon"],
-                "extensions": [".sp"],
-                "configuration": "./sp-language-configuration.json"
+                "id": "go-pigeon",
+                "aliases": ["GoPigeon", "go-pigeon"],
+                "extensions": [".gopigeon"],
+                "configuration": "./gopigeon-language-configuration.json"
             },
             {
-                "id": "dynamic-pigeon",
-                "aliases": ["DynamicPigeon", "dynamic-pigeon"],
-                "extensions": [".dp"],
-                "configuration": "./dp-language-configuration.json"
+                "id": "pigeon",
+                "aliases": ["Pigeon", "pigeon"],
+                "extensions": [".pigeon"],
+                "configuration": "./pigeon-language-configuration.json"
             }
         ],
         "grammars": [
             {
-                "language": "static-pigeon",
-                "scopeName": "source.sp",
-                "path": "./syntaxes/static-pigeon.tmLanguage.json"
+                "language": "go-pigeon",
+                "scopeName": "source.gopigeon",
+                "path": "./syntaxes/go-pigeon.tmLanguage.json"
             },
             {
-                "language": "dynamic-pigeon",
-                "scopeName": "source.dp",
-                "path": "./syntaxes/dynamic-pigeon.tmLanguage.json"
+                "language": "pigeon",
+                "scopeName": "source.pigeon",
+                "path": "./syntaxes/pigeon.tmLanguage.json"
             }
         ],
         "themes": [

@@ -1,10 +1,10 @@
-# StaticPigeon reference
+# GoPigeon reference
 
 Experienced programmers can probably glean everything they need to know from this reference, but beginners should watch the [tutorial videos](http://youtube.com/).
 
 ## definitions
 
-A StaticPigeon program consists of definitions at the top-level of code starting with these reserved words:
+A GoPigeon program consists of definitions at the top-level of code starting with these reserved words:
 
 ### `func`
 
@@ -61,7 +61,7 @@ Booleans (`Bool`) remain unchanged from DynamicPigeon. The default boolean value
 
 Strings (`Str`) have additional operators related to slices. The default string value is `""` (an empty string). 
 
-Whereas DynamicPigeon has just one type of number, StaticPigeon has three:
+Whereas DynamicPigeon has just one type of number, GoPigeon has three:
 
 - 64-bit signed integers (`I`)
 - 8-bit unsigned integers (`Byte`)
@@ -88,7 +88,7 @@ The default integer value is `0`, and the default float value is `0.0`.
 
 ### lists
 
-Lists in StaticPigeon must be 'homogenous', meaning a single list can store only one type of thing, *e.g.* a list of integers can only store integers, a list of booleans can only store booleans, a list of strings can only store strings, *etc.*
+Lists in GoPigeon must be 'homogenous', meaning a single list can store only one type of thing, *e.g.* a list of integers can only store integers, a list of booleans can only store booleans, a list of strings can only store strings, *etc.*
 
 For every list, we must denote the type of the list. This type is then enforced by the compiler in `get` and `set` operations on the list:
 
@@ -736,3 +736,24 @@ When reading at end of file, returns `0` and `"EOF"` ('end of file').
 
 
 
+
+
+
+`floor`
+
+`ceil`
+
+`parseInt`
+
+
+`parseFloat`
+
+`formatInt`
+
+`formatFloat`
+
+`parseTime`
+
+`formatTime`
+
+`timeNow`

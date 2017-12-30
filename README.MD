@@ -1,11 +1,6 @@
 # Pigeon, an educational programming language
 
-More accurately, Pigeon is *two* educational programming languages:
-
-- DynamicPigeon
-- StaticPigeon
-
-DynamicPigeon ([reference](docs/dynamic-pigeon-reference.md), [notes](docs/dynamic-pigeon-notes.md)) teaches basic programming concepts common to all mainstream languages:
+Pigeon ([reference](docs/dynamic-pigeon-reference.md), [notes](docs/dynamic-pigeon-notes.md)) teaches basic programming concepts common to all mainstream languages:
 
 - variables
 - operations
@@ -14,7 +9,7 @@ DynamicPigeon ([reference](docs/dynamic-pigeon-reference.md), [notes](docs/dynam
 - functions
 - lists and hashmaps
 
-StaticPigeon ([reference](docs/static-pigeon-reference.md), [notes](docs/static-pigeon-notes.md)) builds upon DynamicPigeon to teach most of the core concepts of the Go language (*sans* goroutines and channels):
+GoPigeon ([reference](docs/static-pigeon-reference.md), [notes](docs/static-pigeon-notes.md)) builds upon Pigeon to teach most of the core concepts of the Go language (*sans* goroutines and channels):
 
 - static typing
 - arrays and slices
@@ -27,7 +22,7 @@ StaticPigeon ([reference](docs/static-pigeon-reference.md), [notes](docs/static-
 - bitwise operations
 - reading/writing files
 
-Once a student is comfortable with StaticPigeon, learning Go is mostly a matter of adjusting to different syntax. ([Learning Go after Pigeon](docs/go-lang.md)) 
+Once a student is comfortable with GoPigeon, learning Go is mostly a matter of adjusting to different syntax. ([Learning Go after Pigeon](docs/go-lang.md)) 
 
 # Installation and usage
 
@@ -40,6 +35,6 @@ go get github.com/BrianWill/pigeon
 This will put the Pigeon executable in your Go bin directory. Assuming the Go bin directory is on your shell path, you can then run the compiler from any directory like so:
 
 ```
-pigeon somefile.dpigeon      # compile and run somefile.dpigeon as a DynamicPigeon program
-pigeon somefile.spigeon      # compile and run somefile.spigeon as a StaticPigeon program
+pigeon somefile.pigeon        # compile and run somefile.pigeon as a Pigeon program
+pigeon somefile.gopigeon      # compile and run somefile.gopigeon as a GoPigeon program
 ```
