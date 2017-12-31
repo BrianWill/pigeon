@@ -1,15 +1,15 @@
 # Pigeon, an educational programming language
 
-Pigeon ([reference](docs/dynamic-pigeon-reference.md), [notes](docs/dynamic-pigeon-notes.md)) teaches basic programming concepts common to all mainstream languages:
+Pigeon ([reference](docs/pigeon-reference.md), [notes](docs/pigeon-notes.md)) teaches basic programming concepts common to all mainstream languages:
 
 - variables
 - operations
-- control flow (if, while)
+- branching, looping
 - local and global variables
 - functions
 - lists and hashmaps
 
-GoPigeon ([reference](docs/static-pigeon-reference.md), [notes](docs/static-pigeon-notes.md)) builds upon Pigeon to teach most of the core concepts of the Go language (*sans* goroutines and channels):
+GoPigeon ([reference](docs/go-pigeon-reference.md), [notes](docs/go-pigeon-notes.md)) builds upon Pigeon to teach most of the core concepts of the Go language (*sans* goroutines and channels):
 
 - static typing
 - arrays and slices

@@ -61,7 +61,102 @@ func main
 
 
 
-// CSV (COMMAS-SEPARATED VALUES) file
+
+
+// write CSV (COMMAS-SEPARATED VALUES) file
+
+
+
+func writeFile filename Str bytes S<Byte>: Str
+    locals file I err Str bytes S<Byte> n I text Str
+    as file err (openFile filename)
+    if (neq err "")
+        return "" (concat "Could not open file: " err)
+    as bytes (make S<Byte> 1000)                    
+    while true
+        as n err (readFile file bytes)              
+        if (neq err "")
+            if (eq err "EOF")
+                break
+            return "" (concat "Could not read from file: " err)
+        as text (concat text (Str (slice bytes 0 n)))        
+    as err (closeFile file)
+    if (neq err "")
+        return "" (concat "Could not close file: " err)
+    return text
+
+
+
+func split str Str splitter Str : S<Str>
+    locals match Bool start I s S<Byte> ss S<Byte> results S<Str>
+    as s (slice str 0 (len str))      
+    as ss (slice splitter 0 (len str))
+    forinc i 0 (inc (sub (len s) (len ss)))
+        as match true
+        foreach j ch ss
+            if (neq ch (get s (add i j)))
+                as match false
+                break
+        if match
+            as results (append results (Str (slice s start i)))
+            as start (add i (len ss))
+    as results (append results (Str (slice s start (len s))))
+    // trim first and last strings if they're empty
+    if (gt (len results) 0)
+        if (eq 0 (len (get results 0)))
+            as results (slice results 1 (len results))
+    if (gt (len results) 0)
+        if (eq 0 (len (get results (dec (len results)))))
+            as results (slice results 0 (dec (len results)))
+    return results
+
+
+struct Cat
+    name Str
+    weight F
+    age I
+
+
+func readCat line Str : Cat Str
+    locals elems S<Str> name Str weight F age I err Str c Cat
+    as elems (split line ",")
+    if (neq (len elems) 3)
+        return c "Line has wrong number of elements for a Cat."
+    as weight err (parseFloat (get elems 1))
+    if (neq err "")
+        return c err
+    as age err (parseInt (get elems 2))
+    if (neq err "")
+        return c err
+    return (Cat name weight age) ""
+
+
+func main
+    locals text Str err Str lines S<Str> c Cat cats S<Cat> err Str
+    as text err (readFile "cats.csv")              
+    if (neq err "")
+        (println err)
+        return
+    as lines (split text "\n")
+    foreach i I line Str lines
+        as c err (readCat line)
+        if (neq err "")
+
+
+
+
+
+
+
+
+
+
+
+
+// read CSV (COMMAS-SEPARATED VALUES) file
+
+
+
 
 
 // assume a file called 'cats.csv' with data about cats
