@@ -1,0 +1,75 @@
+    var rows = prompt("How many rows for your multiplication table?");
+    var cols = prompt("How many columns for your multiplication table?");
+    if(rows == "" || rows == null)
+   		 rows = 10;
+    if(cols== "" || cols== null)
+   		 cols = 10;
+    createTable(rows, cols);
+    function createTable(rows, cols)
+    {
+      var j=1;
+      var output = "<table border='1' width='500' cellspacing='0'cellpadding='5'>";
+      for(i=1;i<=rows;i++)
+      {
+    	output = output + "<tr>";
+        while(j<=cols)
+        {
+  		  output = output + "<td>" + i*j + "</td>";
+   		  j = j+1;
+   		}
+   		 output = output + "</tr>";
+   		 j = 1;
+    }
+    output = output + "</table>";
+    document.write(output);
+    }
+
+
+asfunc bio
+    (alert (concat 
+        ,[this "name" 0] " " 
+        ,[this "name" 1] " is " 
+        ,[this "age"] " years old. He likes " 
+        ,[this "interests" 0] " and " 
+        ,[this "interests" 1] "."))
+
+asfunc greeting
+    (alert (concat "Hi! I'm " [this "name" 0] "."))
+
+asvar person (map
+    ,"name" (list "Bob" "Smith")
+    ,"age" 32
+    ,"gender" "male"
+    ,"interests" (list "music" "skiing")
+    ,"bio" bio)
+    ,"greeting" greeting  
+
+
+
+// nested functions, closures
+
+// exceptions
+
+// aslet
+
+// for-in vs for-of (foreach covers both)
+// undefined
+
+// truthy, falsey
+
+
+// this, method calls
+
+// object prototype chain
+
+// new, constructor functions
+
+// typeof
+
+// global objects (Math, Date)
+
+
+// (mc Math sin 30)
+
+
+// event handling

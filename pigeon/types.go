@@ -1,4 +1,4 @@
-package dynamicPigeon
+package pigeon
 
 import (
 	"errors"

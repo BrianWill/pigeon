@@ -1,4 +1,4 @@
-package staticPigeon
+package goPigeon
 
 import (
 	"errors"
@@ -16,7 +16,7 @@ func compile(pkg *Package, outputDir string) error {
 	code := "package main\n"
 
 	code += `import _fmt "fmt"
-import _std "github.com/BrianWill/pigeon/staticPigeon/stdlib"
+import _std "github.com/BrianWill/pigeon/goPigeon/stdlib"
 `
 
 	err := processStructs(pkg)
@@ -482,6 +482,10 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 				return "string(" + expr + ")", []DataType{t}, nil
 			} else if isType(returnedTypes[0], BuiltinType{"S", []DataType{BuiltinType{"Str", nil}}}, true) {
 				return "_std.Charslice2string(" + expr + ")", []DataType{t}, nil
+			} else if isType(returnedTypes[0], BuiltinType{"F", nil}, true) {
+				return "_std.FormatFloat(" + expr + ")", []DataType{BuiltinType{"Str", nil}}, nil
+			} else if isType(returnedTypes[0], BuiltinType{"I", nil}, true) {
+				return "_std.FormatInt(" + expr + ")", []DataType{BuiltinType{"Str", nil}}, nil
 			}
 			return "", nil, msg(line, column, "Invalid type expression: Str operand must be a list or slice of strings or runes")
 		case "M":
@@ -549,6 +553,10 @@ func compileTypeExpression(te TypeExpression, pkg *Package, locals map[string]Va
 					return "", nil, err
 				}
 				if len(returnedTypes) != 1 || !isType(returnedTypes[0], t.Params[0], false) {
+					// special case of casint string to byte slice
+					if isType(t.Params[0], BuiltinType{"Byte", nil}, true) && len(te.Operands) == 1 && isType(returnedTypes[0], BuiltinType{"Str", nil}, true) {
+						return "[]byte(" + val + ")", []DataType{BuiltinType{"S", []DataType{BuiltinType{"Byte", nil}}}}, nil
+					}
 					return "", nil, msg(line, column, "Invalid type expression. Slice value of wrong type.")
 				}
 				code += val + ", "
@@ -621,7 +629,6 @@ func compileExpression(e Expression, pkg *Package, locals map[string]Variable) (
 			return "", nil, err
 		}
 	case MethodCall:
-		fmt.Println("compiling method ", e)
 		code, returnedTypes, err = compileMethodCall(e, pkg, locals)
 		if err != nil {
 			return "", nil, err
@@ -1485,9 +1492,6 @@ func compileReturnStatement(s ReturnStatement, expectedReturnTypes []DataType, p
 }
 
 func compileMethodCall(s MethodCall, pkg *Package, locals map[string]Variable) (string, []DataType, error) {
-	if len(s.Arguments) < 1 {
-		return "", nil, msg(s.LineNumber, s.Column, "Method call has no receiver.")
-	}
 	receiver, receiverTypes, err := compileExpression(s.Receiver, pkg, locals)
 	if err != nil {
 		return "", nil, err

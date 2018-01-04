@@ -616,13 +616,13 @@ func main
     (println i)                        // 5                       
 ```
 
-`sr` ('set at reference')
+`set` ('set at reference')
 
 ```
 func main
     locals i I p P<I>
     as p (ref i)
-    (sr p 5)
+    (set p 5)
     (println i)                        // 5                       
 ```
 

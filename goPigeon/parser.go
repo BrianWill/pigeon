@@ -1,4 +1,4 @@
-package staticPigeon
+package goPigeon
 
 import (
 	"fmt"

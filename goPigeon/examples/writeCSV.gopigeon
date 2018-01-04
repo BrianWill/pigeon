@@ -1,0 +1,48 @@
+// write CSV (COMMAS-SEPARATED VALUES) file
+
+struct Cat
+    name Str
+    weight F
+    age I
+
+
+func write filename Str bytes S<Byte> : Str
+    locals file I err Str n I
+    as file err (openFile filename)
+    if (neq err "")
+        return "" (concat "Could not open file: " err)
+    as n err (writeFile file bytes)              
+    if (neq err "")
+        return "" (concat "Could not write file: " err)
+    as err (closeFile file)
+    if (neq err "")
+        return "" (concat "Could not close file: " err)
+    return ""
+
+
+method csv c Cat : Str
+    return (concat (get c name) "," (Str (get c weight)) "," (Str (get c age)) "\n")
+
+
+func main
+    locals cats S<Cat> s Str err Str
+    as cats (S<Cat> (Cat "Oscar" 15.0 14) (Cat "Mittens" 8.7 6) (Cat "Fluffy" 11.1 4))
+    foreach i I c Cat cats
+        as s (concat s (mc csv c))
+    (println s)
+    as err (write "test.txt" (S<Byte> s))
+    if (neq err "")
+        (println err)
+        return
+    (println (len (S<Byte> s)))
+    (println "successfully wrote file 'cats.csv'")
+
+
+
+
+
+
+
+
+
+

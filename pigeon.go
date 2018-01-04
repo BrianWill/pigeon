@@ -8,8 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/BrianWill/pigeon/dynamicPigeon"
-	"github.com/BrianWill/pigeon/staticPigeon"
+	"github.com/BrianWill/pigeon/goPigeon"
 )
 
 func Run(filename string) (*exec.Cmd, error) {
@@ -36,15 +35,15 @@ func main() {
 		os.Mkdir(basedir, os.ModePerm)
 	}
 	var code []byte
-	if strings.HasSuffix(os.Args[1], ".sp") {
-		pkg, err := staticPigeon.Compile(os.Args[1], "pigeon_output/")
+	if strings.HasSuffix(os.Args[1], ".gopigeon") {
+		pkg, err := goPigeon.Compile(os.Args[1], "pigeon_output/")
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		code = []byte(pkg.Code)
-	} else if strings.HasSuffix(os.Args[1], ".dp") {
-		pkg, err := dynamicPigeon.Compile(os.Args[1], "pigeon_output/")
+	} else if strings.HasSuffix(os.Args[1], ".pigeon") {
+		pkg, err := goPigeon.Compile(os.Args[1], "pigeon_output/")
 		if err != nil {
 			fmt.Println(err)
 			return

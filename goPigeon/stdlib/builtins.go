@@ -176,7 +176,7 @@ func CreateFile(name string) (int64, string) {
 }
 
 func OpenFile(name string) (int64, string) {
-	f, err := os.OpenFile(name, os.O_RDWR, os.ModePerm)
+	f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return 0, err.Error()
 	}

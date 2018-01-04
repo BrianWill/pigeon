@@ -1,4 +1,4 @@
-package dynamicPigeon
+package pigeon
 
 import (
 	"errors"
@@ -16,7 +16,7 @@ func compile(pkg *Package, outputDir string) error {
 
 	code += `import _fmt "fmt"
 import _log "log"
-import _std "github.com/BrianWill/pigeon/dynamicPigeon/stdlib"
+import _std "github.com/BrianWill/pigeon/pigeon/stdlib"
 `
 
 	c, err := compileGlobals(pkg)

@@ -1,0 +1,395 @@
+DyanmicPigeon, an educational language
+
+
+
+
+
+
+// corrections: 
+
+(list "A", "B", "C", "D", "E", "F")     // compile error: invalid commas
+(list "A" "B" "C" "D" "E" "F")          // OK
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// "7365" 365 
+
+
+// convert numbers to strings
+// returns nil if input string cannot be parsed to a number
+// (only works on non-negative integers)
+func parseInteger s
+    locals factor result n
+    if (eq (len s) 0)
+        return nil
+    as factor 1
+    as result 0
+    fordec i (len s) 0
+        as n (numeralToNumber (getchar s i))
+        if (eq n nil)
+            return nil
+        as result (add result (mul factor n))
+        as factor (mul factor 10)
+    return result
+
+
+
+
+
+
+
+
+func numeralToNumber s
+    if (eq s "0")
+        return 0
+    elif (eq s "1")
+        return 1
+    elif (eq s "2")
+        return 2
+    elif (eq s "3")
+        return 3
+    elif (eq s "4")
+        return 4
+    elif (eq s "5")
+        return 5
+    elif (eq s "6")
+        return 6
+    elif (eq s "7")
+        return 7
+    elif (eq s "8")
+        return 8
+    elif (eq s "9")
+        return 9
+    else
+        return nil
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main
+    (parseInteger "35")                 // 35
+    (parseInteger "999")                // 999
+    (parseInteger "")                   // nil
+    (parseInteger "234asdf")            // nil
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// return random integer between start and end (exclusive)
+func randInt start end 
+    locals n
+    as n (randNum)                     // n is between 0.0 and 1.0 (exclusive)
+    as n (mul n (sub end start))
+    as n (add n start)
+    return (floor n)
+
+
+
+func main
+    (println (randInt 1 11))           // print random integer between 1 and 10 (inclusive)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// number-guessing game: pick a number between one and 10
+func main
+    locals guess n
+    as n (randInt 1 11)
+    as guess (prompt "Pick a number between 1 and 10 (inclusive): ")
+    as guess (parseInteger guess)
+    if (eq guess nil)
+        (println "Your guess was not a number!")
+    elif (not (and (gte guess 1) (lte guess 10)))
+        (println "Your guess was not between 1 and 10!")    
+    elif (eq guess n)
+        (println "You win!")
+    else
+        (println "You lose! The number was" n)
+
+
+
+
+
+
+
+
+
+
+// number-guessing game: pick a number between one and 10
+func main
+    locals guess n
+    as n (randInt 1 11)
+    while true
+        as guess (prompt "Pick a number between 1 and 10 (inclusive): ")
+        as guess (parseInteger guess)
+        if (eq guess nil)
+            (println "Your guess was not a number!")
+        elif (not (and (gte guess 1) (lte guess 10)))
+            (println "Your guess was not between 1 and 10!")    
+        elif (eq guess n)
+            (println "You win!")
+            return
+        else
+            (println "You lose! The number was" n)
+            return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// hangman
+
+
+func randInt start end 
+    locals n
+    as n (randNum)                     
+    as n (mul n (sub end start))
+    as n (add n start)
+    return (floor n)
+
+// assumes start is less than len and end is less than len+1
+func sublist a start end
+    locals b
+    as b (list)
+    forinc i start end
+        (push b (get a i))
+    return b
+
+
+// s = string, chars = list of strings, returns boolean
+func containsAny s chars
+    foreach i ch (charlist s)
+        foreach j ch2 chars
+            if (eq ch ch2)
+                return true
+    return false
+
+// strings = list of strings, separator = string, returns string
+func join strings separator
+    locals s lastIdx
+    if (eq (len strings) 0)
+        return ""
+    as s ""
+    as lastIdx (dec (len strings))
+    foreach i v (sublist strings 0 lastIdx)
+        as s (concat s v separator)
+    return (concat s (get strings lastIdx))
+
+
+
+
+
+func getLetter found
+    locals letter alphabet
+    as alphabet "abcdefghijklmnopqrstuvwxyz"
+    while true
+        as letter (prompt "Pick a letter:" (join found " "))
+        if (and (eq (len letter) 1) (containsAny alphabet (list letter)))
+            return letter
+        (println "Invalid input: must enter a single lowercase letter.")
+
+
+func updateFound found word letter
+    locals complete
+    as complete true
+    foreach i ch (charlist word)
+        if (eq letter ch)
+            (set found i letter)
+        if (eq (get found i) "_")
+            as complete false
+    return complete
+
+
+func main
+    locals words word found letter nGuesses
+    as words (list "zebra" "moose" "alligator" "elephant" 
+        ,"ibex" "jerboa" "cat" "hippopotamus" "pterodactyl")   // continue line using comma
+    as word (get words (randInt 0 (len words)))                         
+    as nGuesses (len word)  // for an N-letter word, player has N guesses
+    as found (list)
+    forinc i 0 (len word)
+        (push found "_")
+    while (gt nGuesses 0)
+        (println "You have" nGuesses "remaining guesses.")
+        as letter (getLetter found)
+        if (not (containsAny word (list letter)))
+            as nGuesses (dec nGuesses)
+        if (updateFound found word letter)
+            (println "You win! The word was:" word)
+            return
+    (println "You lose! The word was:" word)
+
+
+
+
+
+
+
+
+
+
+
+
+
+// tic-tac-toe
+
+global topRow (list "_" "_" "_")
+global middleRow (list "_" "_" "_")
+global bottomRow (list "_" "_" "_")
+
+func playerMove currentPlayer
+    locals row col
+    while true
+        while true
+            as row (prompt (concat "Player " currentPlayer ": select [t]op, [m]iddle, or [b]ottom row"))
+            if (eq row "t")
+                as row topRow
+                break
+            elif (eq row "m")
+                as row middleRow
+                break
+            elif (eq row "b")
+                as row bottomRow
+                break
+            else
+                (println "Invalid input. Try again.")
+        while true
+            as col (prompt (concat "Player " currentPlayer ": select [l]eft, [m]iddle, or [r]ight column"))
+            if (eq col "l")
+                as col 0
+                break
+            elif (eq col "m")
+                as col 1
+                break
+            elif (eq col "r")
+                as col 2
+                break
+            else
+                (println "Invalid input. Try again.")
+        if (eq (get row col) "_")
+            (set row col currentPlayer)
+            return
+        else 
+            (println "That slot is occupied! Try again.")
+        
+
+// returns "X" if X wins, returns "O" if O wins, returns "_" if no one wins, and returns "tie" if tied
+func winner
+    // check top row
+    if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get topRow 1) (get topRow 2)))
+        return (get topRow 0)
+    // check middle row
+    if (and (neq (get middleRow 0) "_") (eq (get middleRow 0) (get middleRow 1) (get middleRow 2)))
+        return (get middleRow 0)
+    // check bottom row
+    if (and (neq (get bottomRow 0) "_") (eq (get bottomRow 0) (get bottomRow 1) (get bottomRow 2)))
+        return (get bottomRow 0)
+    // check left column
+    if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get middleRow 0) (get bottomRow 0)))
+        return (get topRow 0)
+    // check middle column
+    if (and (neq (get topRow 1) "_") (eq (get topRow 1) (get middleRow 1) (get bottomRow 1)))
+        return (get topRow 1)
+    // check right column
+    if (and (neq (get topRow 2) "_") (eq (get topRow 2) (get middleRow 2) (get bottomRow 2)))
+        return (get topRow 2)
+    // check top-left to bottom-right diagonal
+    if (and (neq (get topRow 0) "_") (eq (get topRow 0) (get middleRow 1) (get bottomRow 2)))
+        return (get topRow 0)
+    // check bottom-left to top-right diagonal
+    if (and (neq (get bottomRow 0) "_") (eq (get bottomRow 0) (get middleRow 1) (get topRow 2)))
+        return (get bottomRow 0)
+    // check tie
+    foreach i s (lconcat topRow middleRow bottomRow)
+        if (eq s "_")
+            return "_"   // not a tie
+    return "tie"
+    
+
+
+
+func main
+    locals w currentPlayer
+    as currentPlayer "X"
+    while true
+        (print (concat topRow "\n" middleRow "\n" bottomRow "\n"))
+        as w (winner)
+        if (eq w "X")
+            (println "X's win!")
+            return
+        elif (eq w "O")
+            (println "O's win!")
+            return
+        elif (eq w "tie")
+            (println "Tie!")
+            return
+        else
+            (playerMove currentPlayer)
+            // toggle the current player
+            if (eq currentPlayer "X")
+                as currentPlayer "O"
+            else
+                as currentPlayer "X"
+
+
+
+
+
+
+
+
