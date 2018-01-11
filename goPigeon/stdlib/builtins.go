@@ -57,12 +57,20 @@ var RandInt = rand.Int63
 
 var RandIntN = rand.Int63n
 
-func ParseFloat(s string) (float64, error) {
-	return strconv.ParseFloat(s, 64)
+func ParseFloat(s string) (float64, string) {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return f, err.Error()
+	}
+	return f, ""
 }
 
-func ParseInt(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 64)
+func ParseInt(s string) (int64, string) {
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return i, err.Error()
+	}
+	return i, ""
 }
 
 func FormatFloat(f float64) string {

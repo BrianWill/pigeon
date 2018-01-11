@@ -758,22 +758,7 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		}
 		code += operandCode[1] + ".(" + operandCode[0] + "))"
 		return code, []DataType{dt, BuiltinType{"Bool", nil}}, nil
-	case "randInt":
-		if len(o.Operands) > 0 {
-			return "", nil, msg(o.LineNumber, o.Column, "randInt operation takes no operands")
-		}
-		returnType = BuiltinType{"I", nil}
-		code += "_std.RandInt()"
-	case "randIntN":
-		if len(o.Operands) != 1 {
-			return "", nil, msg(o.LineNumber, o.Column, "randIntN operation takes one integer operand")
-		}
-		returnType = BuiltinType{"I", nil}
-		if !isType(operandTypes[0], returnType, true) {
-			return "", nil, msg(o.LineNumber, o.Column, "randIntN operation has non-integer operand")
-		}
-		code += "_std.RandIntN(" + operandCode[0] + ")"
-	case "randFloat":
+	case "randNum":
 		if len(o.Operands) > 0 {
 			return "", nil, msg(o.LineNumber, o.Column, "randFloat operation takes no operands")
 		}
@@ -804,8 +789,8 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
 			return "", nil, msg(o.LineNumber, o.Column, "parseInt operation has non-string operand")
 		}
-		code += "_std.ParseInt(" + operandCode[0] + ")"
-		return code, []DataType{BuiltinType{"I", nil}, BuiltinType{"Err", nil}}, nil
+		code += "_std.ParseInt(" + operandCode[0] + "))"
+		return code, []DataType{BuiltinType{"I", nil}, BuiltinType{"Str", nil}}, nil
 	case "parseFloat":
 		if len(o.Operands) != 1 {
 			return "", nil, msg(o.LineNumber, o.Column, "parseFloat operation takes one string operand")
@@ -814,8 +799,8 @@ func compileOperation(o Operation, pkg *Package, locals map[string]Variable) (st
 		if !isType(operandTypes[0], BuiltinType{"Str", nil}, true) {
 			return "", nil, msg(o.LineNumber, o.Column, "parseFloat operation has non-string operand")
 		}
-		code += "_std.ParseFloat(" + operandCode[0] + ")"
-		return code, []DataType{BuiltinType{"F", nil}, BuiltinType{"Err", nil}}, nil
+		code += "_std.ParseFloat(" + operandCode[0] + "))"
+		return code, []DataType{BuiltinType{"F", nil}, BuiltinType{"Str", nil}}, nil
 	case "formatInt":
 		if len(o.Operands) != 1 {
 			return "", nil, msg(o.LineNumber, o.Column, "formatInt operation takes one integer operand")

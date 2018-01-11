@@ -1330,7 +1330,7 @@ func compileForeachStatement(s ForeachStatement, expectedReturnTypes []DataType,
 		return "", msg(s.LineNumber, s.Column, "foreach collection type must be a list, map, slice, or array.")
 	}
 	code += collExpr + " { \n"
-	code += s.IndexName + " := _i \n"
+	code += s.IndexName + " := int64(_i) \n"
 	if isList {
 		dt, err := getDataType(s.ValType, pkg)
 		if err != nil {

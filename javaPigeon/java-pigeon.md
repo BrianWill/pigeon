@@ -78,42 +78,42 @@ class MyArrayList extends Object
     field size Integer
 
     constructor
-        (super #)                               // super() 
-        {# things (new A<Object> 10)}
-        {# size 0}
+        (super this)                               // super() 
+        {this things (new A<Object> 10)}
+        {this size 0}
 
     method append o Object : Integer
-        if (eq [# size] [things length])
-            (expand # [# size])
-        {# things [# size] o}
-        {# size (inc [# size])}
-        return [# size]
+        if (eq [this size] [things length])
+            (expand this [this size])
+        {this things [this size] o}
+        {this size (inc [this size])}
+        return [this size]
 
     method getSize : Integer
-        return [th size]
+        return [this size]
 
     method getThing i Integer : Object
-        if (or (lt idx 0) (gte idx [# size]))
+        if (or (lt idx 0) (gte idx [this size]))
             throw (new IndexOutOfBoundsException "Index out of bounds!")
-        return [# things idx]
+        return [this things idx]
 
     method setThing o Object idx I
-        if (or (lt idx 0) (gte idx [# size]))
+        if (or (lt idx 0) (gte idx [this size]))
             throw (new IndexOutOfBoundsException "Index out of bounds!")
-        {# things idx o}
+        {this things idx o}
         
     method expand toSize I
-        if (gt (add [# size] toSize) [# things length])
-            var newArray A<Object> (new A<Object> (add [# size] toSize))
-            forinc i I 0 (lt i [# things length])
-                {newArray i [# things i]}
-            {# things newArray}
+        if (gt (add [this size] toSize) [this things length])
+            var newArray A<Object> (new A<Object> (add [this size] toSize))
+            forinc i I 0 (lt i [this things length])
+                {newArray i [this things i]}
+            {this things newArray}
 
     method remove idx I : Object
-        var temp Object (getThing # idx)
-        forinc i idx (lt i (dec [# size]))
-            {# things i [# things (inc i)]}
-        {# size (dec [# size])}
+        var temp Object (getThing this idx)
+        forinc i idx (lt i (dec [this size]))
+            {this things i [this things (inc i)]}
+        {this size (dec [this size])}
         return temp
 
     staticmethod main args A<Str>
@@ -162,25 +162,12 @@ public class ChatServer {
 }
 
 
+// JavaPigeon
 
-// Jabiru: name of a bird starting with .ja.
-// Jaybird
-// **Jacobin (a fancy breed of pigeon)
+// will need to decide what set of stdlib classes to include as built-ins
 
-package foo.bar
 
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.ServerSocket
-import java.net.Socket
-import java.lang.out
-import foo.bar.Apple
-
-// cannot import name if it creates conflict, must instead fully qualify name 
-// by prepending package name and //, e.g. java.lang.out
-// (want to make it visually clear what is a package name and what is a class/interface/func/global)
-
-class MyClass
+class MyClass extends Object
 
     staticfield port I 3000
 
@@ -198,12 +185,16 @@ class MyClass
             (close conn)
 
 
-var strs A<Str> (new A<Str> 5)
+// when running a JavaPigeon program, you specify the class whose main you wish to start off execution
 
+
+var strs A<Str> (new A<Str> 5)
 
 
 as i (inc i)
 
+
+(println [System out] "hi")            // maybe just keep print and prompt operators
 
 interface Dog
     method foo String Cat : Dog
@@ -214,7 +205,7 @@ interface Dog
 global s Str "hi"
 
 func foo s Str i I : Cat
-    return (Cat i s)
+    return (new Cat i s)
 
 
 
@@ -233,60 +224,79 @@ finally
 
 get and set operators for accessing array indexes
 
-var Cat[] cats (new Cat[] 9)      // new array of 9 Cats
-(set cats 3 10)                  // cats[3] = 10
-var Integer x (get cats 3)
+var cats A<Cat> (new A<Cat> 9)      // new array of 9 Cats
+{cats 3 10}                         // cats[3] = 10
+var x I [cats 3]
 
+
+
+(len s)          // use len on arrays and strings instead of .length property
 
 
 class Cat extends Object implements Foo Bar    // implements Foo and Bar
-    field I i
-    field Cat c
-    field String s
+    field i I
+    field c Cat
+    field s String
 
     constructor
-        return this          // every constructor must explicitly return this
+        return this                    // every constructor must explicitly return this
 
-    constructor I i String s
-        as ~i i
-        as ~s s
+    constructor i I s String
+        {this i i}
+        {this s s}
         return this
 
-    method foo String s : Cat
+    method foo s String : Cat
         return (new Cat)
 
-    // override method
-    override bar I i         // method returns nothing
+    method bar i I                   // method returns nothing
         return
 
 
-var Cat c (new Cat)
-as c (.foo c "hi")
+var c Cat (new Cat)
+as c (foo c "hi")
 
 
 
 // casting is done by using the type name as operator
 
-var I i 30
-var D d (D i)     // cast i to Double
+var i I 30
+var d D (cast D i)     // cast i to Double
 
 
 no coercions: must always be explicit like Go
 
 
 
+multi-dimensional arrays
+
+(new A<A<I>> 5 10)          // new int[5][10]
+(new A<A<I>> 5)             // new int[5][]
+
+exception classes
+
+enums
+
+generics
+
+overloading (compile error on any ambiguous call, forcing user to do casts to resolve ambiguities)
 
 
 
 // downcast
 
-var Mammal m (new Cat)
-var Cat c (Cat m)
+var m Mammal (new Cat)
+var c Cat (cast Cat m)
 
 
 (instanceof Cat m)    // returns true or false
-(Cat m)               // returns same instance but now compiler accepts it as a Cat
+                      
+(cast Cat m)          // returns same instance but now compiler accepts it as a Cat
                       // by 'm' as a Cat, throws exception if 'm' is not a Cat
+
+
+
+primitives vs wrappers
 
 I -> Integer
 F -> Float
@@ -295,54 +305,192 @@ C -> Character
 S -> Short
 L -> Long
 B -> Byte
+Bool ->Boolean
 
 
 
 
-no primitives, only primitive-wrappers
-one dir = one package
-    no rule about correspondence between file names and class names
-    files must end in .jacobin
-source file directory and name does not matter: only the package statement matters
-required written order: package statement, imports, globals, interfaces, classes, funcs (main last)
+no packages, no imports, only one file
 class member order: fields, constructors, methods
-compiler just compiles every .jacobin file under the specified directory (recursively)
-overriding methods must be denoted by `override` instead of `method`
-no glob import
-use [] only to denote array type, not index arrays (use `get` and `set` operators instead)
-`this` is never implicit, but we use ~foo as shorthand for `this.foo`
 
-no way to populate array on creation
+
+
+this is never implicit
 no abstract
 no interface inheritance
 no checked exceptions, no throws clauses (in the generated Java, every method throws Throwable)
-only types can begin uppercase
-dot only means access field or call method
-assignment is a statement, not an expression
-
-functions and globals all added as statics to one class in the package
-no nested classes
-
-
-    var I[] ints (new I[] 8)
-    (fill ints 7 2 9 11 -3)   // assign these vals to first indexes of the array and returns nothing
-                                  // throws an exception if index out of bounds
-
-
-a constructor is just a method with same name as its class, implicit return 
-    type (same as class), and it must return this
-(the return is not implicit: must always write it at end, and any early return must return this)
-calling a constructor without . implicitly passes a new instance
+constructor return is not implicit: must always write it at end, and any early return must return this
 
 
 
-overloading? methods only, not functions
-no enums
-no generics
-no annotations
 
-can import functions from other packages
+    var ints A<I> (new A<I> 8)   // new array with 8 ints
+    // newarr creates array with specified values
+    (newarr A<I> 7 2 9 11 -3)              
+    (newarr A<Str> 3 "hi" "Yo" "bye")
+                                
 
-(Double x)    // to convert between primitive types, use constructor (x here can be any primitive wrapper)
 
-package names use / instead of . to separate components of the name 
+
+
+
+
+
+enums
+generics
+annotations
+
+
+var x D 9.0
+(new Double x)    // to get wrapped from primitive
+
+
+
+
+
+
+
+
+
+
+
+class BinaryConverter {
+    
+    public static void main(String[] args){
+        for(int i = -5; i < 33; i++){
+            System.out.println(i + ": " + toBinary(i));
+            System.out.println(i);
+            //always another way
+            System.out.println(i + ": " + Integer.toBinaryString(i));
+        }
+    }
+    
+    /*
+     * pre: none
+     * post: returns a String with base10Num in base 2
+     */
+    public static String toBinary(int base10Num){
+        boolean isNeg = base10Num < 0;
+        base10Num = Math.abs(base10Num);        
+        String result = "";
+        
+        while(base10Num > 1){
+            result = (base10Num % 2) + result;
+            base10Num /= 2;
+        }
+        assert base10Num == 0 || base10Num == 1 : "value is not <= 1: " + base10Num;
+        
+        result = base10Num + result;
+        assert all0sAnd1s(result);
+        
+        if( isNeg )
+            result = "-" + result;
+        return result;
+    }
+    
+    /*
+     * pre: cal != null
+     * post: return true if val consists only of characters 1 and 0, false otherwise
+     */
+    public static boolean all0sAnd1s(String val){
+        assert val != null : "Failed precondition all0sAnd1s. parameter cannot be null";
+        boolean all = true;
+        int i = 0;
+        char c;
+        
+        while(all && i < val.length()){
+            c = val.charAt(i);
+            all = c == '0' || c == '1';
+            i++;
+        }
+        return all;
+    }
+}
+
+
+
+class BinaryConverter
+    
+    staticmethod main args A<Str>
+        forinc i I -5 33
+            (println (concat i ": " (toBinary BinaryConverter i)))
+            (println i)
+            //always another way
+            (println i (concat ": " (toBinaryString Integer i)))
+    
+    staticmethod toBinary base10Num I : String
+        as isNeg Bool (lt base10Num 0)
+        as base10Num (abs Math base10Num)
+        as result String ""
+        
+        while (gt base10Num 1)
+            as result (add (mod base10Num 2) result)
+            as base10Num (div base10Num 2)
+        
+        assert (or (eq base10Num 0) (eq base10Num 1)) (concat "value is not <= 1: " base10Num)
+        
+        as result (concat base10Num result)
+        assert (all0sAnd1s BinaryConverter result)
+        
+        if isNeg
+            as result (concat "-" result)
+        return result
+    
+    staticmethod all0sAnd1s val String : Bool
+        assert (neq val null) "Failed precondition all0sAnd1s. parameter cannot be null"
+        as all Bool true
+        as i I 0
+        as c C
+        
+        while (and all (lt i (len val)))
+            as c (charAt val i)
+            as all (or (eq c '0') (eq c '1'))
+            as i (inc i)
+        return all
+
+
+
+public class MineSweeper
+{	private int[][] myTruth;
+	private boolean[][] myShow;
+	
+	public void cellPicked(int row, int col)
+	{	if( inBounds(row, col) && !myShow[row][col] )
+		{	myShow[row][col] = true;
+		
+			if( myTruth[row][col] == 0)
+			{	for(int r = -1; r <= 1; r++)
+					for(int c = -1; c <= 1; c++)
+						cellPicked(row + r, col + c);
+			}	
+		}
+	}
+	
+	public boolean inBounds(int row, int col)
+	{	return 0 <= row && row < myTruth.length && 0 <= col && col < myTruth[0].length;
+	}
+}
+
+
+
+class MineSweeper
+	field myTruth A<A<I>>
+	field myShow A<A<Bool>>
+	
+	method cellPicked row I col I
+		if (and (inBounds this row col) (not [myShow row col]))
+			{myShow row col true}
+		
+			if (eq [myTruth row col] 0)
+				forinc r I -1 2
+					forinc c I -1 2
+						(cellPicked this (add row r) (add col c))
+			
+	
+	method inBounds row I col I
+		return (and (lte 0 row) 
+            ,(lt row (len myTruth))
+            ,(lte 0 col)
+            ,(lt col (len [myTruth 0])))
+
+

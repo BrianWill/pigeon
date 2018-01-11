@@ -1,31 +1,28 @@
-    var rows = prompt("How many rows for your multiplication table?");
-    var cols = prompt("How many columns for your multiplication table?");
-    if(rows == "" || rows == null)
-   		 rows = 10;
-    if(cols== "" || cols== null)
-   		 cols = 10;
-    createTable(rows, cols);
-    function createTable(rows, cols)
-    {
-      var j=1;
-      var output = "<table border='1' width='500' cellspacing='0'cellpadding='5'>";
-      for(i=1;i<=rows;i++)
-      {
-    	output = output + "<tr>";
-        while(j<=cols)
-        {
-  		  output = output + "<td>" + i*j + "</td>";
-   		  j = j+1;
-   		}
-   		 output = output + "</tr>";
-   		 j = 1;
-    }
-    output = output + "</table>";
-    document.write(output);
-    }
+global rows (prompt "How many rows for your multiplication table?")
+global cols (prompt "How many columns for your multiplication table?")
+
+func main
+    if (or (eq rows "") (eq rows null))
+        as rows 10
+    if (or (eq cols "") (eq cols null))
+        as cols 10
+    (createTable rows cols)
+    func createTable rows cols
+        let j 1
+        let output "<table border='1' width='500' cellspacing='0'cellpadding='5'>"
+        forinc i 1 (inc rows)
+        as output (concat output "<tr>")
+        while (lte j cols)
+            as output (concat output "<td>" (mul i j) "</td>")
+            as j (inc j)
+        as output (concat output "</tr>")
+        as j 1
+    as output (concat output "</table>")
+    (mc write document output)
+    
 
 
-asfunc bio
+func bio
     (alert (concat 
         ,[this "name" 0] " " 
         ,[this "name" 1] " is " 
@@ -33,7 +30,7 @@ asfunc bio
         ,[this "interests" 0] " and " 
         ,[this "interests" 1] "."))
 
-asfunc greeting
+func greeting
     (alert (concat "Hi! I'm " [this "name" 0] "."))
 
 asvar person (map
@@ -43,7 +40,6 @@ asvar person (map
     ,"interests" (list "music" "skiing")
     ,"bio" bio)
     ,"greeting" greeting  
-
 
 
 // nested functions, closures

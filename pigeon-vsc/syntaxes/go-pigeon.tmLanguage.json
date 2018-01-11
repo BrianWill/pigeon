@@ -49,11 +49,11 @@
 		},
 		{
 			"name": "keyword.operator.file.go-pigeon",
-			"match": "\\b(createFile|openFile|readFile|writeFile|seekFile|seekFileStart|seekFileEnd)\\b"
+			"match": "\\b(createFile|openFile|readFile|writeFile|seekFile|seekFileStart|seekFileEnd|closeFile)\\b"
 		},
 		{
 			"name": "keyword.operator.misc.go-pigeon",
-			"match": "\\b(print|println|prompt|randNum|parseNum|newError)\\b"
+			"match": "\\b(print|println|prompt|randInt|randIntN|randFloat|parseInt|parseFloat)\\b"
 		},
 		{
 			"name": "constant.numeric.go-pigeon",

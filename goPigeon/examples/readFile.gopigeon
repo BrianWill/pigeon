@@ -11,7 +11,7 @@ func main
         // the circumstances under which a read is partial are very common 
         // (storage drives can be relatively very slow, so rather than wait, 
         // the readFile operator will just read what it can and return) 
-        as n err (readFile file bytes)              
+        as n err (readFile file bytes)      
         if (neq err "")
             if (eq err "EOF")
                 break
@@ -20,7 +20,7 @@ func main
         // use Str to convert a slice of bytes to a string
         as msg (concat msg (Str (slice bytes 0 n)))               
     // print out the whole file
-    (print msg)       
+    (print msg)     
     as err (closeFile file)
     if (neq err "")
         (println "Could not close file:" err)
