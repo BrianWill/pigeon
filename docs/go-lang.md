@@ -1,6 +1,6 @@
 ## Learning Go after GoPigeon
 
-Once you've learned GoPigeon, learning Go is primarily a matter of learning the different syntax and the essential parts of the Go standard library (which is much, much larger than what GoPigeon offers). Beyond syntax, there are a few few additional features (nested functions, closures, go routines, channels, const).
+Once you've learned GoPigeon, learning Go is primarily a matter of learning the different syntax and the essential parts of the Go standard library. Beyond syntax, there are a few additional features, including nested functions, closures, goroutines, and channels.
 
 ## compiling Go code
 
@@ -17,7 +17,7 @@ The Go tools are meant to be run from the command line because we need to pass i
 
 ## packages
 
-Go source files are organized into ***packages***. The first line of code in a source file must be a *package statement* stating the name of its containing package:
+Go source files are organized into ***packages***. The first line of code in a source file must be a *package statement* stating the name of the file's containing package:
 
 ```
 package foo            // this source file is part of a package called 'foo'

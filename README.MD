@@ -1,5 +1,7 @@
 # Pigeon, an educational programming language
 
+Video lessons on [Youtube](https://www.youtube.com/watch?v=tMZQb7CPWDY&list=PLIbUZ3URbL0GcLBpWebtEXO5kT2_vHfBW).
+
 Pigeon ([reference](docs/pigeon-reference.md), [notes](docs/pigeon-notes.md)) teaches basic programming concepts common to all mainstream languages:
 
 - variables

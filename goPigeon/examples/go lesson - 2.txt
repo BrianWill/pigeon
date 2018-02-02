@@ -1,1 +1,33 @@
+package main
+
+import "fmt"
+
+// func sum nums S<I> : I
+//     locals total I
+//     as total 0
+//     foreach i I v I nums
+//         as total (add total v)
+//     return total
+
+func sum(nums []int) int {
+    var total int
+    total = 0
+    for _, v := range nums {
+        total = total + v
+    }
+    return total
+}
+
+// func main
+//     locals numbers S<I> result I
+//     as numbers (S<I> 6 2 1 8 -56)
+//     as result (sum numbers)
+
+func main() {
+    var numbers []int
+    var result int
+    numbers = []int{6, 2, 1, 8, -56}
+    result = sum(numbers)
+    fmt.Println(result)
+}
 

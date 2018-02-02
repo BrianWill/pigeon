@@ -1,50 +1,22 @@
-// hangman (with slices instead of lists)
-
-func randInteger start I end I : I
-    locals n F
-    as n (randFloat)                     
-    as n (mul n (F (sub end start)))
-    as n (add n (F start))
-    return (I (floor n))
-
-// import "math/rand"
-// t := time.Now()
-// rand.Seed(t.UnixNano())
-// rand.RandIntN(end)
-
-
-
-
-
-
-import "fmt"
-import "math/rand"
-
-
-
-// don't need 'sublist' function because 'slice' does what we want
-
-
-
-
-func containsAny s Str chars S<Str> : Bool
-    foreach i I ch Str (charslice s)
-        foreach j I ch2 Str chars
-            if (eq ch ch2)
-                return true
-    return false
-
-
-func containsAny(s string, chars []string) bool {
-    for i, r := range s {
-        ch := string(r)
-        for j, ch2 := range chars {
-            if ch == ch2 {
-                return true
-            }
-        }
-    }
-}
+/* 
+Go has an implicit semi-colon at end of any line with an identifier, literal, or:
+	break
+	continue
+	fallthrough
+	return
+	++
+	--
+	)
+	}
+*/
+func sum(nums []int) int {
+	var total int; 
+	total = 0;
+    for _, v := range nums {
+        total = total + v;
+    };
+    return total;
+};
 
 
 
@@ -52,128 +24,2238 @@ func containsAny(s string, chars []string) bool {
 
 
 
-func join strings S<Str> separator Str : Str
-    locals s Str lastIdx I
-    if (eq (len strings) 0)
-        return ""
-    as s ""
-    as lastIdx (dec (len strings))
-    foreach i I v Str (slice strings 0 lastIdx)
-        as s (concat s v separator)
-    return (concat s (get strings lastIdx))
-
-func join(strings []string, separator string) string {
-    var s string
-    var lastIdx int
-    if len(strings) == 0 {
-        return ""
-    }
-    s = ""
-    lastIdx = len(strings) - 1
-    for i, v := range strings[0:lastIdx] {
-        s += string(v) + separator         // s = s + v + separator
-    }
-    return s + strings[lastIdx]
-}
 
 
 
 
 
-func getLetter found S<Str> : Str
-    locals letter Str alphabet Str
-    as alphabet "abcdefghijklmnopqrstuvwxyz"
-    while true
-        as letter (prompt "Pick a letter:" (join found " "))
-        if (and (eq (len letter) 1) (containsAny alphabet (S<Str> letter)))
-            return letter
-        (println "Invalid input: must enter a single lowercase letter.")
-    return ""
-
-func getLetter(found []string) string {
-    var letter string
-    var alphabet string
-    alphabet = "abcdefghijklmnopqrstuvwxyz"
-    for true {
-        letter = prompt("Pick a letter:", join(found, " "))
-        if len(letter) == 1 && containsAny(alphabet, []string{letter}) {
-            return letter
-        }
-        fmt.Println("Invalid input: must enter a single lowercase letter.")
-    }
-    return ""
-}
-
-
-func updateFound found S<Str> word Str letter Str : Bool
-    locals complete Bool
-    as complete true
-    foreach i I ch Str (charslice word)
-        if (eq letter ch)
-            (set found i letter)
-        if (eq (get found i) "_")
-            as complete false
-    return complete
-
-func updateFound(found []string, word string, letter string) bool {
-    var complete bool
-    complete = true
-    for i, r := range word {
-        if letter == string(r) {
-            found[i] = letter
-        }
-        if found[i] == "_" {
-            complete = false
-        }
-    }
-    return complete
-}
 
 
 
 
 
-func main
-    locals words S<Str> word Str found S<Str> letter Str nGuesses I
-    as words (S<Str> "zebra" "moose" "alligator" "elephant" 
-        ,"ibex" "jerboa" "cat" "hippopotamus" "pterodactyl")   // continue line using comma
-    as word (get words (randInteger 0 (len words)))
-    as nGuesses (len word)  // for an N-letter word, player has N guesses
-    as found (S<Str>)
-    forinc i I 0 (len word)
-        as found (append found "_")
-    while (gt nGuesses 0)
-        (println "You have" nGuesses "remaining guesses.")
-        as letter (getLetter found)
-        if (not (containsAny word (S<Str> letter)))
-            as nGuesses (dec nGuesses)
-        if (updateFound found word letter)
-            (println "You win! The word was:" word)
-            return
-    (println "You lose! The word was:" word)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// int           32- or 64-bit
+// int8
+// int16
+// int32
+// int64
+// rune          alias for int32
+
+// uint          32- or 64-bit
+// uint8
+// uint16
+// uint32
+// uint64
+// byte          alias for uint8
+
+// float32
+// float64
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 func main() {
-    var words []string
-    var word string
-    var found []string
-    var letter string
-    var nGuesses int
-    words = []string{"zebra", "moose", "alligator", "elephant", "ibex", "jerboa", "cat", "hippopotamus", "pterodactyl"}
-    nGuesses = len(word)
-    found = []string{}
-    for i := 0; i < len(word); i++ {
-        found = append(found, "_")
-    }
-    for nGuesses > 0 {
-        fmt.Println("You have", nGuesses, "remaining guesses.")
-        letter = getLetter(found)
-        if !containsAny(word, []string{letter}) {
-            nGuesses--
-        }
-        if updateFound(found, word, letter) {
-            fmt.Println("You win! The word was:", word)
-            return
-        }
-    }
-    fmt.Println("You lose! The word was:", word)
+	// number literals have no particular type
+	var x uint16 = 500
+	var y int8 = -60
+	var z float32 = 4.7
+	x = 1000000             // compile error: 1000000 is out of uint16 range
+	y = -200                // compile error: -200 is out of int8 range
+	y = -50 * 4             // compile error: -200 is out of int8 range
+	y = 4.7                 // compile error: 4.7 is not an int8 value
+	z = 9                   
+	z = 9.2e4               // engineering notation: 92000.0
+	z = 9.2e50              // compile error: out of float32 range
+	z = 9.3249875912834986894128934719824124120841294    // OK, but gets approximated
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var x uint16 = 500
+	var y int8 = -60
+
+	y = x               // compile error: can only assign int8 values to x
+	y = int8(x)         // value gets truncated to 8 bits
+
+	// the uint16 value 500 is 0000_0001 1111_0100 as bits
+	// the bits 1111_0100 is -12 as an int8
+
+	x = uint16(y)       // value gets padded out to 16 bits by extending the highest bit
+
+	// the bits 1111_1111 1111_0100 is the uint16 value 65524
+
+	fmt.Println(x, y)    // prints -12 and 65524
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var x uint16 = 20
+	var y int8 = 0
+
+	y = x               // compile error: can only assign int8 values to x
+	y = int8(x)         // value gets truncated to 8 bits
+
+	// the uint16 value 20 is 0000_0000 0001_0100 as bits
+	// the bits 0001_0100 is 20 as an int8
+
+	x = uint16(y)       // value gets padded out to 16 bits by extending the highest bit
+
+	// the bits 0000_0000 0001_0100 is the uint16 value 20
+
+	fmt.Println(x, y)    // prints 20 and 20
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var x uint8 = 244
+
+	// arithmetic with uint8 and constant returns a uint8
+	x += 6                       // 250
+
+	// overflow
+	fmt.Println(x + 6)           // prints 0 
+	fmt.Println(x + 10)          // prints 4
+
+	x = 0
+
+	// underflow
+	fmt.Println(x - 1)           // prints 255
+	fmt.Println(x - 6)           // prints 250
+}
+
+
+
+
+
+
+
+
+
+
+
+// defining structs
+type cat struct {
+	name string
+	age int
+	weight float32
+}
+
+
+func main() {
+	var x cat
+	x = cat{"Oscar", 14, 15.2}
+	x = cat{}                  
+	x = cat{age: 14, name: "Oscar"}      // weight defaults to 0.0
+	x = cat{age: 14, name: "Oscar", weight: 15.2} 
+
+	var y cat
+	y = x                                // copy x to y
+	if x == y {
+		fmt.Print("x and y are equal")
+	}
+	
+	var s string = x.name
+	fmt.Println(s)                      // prints "Oscar"
+	x.name = "Snowball VI"
+	x.weight = 4.3
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var a [4]int               // array of 4 ints
+	a = [4]int{7, 2, 4, 5}
+	a = [4]int{}               // all four values default to 0's
+	a = [4]int{7, 2}           // last two values default to 0's
+
+	var b []int                // slice of ints
+	b = []int{7, 2, 4, 5, 3}
+	b = a[0:len(a)]            // slice representing whole array
+	b = a[:]                   // 0 and len(a) left implicit
+	b = make([]int, 20, 40)    // slice with length 20 and capacity 40
+
+	var c [5]int
+	a = c                      // compile error: mismatched array sizes
+	copy(a[:], b)
+	copy(c[:], a[:])
+
+	var d[5]int
+
+	c = d
+	copy(c[:], d[:])
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// defining named types
+
+// like a struct with one unnamed field
+type foo [3]int             // array of 3 ints               A<I 3>
+type bar bool               //                               Bool
+type ack [][]bool           // slice of slice of bools       S<S<Bool>>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// defining named types
+
+// like a struct with one unnamed field
+type foo [3]int             // array of 3 ints
+type bar bool
+type ack [][]bool           // slice of slice of bools
+
+
+// we can use the same operators on a named type as on its underlying type
+func main() {
+	var x bar = true
+	var y bar = false
+	var z bar = true
+	var b bool = false
+	x = b                   // compile error
+	x = bar(b)
+	
+	z = x && y              // && with bar operands returns a bar value
+	b = x && y              // compile error: cannot assign a bar to a bool variable
+	b = bool(x && y)        // OK
+
+	z = b && x              // compile error: && operands must be same type
+	z = bar(b) && x         // OK
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+type weight float64            
+
+func foo(w weight) {
+	// ...
+}
+
+func main() {
+	var f float64 = 64.72       // OK: number constant does not have a particular type
+	var w weight = 64.72
+
+	f = w                       // compile error
+	w = f                       // compile error
+	f = float64(w)             
+	w = weight(f)              
+	foo(w)                      
+	foo(f)                      // compile error
+	foo(weight(f))              
+
+	w += 4                      // 68.72
+	w = weight(f) + 4
+	w = weight(f + 4) 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var day string
+	day = "Sunday"
+	day = "Monday"
+	day = "Tuesday"
+	day = "Wednsday"
+	day = "Thursday"
+	day = "Friday"
+	day = "Saturday"
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var day int
+	// choice of int values is arbitrary
+	day = 0  // Sunday
+	day = 1  // Monday
+	day = 2  // Tuesday
+	day = 3  // Wednsday
+	day = 4  // Thursday
+	day = 5  // Friday
+	day = 6  // Saturday
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var Sunday string = "Sunday"
+var Monday string = "Monday"
+var Tuesday string = "Tuesday"
+var Wednesday string = "Wednesday"
+var Thursday string = "Thursday"
+var Friday string = "Friday"
+var Saturday string = "Saturday"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var Sunday int = 0
+var Monday int = 1
+var Tuesday int = 2
+var Wednesday int = 3
+var Thursday int = 4
+var Friday int = 5
+var Saturday int = 6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const Sunday int = 0
+const Monday int = 1
+const Tuesday int = 2
+const Wednesday int = 3
+const Thursday int = 4
+const Friday int = 5
+const Saturday int = 6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var (
+	Sunday int = 0
+	Monday int = 1
+	Tuesday int = 2
+	Wednesday int = 3
+	Thursday int = 4
+	Friday int = 5
+	Saturday int = 6
+)
+
+const (
+	Sunday int = 0
+	Monday int = 1
+	Tuesday int = 2
+	Wednesday int = 3
+	Thursday int = 4
+	Friday int = 5
+	Saturday int = 6
+)
+
+
+
+
+
+
+import (
+	"fmt"
+	"math/rand"
+	"os"
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// a const number doesn't have to have a type
+
+const (
+	Sunday = 0
+	Monday = 1
+	Tuesday = 2
+	Wednesday = 3
+	Thursday = 4
+	Friday = 5
+	Saturday = 6
+)
+
+
+func main() {
+	var a int = Sunday       // OK
+	var b float64 = Sunday   // OK
+	var c uint32 = Sunday    // OK
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const (
+	Sunday = iota
+	Monday
+	Tuesday
+	Wednesday
+	Thursday
+	Friday
+	Saturday
+)
+
+
+func main() {
+	var a int = Sunday       // OK
+	var b float64 = Sunday   // OK
+	var c uint32 = Sunday    // OK
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const (
+	Sunday = 5 + iota         // 2 * 0
+	Monday                    // 2 * 1   
+	Tuesday                   // 2 * 2
+	Wednesday                 // 2 * 3
+	Thursday                  // 2 * 4
+	Friday                    // 2 * 5
+	Saturday                  // 2 * 6
+)
+
+
+func main() {
+	var a int = Sunday       // OK
+	var b float64 = Sunday   // OK
+	var c uint32 = Sunday    // OK
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const (
+	Sunday int = iota          // all of the constants are ints
+	Monday 
+	Tuesday 
+	Wednesday
+	Thursday
+	Friday
+	Saturday
+)
+
+
+func main() {
+	var a int = Sunday       // OK
+	var b float64 = Sunday   // compile error
+	var c uint32 = Sunday    // compile error
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const typed string = "I'm a typed constant"
+const untyped = "I'm an untyped constant"
+
+type myString string
+
+
+func main() {
+	var s myString
+	s = typed              // compile error: a string is not a myString
+	s = myString(typed)    // OK
+	s = untyped                  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 
+	         int						    					   			 int
+			*int	                                              pointer to int
+	     [4]*int	                                  array of 4 pointers to int
+	   [][4]*int	                        slice of arrays of 4 pointers to int
+	 [][][4]*int	               slice of slice of arrays of 4 pointers to int
+	*[][][4]*int	    pointer to slice of slice of arrays of 4 pointers to int
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var i int
+	var p *int          // * in front of a type makes it a pointer
+	var pp **int        // a pointer to a pointer to an int (i.e. an int pointer pointer)
+
+	i = 5
+	p = &i
+	pp = &p
+
+	var j int
+	j = *p              // 5 (* is the dereference operator)
+	j = *(*pp)          // 5
+	
+	*p = 4              // store 4 in i
+	**pp = 3            // store 3 in i
+
+	pp = &(&j)          // compile error: &j not a variable (or element of an array, slice, or struct)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var arr [3]int
+	var p *int
+	p = &(arr[0])       // pointer to second int of arr
+
+	var ap *[3]int
+	ap = &arr           // pointer to the array arr itself
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+type cat struct {
+	name string
+	age int
+	weight float32
+}
+
+func main() {
+	a := &cat{}
+	b := &[2]int{}
+	c := &[]int{}
+	d := &5         // compile error
+	e := &"hi"      // compile error
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+type cat struct {
+	name string
+	age int
+	weight float32
+}
+
+func (c cat) sleep() {
+	fmt.Println("zzzzz")
+}
+
+func (c cat) eat(food float32) float32 {
+	return c.weight + food
+}
+
+func main() {
+	c := cat{"Oscar", 14, 15.2}
+	c.sleep()          // prints "zzzzz"
+	c.eat(0.3)         // 15.5
+
+	p := &c
+	p.sleep()		   // (*p).sleep()
+	p.eat(0.3)         // (*p).eat(0.3)
+	z := p.age
+	p.age = 9
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+type cat struct {
+	name string
+	age int
+	weight float32
+}
+
+func (c cat) sleep() {
+	fmt.Println("zzzzz")
+}
+
+func (c *cat) eat(food float32) float32 {
+	c.weight += food      // (*c).weight += food
+	return c.weight       // return (*c).weight
+}
+
+func main() {
+	c := cat{"Oscar", 14, 15.2}
+	c.sleep()          
+	c.eat(0.3)         // (&c).eat(0.3)
+
+	p := &c
+	p.sleep()		   // (*p).sleep()
+	p.eat(0.3)         // p.eat(0.3)
+
+	z := p.weight      // (*p).weight is now 15.5
+}
+
+
+
+
+
+
+
+
+type cat struct {
+	name string
+	age int
+	weight float32
+}
+
+func (c cat) sleep() {
+	fmt.Println("zzzzz")
+}
+
+// compile error: cat and *cat cannot have a method of the same name
+func (c *cat) sleep() {
+	fmt.Println("zzzzz")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/* 
+all methods of interface are implemented for T:
+	T and *T implement the interface
+
+all methods of interface are implemented for *T:
+all methods of interface are implemented between T and *T:
+	only *T implements the interface
+*/
+
+
+type animal interface {
+	eat()
+	sleep()
+	drink()
+}
+
+// if any of these methods has a *cat receiver, then only *cat will implement animal
+func (c cat) eat() { /* do something*/ }
+
+func (c cat) sleep() { /* do something*/ }
+
+func (c cat) drink() { /* do something*/ }
+
+func main() {
+	var a animal
+	a = cat{}          // compile error
+	a = &cat{}         // OK
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// named types can have methods and implement interfaces
+
+
+type time float64
+
+
+func (t time) fly() {
+	// ...
+}
+
+
+func (t *time) kill() {
+	// ...
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+// assume Fruit is an interface implemented by structs Banana, Orange, and others
+func foo f Fruit 
+    // the order of the cases does not matter
+    typeswitch f
+    case b Banana
+        // ... executed if 'f' references an Banana
+    case o Orange
+        // ... executed if 'f' references an Orange
+    // the default clause (if present) must come last
+    default
+        // ... executed if 'f' references something other than a Banana or Orange
+*/
+
+
+func foo(f Fruit) {
+	switch x := f.(type) {
+	case Banana:
+		// ... if 'x' references a Banana
+	case Orange:
+		// ... if 'x' references an Orange
+	default:
+		// ... if 'x' references something else
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo(f Fruit) {
+	b, ok := f.(Banana)   // type assertion          
+	if ok {
+		// ... Banana in 'f' assigned to 'b'
+	} else {
+		// ... 'f' was not a Banana; zero value Banana assigned to 'b'
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo(f Fruit) {
+	var b Banana
+	b = f.(Banana)           // type assertion in single-value context may panic
+	fmt.Println(b)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 5; j++ {
+			if someCondition {
+				break                  // break out of the inner loop
+			}
+			doSomething()
+		}
+	}
+	// ...
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	loop2: 
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 5; j++ {
+			if someCondition {
+				break loop2                  // break out of the outer loop
+			}
+			doSomething()
+		}
+	}
+	// ...
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo(a int, b string) bool {
+	// ...
+}
+
+
+func main() {
+	var f func (int, string) bool         // Fn<I Str : Bool>
+	f = foo
+	f(8, "hi")
+	foo(8, "hi")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo(a int, b string) (bool, int) {
+	// ...
+}
+
+func bar(a int, b string) {
+	// ...
+}
+
+func main() {
+	var f func (int, string) (bool, int)
+	f = foo
+	foo(8, "hi")
+	f = bar              // compile error: wrong kind of function
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func (c cat) eat(food float32) float32 {
+	return c.weight + food
+}
+
+func main() {
+	c := cat{"Oscar", 14, 15.2}
+	c2 := cat{"Mittens", 10, 8.4}
+
+	var f func(float32) float32
+
+	// method values
+	f = c.eat         // function stored in x is bound to cat value of 'c'
+	f(0.4)            // 15.6
+	
+	f = c2.eat
+	f(0.4)            // 8.8
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+func (c cat) eat(food float32) float32 {
+	return c.weight + food
+}
+
+func main() {
+	c := &cat{"Oscar", 14, 15.2}
+
+	var f func(float32) float32
+
+	// method values
+	f = c.eat         // function stored in x is bound to cat value of 'c'
+	f(0.4)            // 15.6
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func (c cat) eat(food float32) int {
+	// ...
+}
+
+
+func main() {
+	// method expressions
+	var foo func (cat, float32) int
+	var bar func (*cat, float32) int
+	
+	foo = cat.eat              // method expression has the type name before the .
+	bar = (*cat).eat           
+
+	var c cat
+
+	foo(c, 1.7)
+	bar(&c, 1.7)
+	
+	foo(&c, 1.7)               // compile error: expecting cat
+	bar(c, 1.7)                // compile error: expecting *cat
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo(a int) int {
+	return a + 3
+}
+
+
+func main() {
+    var f func(int) int
+    // create a function and assign it to 'f'
+    f = foo
+    f(8)       // 11
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// func foo(a int) int {
+// 	return a + 3
+// }
+
+
+func main() {
+    // create a function and assign it to 'f'
+    f := func(a int) int {
+		fmt.Println("hi")		
+		return a + 3
+    }          // the function starts with the word func and ends with the } at end of its body
+    f(8)       // 11
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+func process(nums []int, f func (int) int) {
+	for i, v := range nums {
+		nums[i] = f(v)
+	}
+}
+
+
+func adder(a int) int {
+	return a + 5
+}
+
+
+func main() {
+	x := []int{3, 2, 4, -10, 8}
+	process(x, adder)
+	fmt.Println(x)                 // prints [8, 7, 9, -5, 13]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func process(nums []int, f func (int) int) {
+	for i, v := range nums {
+		nums[i] = f(v)
+	}
+}
+
+
+func main() {
+	x := []int{3, 2, 4, -10, 8}
+	process(x, func(a int) int {
+		return a + 5
+	})
+	fmt.Println(x)                 // prints [8, 7, 9, -5, 13]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+    // main has three local variables: 'a', 'b', 'bar', and 'z'
+    a := 3
+    b := 11
+    bar := func() int {
+		x := 2                  // local to the anonymous function
+		a += 3
+        return x + a            // we can access 'a' and 'b' of the enclosing function call
+	}
+	z := bar()                  // 8
+	z = bar()                   // 11
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+    // main has three local variables: 'a', 'b', and 'bar'
+    a := 3
+    b := 11
+    bar := func() int {
+		a := 8                  // local to the anonymous function
+        x := 2                  // local to the anonymous function
+        return x + a            // 'a' of the local function, not 'a' of main
+	}
+	z := bar()                  // 10
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 'foo' returns a function taking no parameters and returning an int
+func foo() func() int {
+    a := 2
+    return func() int {
+        a += 3                 // 'a' is from enclosing call
+        return a
+    }
+}
+
+func main() {
+    var x func() int
+    var y func() int
+
+	x = foo()      // assign closure to 'x' (function returned by 'foo' retains variable 'a')
+	y = foo()      // assign a different closure to 'y' (same function but with a different retained variable 'a')
+
+    x()            // 5
+    x()            // 8
+    x()            // 11
+    
+    y()            // 5
+    y()            // 8
+    y()            // 11
+
+    x()            // 14
+    x()            // 17
+    y()            // 14
+    y()            // 17
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func process(nums []int, f func (int) int) {
+	for i, v := range nums {
+		nums[i] = f(v)
+	}
+}
+
+
+func main() {
+	val := promptInt()            // get an int from the user at console
+	x := []int{3, 2, 4, -10, 8}
+	process(x, func(a int) int {
+		return a + val
+	})
+	fmt.Println(x)                  // prints [8, 2, 9, -5, 13]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	a :=  3
+
+	// both functions share the same 'a'
+
+	f := func() {
+		a += 5
+	}
+
+	g := func() {
+		a += 2
+	}
+
+	f()
+	g()
+
+	fmt.Println(a)        // 10
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func main() {
+	var x [3]int
+	x[6] = 9          // panic (runtime error): index out of bounds
+
+	var a animal      // assume animal is an interface
+	a.eat()           // panic (runtime error):  cannot call method on nil
+}
+
+
+//    runtime errors: bugs in our code
+//    user input errors and i/o errors: not our fault, but we must cope
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// responsibility of caller not to pass in bad input
+// (not an error: if our code is correct, input should never be bad)
+func factorial(n int) int {
+	if n < 0 { 
+		panic("cannot compute factorial of negative number")
+	}
+	if n == 0 {
+		return 1
+	}
+	return n * factorial(n - 1)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func cat() {
+	fmt.Println("meow")
+}
+
+func dog(a int) {
+	fmt.Println("dog", a)
+}
+
+func main() {
+	// when main returns (or exits early due to panic), deferred calls run last-to-first
+	defer cat()          // defer call cat()
+	i := 10         
+	defer dog(i)
+	// ... panic / return
+	i = 6   
+	defer dog(i)	 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func cat() {
+	fmt.Println("meow")
+}
+
+func dog() {
+	fmt.Println("bark")
+}
+
+func main() {
+	defer cat()
+	defer dog()
+	panic("abort")
+	defer dog()
+	fmt.Println("end main")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func cat() {
+	fmt.Println("meow")
+}
+
+func dog() {
+	fmt.Println("bark")
+}
+
+func bar() {
+	defer dog()
+	panic("bad dog")
+}
+
+func foo() {
+	defer cat()
+	bar()
+}
+
+func main() {
+	foo()
+	fmt.Println("end main")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func cat() {
+	fmt.Println("meow")
+	recover()               // stops panic
+}
+
+func dog() {
+	fmt.Println("bark")
+}
+
+func foo() int {
+	defer fmt.Println("yo")
+	defer cat()
+	defer dog()
+	panic("abort")
+	fmt.Println("end foo")
+	return 5
+}
+
+// recover is executed in deferred call of foo, so execution resumes after the call to foo
+func main() {
+	z := foo()                   // 0 (recovered call returns zero values)
+	fmt.Println("after", z)      
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func cat() {
+	fmt.Println("meow")
+	v := recover()               // stops panic
+	fmt.Println(v)               // "abort"
+}
+
+func dog() {
+	fmt.Println("bark")
+}
+
+func foo() int {
+	defer cat()
+	defer dog()
+	panic("abort")
+	fmt.Println("end foo")
+	return 5
+}
+
+// recover is executed in deferred call of foo, so execution resumes after the call to foo
+func main() {
+	z := foo()                   // 0 (recovered call returns zero values)
+	fmt.Println("after", z)      
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func ack() {
+	recover()        // this recover does nothing and returns nil!
+}
+
+func bar() {
+	ack()
+	recover()        // this recover stops the panic and returns "abort"
+}
+
+func foo() {
+	defer bar()
+	panic("abort")
+}
+
+func main() {
+	foo()
+	fmt.Println("end main")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo() {
+	// defer call to anonymous function
+	defer func() {
+		recover()
+	}()
+	panic("abort")
+}
+
+func main() {
+	foo()
+	fmt.Println("end main")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// return parameters
+
+func foo(a int) (x int) {
+	x = 5 + a
+	if x > 10 {
+		return           // return x
+	} else {
+		return 10
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// return parameters
+
+func bar(a int) (x int, y int) {
+	x = 5 + a
+	y =  5 * a
+	if x > 10 {
+		return           // return x, y
+	} else {
+		return 10, x
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func foo() (x int) {
+	defer func() {
+		if recover() == nil {         // only true when no panic or panic(nil)
+			x = 5                     // control what foo returns in event of panic
+		}
+	}()
+	// ... do stuff
+	return
+}
+
+func main() {
+	z := foo()                       // 5
+	fmt.Println("end main", z)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bitwise operators
+
+
+files
+
+reading writing image files
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

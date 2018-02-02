@@ -35,7 +35,6 @@ func containsAny s Str chars L<Str> : Bool
                 return true
     return false
 
-
 func join strings L<Str> separator Str : Str
     locals s Str lastIdx I
     if (eq (len strings) 0)
