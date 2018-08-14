@@ -26,7 +26,7 @@ A *declaration* statement creates a variable. An *assignment* statement stores a
 
 An `if` statement has a condition and contains other statements. The condition is something like 'is variable x greater than the number 5?' or 'is variable y equal to the number 8?'. The contained statements can be any kind, even other `if` statements. When an `if` is executed, its condition is tested, and if true, the contained statements are executed in order; if the condition tests false, the contained statements are skipped over. Either way, execution continues on to the next statement after the `if`.
 
-A `while` statement is just like an `if`, but with one difference: after the condition tests true and the contained statements are executed, the condition is tested again. If the condition is true again, the contained statements are executed another time, and the condition tested once more. This repeats indefinitely until the condition tests false, in which case execution continues on to the next statement after the `while`.
+A `while` statement is just like an `if`, but with one difference: after the condition tests true and the contained statements are executed, the condition is tested again. If the condition is true again, the contained statements are executed another time. This repeats indefinitely until the condition tests false, in which case execution continues on to the next statement after the `while`.
 
 A ***function*** is a series of statements that we give a name, such that we can run that series of statements in other parts of code by just referring to the name. A function can also receive input values and produce an output value. A function, in a sense, is like an operator created by the programmer.
 
@@ -35,7 +35,7 @@ A ***function*** is a series of statements that we give a name, such that we can
 It's sometimes useful to leave notes in code, and so we need some way of telling the compiler or interpreter to ignore a chunk of text. These ignored chunks of text are called ***comments***. In Pigeon, a comment starts with // and includes all text through the rest of that line:
 
 ```
-// This number sign and everything after it on the line is ignored by the language
+// These two slashes and everything after them on the line are ignored by the language
 ```
 
 ## data types
