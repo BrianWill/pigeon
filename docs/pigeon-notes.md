@@ -667,9 +667,9 @@ Because getting and setting from lists and maps is particularly common, we have 
 function main
     locals x
     as x (list 86 "hi")
-    (print x[0])               // (print (get x 0)) 
-    as x[1] "bye"              // (set x 1 "bye")
-    (print x[(sub 9 8)])       // (print (get x (sub 9 8))) 
+    (print [x 0])               // (print (get x 0)) 
+    as [x 1] "bye"              // (set x 1 "bye")
+    (print [x (sub 9 8)])       // (print (get x (sub 9 8))) 
 ```
 
 We can use any expression in the brackets to specify the index/key.
